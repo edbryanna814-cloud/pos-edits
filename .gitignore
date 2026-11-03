@@ -1,0 +1,15 @@
+node_modules/
+out/
+dist/
+release/
+test-results/
+playwright-report/
+screenshots/
+graphify-out/
+coverage/
+*.log
+.env
+.env.*
+*.pem
+*.key
+license.json
