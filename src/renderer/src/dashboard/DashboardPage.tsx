@@ -28,7 +28,9 @@ const copy = {
     goPos: 'Open point of sale',
     goInventory: 'Manage inventory',
     units: 'units',
-    columns: { product: 'Product', stock: 'Stock', minimum: 'Minimum' },
+    expired: 'Expired',
+    expiresSoon: 'Expires soon',
+    columns: { product: 'Product', stock: 'Stock', minimum: 'Minimum', expiry: 'Expiry' },
     saleColumns: { invoice: 'Invoice', date: 'Date', total: 'Total' }
   },
   ar: {
@@ -46,7 +48,9 @@ const copy = {
     goPos: 'فتح نقطة البيع',
     goInventory: 'إدارة المخزون',
     units: 'منتج',
-    columns: { product: 'المنتج', stock: 'الرصيد', minimum: 'الحد الأدنى' },
+    expired: 'منتهي الصلاحية',
+    expiresSoon: 'قارب على الانتهاء',
+    columns: { product: 'المنتج', stock: 'الرصيد', minimum: 'الحد الأدنى', expiry: 'الانتهاء' },
     saleColumns: { invoice: 'الفاتورة', date: 'التاريخ', total: 'الإجمالي' }
   }
 } as const
@@ -55,9 +59,26 @@ export default function DashboardPage({ language, currency, products, sales, cas
   const text = copy[language]
   const todaySales = sales.filter((sale) => sale.status === 'completed' && isToday(sale.createdAt))
   const todayTotal = todaySales.reduce((sum, sale) => sum + sale.totalCents, 0)
+  const daysLeft = (date: string | undefined): number | null => {
+    if (!date) return null
+    const target = new Date(`${date.slice(0, 10)}T00:00:00`)
+    if (Number.isNaN(target.getTime())) return null
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return Math.round((target.getTime() - today.getTime()) / 86400000)
+  }
   const lowStock = products
-    .filter((product) => product.active !== false && product.stockQuantity <= product.minStock)
-    .sort((a, b) => a.stockQuantity - b.stockQuantity)
+    .filter((product) => {
+      if (product.active === false) return false
+      const remaining = daysLeft(product.expiryDate)
+      return product.stockQuantity <= 6 || (remaining !== null && remaining <= 30)
+    })
+    .sort((a, b) => {
+      const ae = daysLeft(a.expiryDate)
+      const be = daysLeft(b.expiryDate)
+      if ((ae !== null && ae < 0) !== (be !== null && be < 0)) return ae !== null && ae < 0 ? -1 : 1
+      return a.stockQuantity - b.stockQuantity
+    })
   const cashboxBalance = cashbox.reduce((sum, movement) => sum + movement.amountCents, 0)
 
   return (
@@ -121,18 +142,32 @@ export default function DashboardPage({ language, currency, products, sales, cas
                     <th>{text.columns.product}</th>
                     <th>{text.columns.stock}</th>
                     <th>{text.columns.minimum}</th>
+                    <th>{text.columns.expiry}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lowStock.slice(0, 8).map((product) => (
-                    <tr key={product._id ?? product.sku}>
-                      <td>{product.name}</td>
-                      <td className={product.stockQuantity <= 0 ? 'danger-text' : 'warning-text'}>
-                        {product.stockQuantity}
-                      </td>
-                      <td>{product.minStock}</td>
-                    </tr>
-                  ))}
+                  {lowStock.slice(0, 8).map((product) => {
+                    const remaining = daysLeft(product.expiryDate)
+                    const expired = remaining !== null && remaining < 0
+                    return (
+                      <tr key={product._id ?? product.sku}>
+                        <td>{product.name}</td>
+                        <td className={product.stockQuantity <= 3 || expired ? 'danger-text' : 'warning-text'}>
+                          {product.stockQuantity}
+                        </td>
+                        <td>{product.minStock}</td>
+                        <td>
+                          {product.expiryDate ? (
+                            <span className={`tag ${expired ? 'danger-tag' : 'warning-tag'}`}>
+                              {expired ? text.expired : text.expiresSoon} · {product.expiryDate.slice(0, 10)}
+                            </span>
+                          ) : (
+                            <span className="muted">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

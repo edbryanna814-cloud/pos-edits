@@ -33,7 +33,12 @@ const copy = {
     columns: ['Username', 'Role', 'Status', 'Created', ''],
     activeLabel: 'Active',
     inactiveLabel: 'Disabled',
-    editTitle: 'Edit user'
+    editTitle: 'Edit user',
+    totalUsers: 'Total users',
+    activeUsers: 'Active',
+    disabledUsers: 'Disabled',
+    searchUsers: 'Search users...',
+    noSearchResults: 'No users match your search.'
   },
   ar: {
     title: 'المستخدمون والأدوار',
@@ -60,7 +65,12 @@ const copy = {
     columns: ['اسم المستخدم', 'الدور', 'الحالة', 'تاريخ الإنشاء', ''],
     activeLabel: 'نشط',
     inactiveLabel: 'موقوف',
-    editTitle: 'تعديل المستخدم'
+    editTitle: 'تعديل المستخدم',
+    totalUsers: 'إجمالي المستخدمين',
+    activeUsers: 'نشط',
+    disabledUsers: 'موقوف',
+    searchUsers: 'ابحث عن مستخدم...',
+    noSearchResults: 'لا يوجد مستخدمون مطابقون للبحث.'
   }
 } as const
 
@@ -96,6 +106,14 @@ export default function UsersPage({ language }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [query, setQuery] = useState('')
+
+  const activeUsers = users.filter((user) => user.active !== false).length
+  const filteredUsers = users.filter((user) => {
+    const search = query.trim().toLowerCase()
+    if (!search) return true
+    return user.username.toLowerCase().includes(search) || user.role.toLowerCase().includes(search)
+  })
 
   async function load(): Promise<void> {
     if (!window.api) return
@@ -241,26 +259,55 @@ export default function UsersPage({ language }: Props) {
         </form>
       ) : null}
 
-      {users.length === 0 ? (
-        <div className="empty-state">{text.noUsers}</div>
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <span>{text.totalUsers}</span>
+          <strong>{users.length}</strong>
+        </div>
+        <div className="kpi-card">
+          <span>{text.activeUsers}</span>
+          <strong className="ok-text">{activeUsers}</strong>
+        </div>
+        <div className="kpi-card">
+          <span>{text.disabledUsers}</span>
+          <strong className={users.length - activeUsers > 0 ? 'danger-text' : ''}>{users.length - activeUsers}</strong>
+        </div>
+      </div>
+
+      <input
+        className="crm-search"
+        type="search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder={text.searchUsers}
+        aria-label={text.searchUsers}
+      />
+
+      {filteredUsers.length === 0 ? (
+        <div className="empty-state">{query ? text.noSearchResults : text.noUsers}</div>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>{text.columns.map((column, index) => <th key={`${column}-${index}`}>{column}</th>)}</tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <tr key={user._id ?? user.username} className={user.active === false ? 'row-muted' : ''}>
-                  <td><strong>{user.username}</strong></td>
-                  <td>{user.role}</td>
-                  <td><span className={`tag ${user.active === false ? '' : 'ok-tag'}`}>{user.active === false ? text.inactiveLabel : text.activeLabel}</span></td>
-                  <td>{formatDateTime(user.createdAt, language)}</td>
-                  <td><button type="button" onClick={() => openEdit(user)}>{text.edit}</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="user-grid">
+          {filteredUsers.map((user) => (
+            <article key={user._id ?? user.username} className={`user-card ${user.active === false ? 'inactive' : ''}`}>
+              <div className="user-card-head">
+                <span className="crm-avatar">{(user.username || '?').slice(0, 1).toUpperCase()}</span>
+                <div>
+                  <strong>{user.username}</strong>
+                  <small className="block-muted">{user.role}</small>
+                </div>
+                <span className={`tag ${user.active === false ? '' : 'ok-tag'}`}>
+                  {user.active === false ? text.inactiveLabel : text.activeLabel}
+                </span>
+              </div>
+              <dl className="stat-list">
+                <div><dt>{text.created}</dt><dd>{formatDateTime(user.createdAt, language)}</dd></div>
+                <div><dt>{text.permissions}</dt><dd>{user.permissions?.length ?? 0}</dd></div>
+              </dl>
+              <div className="form-actions">
+                <button type="button" onClick={() => openEdit(user)}>{text.edit}</button>
+              </div>
+            </article>
+          ))}
         </div>
       )}
 

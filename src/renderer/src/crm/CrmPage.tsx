@@ -48,7 +48,10 @@ const copy = {
     noDeals: 'No deals yet.',
     noActivities: 'No activities yet.',
     selectedCustomer: 'Selected customer',
-    chooseCustomer: 'Choose a customer above to manage contacts and notes.',
+    chooseCustomer: 'Choose a customer from the list to see their profile.',
+    searchCustomers: 'Search customers...',
+    noSearchResults: 'No customers match your search.',
+    overview: 'Overview',
     contacts: 'Contacts',
     addContact: 'Add contact',
     contactName: 'Contact name',
@@ -128,7 +131,10 @@ const copy = {
     noDeals: 'لا توجد فرص بعد.',
     noActivities: 'لا توجد متابعات بعد.',
     selectedCustomer: 'العميل المحدد',
-    chooseCustomer: 'اختر عميلاً من الأعلى لإدارة جهات الاتصال والملاحظات.',
+    chooseCustomer: 'اختر عميلاً من القائمة لعرض ملفه.',
+    searchCustomers: 'ابحث عن عميل...',
+    noSearchResults: 'لا يوجد عملاء مطابقون للبحث.',
+    overview: 'نظرة عامة',
     contacts: 'جهات الاتصال',
     addContact: 'إضافة جهة اتصال',
     contactName: 'اسم جهة الاتصال',
@@ -241,6 +247,7 @@ export default function CrmPage({ language, currency }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [customerQuery, setCustomerQuery] = useState('')
   const [customerForm, setCustomerForm] = useState<CustomerForm | null>(null)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [leadForm, setLeadForm] = useState<LeadForm | null>(null)
@@ -274,6 +281,16 @@ export default function CrmPage({ language, currency }: Props) {
     }
     return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 30)
   }, [notes, activities, purchases, selectedCustomerId, text, currency])
+
+  const filteredCustomers = useMemo(() => {
+    const query = customerQuery.trim().toLowerCase()
+    if (!query) return customers
+    return customers.filter((customer) =>
+      [customer.name, customer.company, customer.phone, customer.email]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    )
+  }, [customers, customerQuery])
 
   const customerNames = useMemo(() => {
     const map = new Map<string, string>()
@@ -589,40 +606,62 @@ export default function CrmPage({ language, currency }: Props) {
             </form>
           ) : null}
 
-          {customers.length === 0 ? (
-            <div className="empty-state">{text.noCustomers}</div>
-          ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>{text.columns.customers.map((column, index) => <th key={`${column}-${index}`}>{column}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {customers.map((customer) => (
-                    <tr key={customer._id ?? customer.name} className={customer._id === selectedCustomerId ? 'row-selected' : ''}>
-                      <td><strong>{customer.name}</strong>{customer.tags?.length ? <small className="block-muted">{customer.tags.join(', ')}</small> : null}</td>
-                      <td>{customer.company || '-'}</td>
-                      <td>{customer.phone || '-'}</td>
-                      <td>{customer.category || '-'}</td>
-                      <td><span className={`tag ${customer.active === false ? '' : 'ok-tag'}`}>{customer.active === false ? '-' : text.active}</span></td>
-                      <td>
-                        <div className="row-actions">
-                          <button type="button" onClick={() => setSelectedCustomerId(customer._id ?? '')}>{text.contacts}</button>
-                          <button type="button" onClick={() => openCustomer(customer)}>{text.edit}</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="crm-split">
+            <aside className="crm-list-panel">
+              <input
+                className="crm-search"
+                type="search"
+                value={customerQuery}
+                onChange={(event) => setCustomerQuery(event.target.value)}
+                placeholder={text.searchCustomers}
+                aria-label={text.searchCustomers}
+              />
+              <div className="crm-list">
+                {filteredCustomers.length === 0 ? (
+                  <p className="muted">{customerQuery ? text.noSearchResults : text.noCustomers}</p>
+                ) : filteredCustomers.map((customer) => (
+                  <button
+                    key={customer._id ?? customer.name}
+                    type="button"
+                    className={`crm-list-item ${customer._id === selectedCustomerId ? 'active' : ''}`}
+                    onClick={() => setSelectedCustomerId(customer._id ?? '')}
+                  >
+                    <span className="crm-avatar">{(customer.name || '?').slice(0, 1).toUpperCase()}</span>
+                    <span className="crm-list-info">
+                      <strong>{customer.name}</strong>
+                      <small>{[customer.company, customer.phone].filter(Boolean).join(' · ') || customer.category || '-'}</small>
+                    </span>
+                    <span className={`tag ${customer.active === false ? '' : 'ok-tag'}`}>
+                      {customer.active === false ? '-' : text.active}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </aside>
 
+            <section className="crm-detail-panel">
           {selectedCustomer ? (
             <div className="crm-details">
-              <div className="section-header">
-                <h3>{text.selectedCustomer}: {selectedCustomer.name}</h3>
-                <button type="button" className="link-button" onClick={() => setSelectedCustomerId('')}>{text.cancel}</button>
+              <div className="crm-detail-header">
+                <span className="crm-avatar large">{(selectedCustomer.name || '?').slice(0, 1).toUpperCase()}</span>
+                <div className="crm-detail-title">
+                  <h3>{selectedCustomer.name}</h3>
+                  <p className="muted">
+                    {[selectedCustomer.company, selectedCustomer.phone, selectedCustomer.email].filter(Boolean).join(' · ') || '-'}
+                  </p>
+                  {selectedCustomer.tags?.length ? (
+                    <div className="chip-row">
+                      {selectedCustomer.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="row-actions">
+                  <span className={`tag ${selectedCustomer.active === false ? '' : 'ok-tag'}`}>
+                    {selectedCustomer.active === false ? '-' : text.active}
+                  </span>
+                  <button type="button" onClick={() => openCustomer(selectedCustomer)}>{text.edit}</button>
+                  <button type="button" className="link-button" onClick={() => setSelectedCustomerId('')}>{text.cancel}</button>
+                </div>
               </div>
 
               <div className="crm-details-grid">
@@ -710,8 +749,10 @@ export default function CrmPage({ language, currency }: Props) {
               </section>
             </div>
           ) : (
-            <p className="muted">{text.chooseCustomer}</p>
+            <div className="empty-state"><p>{text.chooseCustomer}</p></div>
           )}
+            </section>
+          </div>
         </>
       ) : null}
 

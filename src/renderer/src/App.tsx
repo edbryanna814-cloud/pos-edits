@@ -636,14 +636,15 @@ export default function App() {
             />
           </>
         ) : active === 'reports' ? (
-          <ReportsPage
-            language={language}
-            currency={currency}
-            sales={sales}
-            salesReport={reportSales}
-            cashboxReport={reportCashbox}
-            inventoryReport={reportInv}
-          />
+            <ReportsPage
+              language={language}
+              currency={currency}
+              sales={sales}
+              products={products}
+              salesReport={reportSales}
+              cashboxReport={reportCashbox}
+              inventoryReport={reportInv}
+            />
         ) : active === 'dashboard' ? (
           <>
             {settingsError ? (

@@ -91,6 +91,7 @@ export async function createProduct(input: Partial<Product>): Promise<Product> {
     sellingPriceCents: toInteger(input.sellingPriceCents ?? 0, 'Selling price'),
     stockQuantity: toInteger(input.stockQuantity ?? 0, 'Stock quantity'),
     minStock: toInteger(input.minStock ?? 0, 'Minimum stock'),
+    expiryDate: input.expiryDate ? String(input.expiryDate).trim() : undefined,
     active: input.active !== false,
     createdAt: now,
     updatedAt: now
@@ -119,6 +120,8 @@ export async function updateProduct(id: string, input: Partial<Product>): Promis
   if (input.purchaseCostCents !== undefined) update.purchaseCostCents = toInteger(input.purchaseCostCents, 'Purchase cost')
   if (input.sellingPriceCents !== undefined) update.sellingPriceCents = toInteger(input.sellingPriceCents, 'Selling price')
   if (input.minStock !== undefined) update.minStock = toInteger(input.minStock, 'Minimum stock')
+  if (input.expiryDate !== undefined)
+    update.expiryDate = input.expiryDate ? String(input.expiryDate).trim() : undefined
   if (input.active !== undefined) update.active = Boolean(input.active)
   if (Object.keys(update).length === 0) throw new Error('No product changes supplied')
 

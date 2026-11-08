@@ -26,6 +26,8 @@ const copy = {
     emptyCartHint: 'Choose a product to start a sale.',
     noProducts: 'No products found',
     noProductsHint: 'Add products from the Inventory page first.',
+    expired: 'Expired',
+    expiredError: 'This product is expired and cannot be sold.',
     outOfStock: 'Out of stock',
     low: 'Low stock',
     quantity: 'Qty',
@@ -91,6 +93,8 @@ const copy = {
     emptyCartHint: 'اختر منتجًا لبدء عملية البيع.',
     noProducts: 'لا توجد منتجات مطابقة',
     noProductsHint: 'أضف منتجات من صفحة المخزون أولًا.',
+    expired: 'منتهي الصلاحية',
+    expiredError: 'هذا المنتج منتهي الصلاحية ولا يمكن بيعه.',
     outOfStock: 'نفد المخزون',
     low: 'منخفض',
     quantity: 'الكمية',
@@ -158,6 +162,12 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function isExpired(expiryDate: string | undefined): boolean {
+  if (!expiryDate) return false
+  const end = new Date(`${expiryDate.slice(0, 10)}T23:59:59`)
+  return !Number.isNaN(end.getTime()) && end.getTime() < Date.now()
+}
+
 function newRequestId(): string {
   const cryptoApi = globalThis.crypto as Crypto | undefined
   return cryptoApi?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -203,6 +213,7 @@ export default function PosPage({
     const needle = query.trim().toLowerCase()
     return products
       .filter((product) => product.active !== false)
+      .filter((product) => !isExpired(product.expiryDate))
       .filter((product) => (product.stockQuantity || 0) > 0)
       .filter((product) =>
         needle
@@ -255,6 +266,10 @@ export default function PosPage({
 
   function addProduct(product: Product): void {
     if (!product._id || product.stockQuantity <= 0) return
+    if (isExpired(product.expiryDate)) {
+      setError(`${text.expiredError} ${product.name}`)
+      return
+    }
     const existing = cart.find((item) => item.productId === product._id)
     if (existing && existing.quantity >= product.stockQuantity) {
       setError(`${text.outOfStock}: ${product.name}`)

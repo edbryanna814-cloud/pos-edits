@@ -67,6 +67,9 @@ const copy = {
     approve: 'Approve',
     reject: 'Reject',
     activeStatuses: 'active',
+    daysLeft: 'days left',
+    none: 'None',
+    devicesInUse: 'devices in use',
     errors: {
       planName: 'Plan name is required.',
       price: 'Enter a valid price.',
@@ -158,6 +161,9 @@ const copy = {
     approve: 'موافقة',
     reject: 'رفض',
     activeStatuses: 'نشط',
+    daysLeft: 'يوم متبقي',
+    none: 'لا يوجد',
+    devicesInUse: 'جهاز مستخدم',
     errors: {
       planName: 'اسم الخطة مطلوب.',
       price: 'أدخل سعراً صحيحاً.',
@@ -410,6 +416,17 @@ export default function SubscriptionLicensingPanel({ language, currency, reviewe
 
   const planName = (planId: string): string => plans.find((plan) => plan._id === planId)?.name ?? planId
 
+  const periodEnd = subscription ? new Date(subscription.currentPeriodEnd).getTime() : 0
+  const periodStart = subscription ? new Date(subscription.startDate).getTime() : 0
+  const daysLeft = periodEnd ? Math.max(0, Math.ceil((periodEnd - Date.now()) / 86400000)) : 0
+  const periodProgress =
+    periodEnd > periodStart
+      ? Math.min(100, Math.max(0, Math.round(((Date.now() - periodStart) / (periodEnd - periodStart)) * 100)))
+      : 0
+  const activeDevices = licenses.reduce((sum, license) => sum + license.currentActiveDeviceCount, 0)
+  const deviceLimit = licenses.reduce((sum, license) => sum + license.maxActiveDevices, 0)
+  const pendingReplacements = replacements.filter((request) => request.status === 'pending').length
+
   return (
     <section className="panel subscription-page" aria-labelledby="subscription-title">
       <div className="section-header">
@@ -421,6 +438,31 @@ export default function SubscriptionLicensingPanel({ language, currency, reviewe
 
       {error ? <p className="error" role="alert">{error}</p> : null}
       {success ? <p className="success" role="status">{success}</p> : null}
+
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <span>{text.subscription}</span>
+          <strong>{subscription ? planName(subscription.planId) : text.none}</strong>
+          <small>{subscription ? (text.statusLabels[subscription.status] ?? subscription.status) : text.noSubscription}</small>
+        </div>
+        <div className="kpi-card">
+          <span>{text.periodEnd}</span>
+          <strong className={daysLeft <= 14 ? 'warning-text' : ''}>
+            {subscription ? daysLeft : '—'}
+          </strong>
+          <small>{text.daysLeft} · {subscription ? formatDateTime(subscription.currentPeriodEnd, language) : '-'}</small>
+        </div>
+        <div className="kpi-card">
+          <span>{text.licenses}</span>
+          <strong>{activeDevices} / {deviceLimit}</strong>
+          <small>{text.devicesInUse}</small>
+        </div>
+        <div className="kpi-card">
+          <span>{text.replacements}</span>
+          <strong className={pendingReplacements > 0 ? 'warning-text' : ''}>{pendingReplacements}</strong>
+          <small>{text.statusLabels.pending}</small>
+        </div>
+      </div>
 
       <div className="settings-split">
         <section>
@@ -459,11 +501,22 @@ export default function SubscriptionLicensingPanel({ language, currency, reviewe
           <div className="section-header"><h3>{text.subscription}</h3></div>
           {subscription ? (
             <>
+              <div className="plan-card">
+                <div className="plan-card-head">
+                  <strong>{planName(subscription.planId)}</strong>
+                  <span className={`tag ${subscription.status === 'active' ? 'ok-tag' : subscription.status === 'expired' || subscription.status === 'canceled' ? 'danger-tag' : 'warning-tag'}`}>
+                    {text.statusLabels[subscription.status] ?? subscription.status}
+                  </span>
+                </div>
+                <div className="progress" role="presentation">
+                  <span className={periodProgress >= 90 ? 'danger' : periodProgress >= 70 ? 'warning' : ''} style={{ width: `${periodProgress}%` }} />
+                </div>
+                <small className="muted">
+                  {text.start}: {formatDateTime(subscription.startDate, language)} · {text.periodEnd}: {formatDateTime(subscription.currentPeriodEnd, language)}
+                </small>
+              </div>
               <dl className="status-grid">
                 <div><dt>{text.currentPlan}</dt><dd>{planName(subscription.planId)}</dd></div>
-                <div><dt>{text.status}</dt><dd>{text.statusLabels[subscription.status] ?? subscription.status}</dd></div>
-                <div><dt>{text.start}</dt><dd>{formatDateTime(subscription.startDate, language)}</dd></div>
-                <div><dt>{text.periodEnd}</dt><dd>{formatDateTime(subscription.currentPeriodEnd, language)}</dd></div>
                 <div><dt>{text.nextRenewal}</dt><dd>{formatDateTime(subscription.nextRenewalDate, language)}</dd></div>
               </dl>
               <div className="form-actions">

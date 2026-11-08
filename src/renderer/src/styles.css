@@ -1666,10 +1666,276 @@ h3 {
   gap: 16px;
 }
 
+.crm-split {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.crm-list-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-2, rgba(148, 163, 184, 0.04));
+  max-height: 640px;
+  overflow: auto;
+}
+
+.crm-search {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.crm-list {
+  display: grid;
+  gap: 6px;
+}
+
+.crm-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: start;
+  cursor: pointer;
+}
+
+.crm-list-item:hover {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.crm-list-item.active {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.crm-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.16);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.crm-avatar.large {
+  width: 48px;
+  height: 48px;
+  font-size: 20px;
+}
+
+.crm-list-info {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.crm-list-info strong,
+.crm-list-info small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-list-info small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.crm-detail-panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.crm-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.crm-detail-title {
+  flex: 1;
+  min-width: 160px;
+}
+
+.crm-detail-title h3 {
+  margin: 0 0 4px;
+}
+
+.crm-detail-title p {
+  margin: 0;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.plan-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2, rgba(148, 163, 184, 0.04));
+  display: grid;
+  gap: 10px;
+}
+
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.progress > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ok, #22c55e);
+  transition: width 0.3s ease;
+}
+
+.progress > span.warning {
+  background: var(--warning, #f59e0b);
+}
+
+.progress > span.danger {
+  background: var(--danger, #ef4444);
+}
+
+.bar-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(70px, 1.1fr) minmax(60px, 2.4fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.16);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.bar-fill.ok {
+  background: var(--ok, #22c55e);
+}
+
+.bar-fill.warning {
+  background: var(--warning, #f59e0b);
+}
+
+.bar-fill.danger {
+  background: var(--danger, #ef4444);
+}
+
+.bar-value {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.report-wide {
+  margin-top: 18px;
+}
+
+.user-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.user-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.user-card.inactive {
+  opacity: 0.7;
+}
+
+.user-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-card-head > div {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.user-card .form-actions {
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .order-line,
   .crm-details-grid,
+  .crm-split,
   .settings-split {
     grid-template-columns: 1fr;
+  }
+
+  .crm-list-panel {
+    max-height: 280px;
   }
 }

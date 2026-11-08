@@ -1,106 +1,137 @@
 import type { CashboxReport, InventoryReport, SalesReport } from '../../../shared/reports'
 import type { Language } from '../../../shared/settings'
 import type { Sale } from '../../../shared/pos'
+import type { Product } from '../../../shared/inventory'
 import { formatMoney, isToday } from '../money'
 
 interface Props {
   language: Language
   currency: string
   sales: Sale[]
+  products: Product[]
   salesReport: SalesReport | null
   cashboxReport: CashboxReport | null
   inventoryReport: InventoryReport | null
 }
 
+type Bar = { label: string; value: string; ratio: number; tone?: 'ok' | 'warning' | 'danger' }
+
+function BarList({ bars }: { bars: Bar[] }) {
+  if (bars.length === 0) return <p className="muted">—</p>
+  return (
+    <div className="bar-list">
+      {bars.map((bar) => (
+        <div className="bar-row" key={bar.label}>
+          <span className="bar-label" title={bar.label}>{bar.label}</span>
+          <div className="bar-track">
+            <span
+              className={`bar-fill ${bar.tone ?? ''}`}
+              style={{ width: `${Math.max(2, Math.round(bar.ratio * 100))}%` }}
+            />
+          </div>
+          <span className="bar-value">{bar.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const copy = {
   en: {
     title: 'Reports',
-    intro: 'Sales, cashbox, and inventory totals.',
-    sales: 'Sales',
+    intro: 'Sales, profit, inventory, and best sellers in one place.',
+    sales: 'Sales trend (7 days)',
+    paymentMethods: 'Payment methods',
     profitability: 'Profitability',
+    inventory: 'Inventory',
+    topProducts: 'Top selling products (30 days)',
+    restock: 'Restock planner',
+    cashiers: 'Cashier performance',
+    customers: 'Top customers',
+    totalSales: 'Total sales',
+    invoices: 'Invoices',
+    average: 'Average invoice',
+    today: "Today's sales",
     grossSales: 'Gross sales',
     discounts: 'Discounts',
     taxes: 'Taxes',
     returns: 'Returns',
-    returnsCount: 'Returned invoices',
     cogs: 'Cost of goods sold',
     grossProfit: 'Gross profit',
-    cashierPerformance: 'Cashier performance',
-    cashier: 'Cashier',
-    customerReport: 'Customer performance',
-    customer: 'Customer',
-    productReport: 'Product performance',
-    product: 'Product',
-    quantity: 'Qty',
-    revenue: 'Revenue',
-    profit: 'Profit',
-    none: 'None yet.',
-    totalSales: 'Total sales',
-    completedCount: 'Completed invoices',
-    average: 'Average invoice',
-    today: "Today's sales",
-    byMethod: 'By payment method',
-    method: 'Method',
-    count: 'Count',
-    total: 'Total',
-    cashbox: 'Cashbox',
-    totalIn: 'Total received',
-    totalOut: 'Total paid out',
-    balance: 'Balance',
-    inventory: 'Inventory',
     products: 'Products',
     lowStock: 'Low stock',
     stockValue: 'Stock value (cost)',
+    totalIn: 'Cash in',
+    totalOut: 'Cash out',
+    balance: 'Cashbox balance',
+    method: 'Method',
+    count: 'Count',
+    total: 'Total',
+    product: 'Product',
+    sold30: 'Sold (30d)',
+    stock: 'Stock',
+    dailyAverage: 'Daily avg',
+    daysLeft: 'Days left',
+    suggested: 'Suggested 30d',
+    cashier: 'Cashier',
+    customer: 'Customer',
+    none: 'No data yet.',
     noData: 'No report data yet.',
     methods: { cash: 'Cash', card: 'Card', other: 'Other' }
   },
   ar: {
     title: 'التقارير',
-    intro: 'إجماليات المبيعات والصندوق والمخزون.',
-    sales: 'المبيعات',
+    intro: 'المبيعات والأرباح والمخزون والأكثر مبيعًا في مكان واحد.',
+    sales: 'حركة المبيعات (7 أيام)',
+    paymentMethods: 'طرق الدفع',
     profitability: 'الربحية',
+    inventory: 'المخزون',
+    topProducts: 'الأكثر مبيعًا (30 يومًا)',
+    restock: 'خطة إعادة الطلب',
+    cashiers: 'أداء الكاشير',
+    customers: 'أفضل العملاء',
+    totalSales: 'إجمالي المبيعات',
+    invoices: 'الفواتير',
+    average: 'متوسط الفاتورة',
+    today: 'مبيعات اليوم',
     grossSales: 'إجمالي المبيعات قبل الخصم',
     discounts: 'الخصومات',
     taxes: 'الضرائب',
     returns: 'المرتجعات',
-    returnsCount: 'الفواتير المرتجعة',
     cogs: 'تكلفة البضاعة المباعة',
     grossProfit: 'إجمالي الربح',
-    cashierPerformance: 'أداء الكاشير',
-    cashier: 'الكاشير',
-    customerReport: 'أداء العملاء',
-    customer: 'العميل',
-    productReport: 'أداء المنتجات',
-    product: 'المنتج',
-    quantity: 'الكمية',
-    revenue: 'الإيراد',
-    profit: 'الربح',
-    none: 'لا يوجد بعد.',
-    totalSales: 'إجمالي المبيعات',
-    completedCount: 'الفواتير المكتملة',
-    average: 'متوسط الفاتورة',
-    today: 'مبيعات اليوم',
-    byMethod: 'حسب طريقة الدفع',
-    method: 'الطريقة',
-    count: 'العدد',
-    total: 'الإجمالي',
-    cashbox: 'الصندوق',
-    totalIn: 'إجمالي الوارد',
-    totalOut: 'إجمالي الصادر',
-    balance: 'الرصيد',
-    inventory: 'المخزون',
     products: 'المنتجات',
     lowStock: 'منخفض المخزون',
     stockValue: 'قيمة المخزون (بالتكلفة)',
+    totalIn: 'إجمالي الوارد',
+    totalOut: 'إجمالي الصادر',
+    balance: 'رصيد الصندوق',
+    method: 'الطريقة',
+    count: 'العدد',
+    total: 'الإجمالي',
+    product: 'المنتج',
+    sold30: 'المبيع (30 يومًا)',
+    stock: 'الرصيد',
+    dailyAverage: 'متوسط يومي',
+    daysLeft: 'يكفي لـ',
+    suggested: 'مقترح 30 يومًا',
+    cashier: 'الكاشير',
+    customer: 'العميل',
+    none: 'لا توجد بيانات بعد.',
     noData: 'لا توجد بيانات تقارير بعد.',
     methods: { cash: 'نقدًا', card: 'بطاقة', other: 'أخرى' }
   }
 } as const
 
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 export default function ReportsPage({
   language,
   currency,
   sales,
+  products,
   salesReport,
   cashboxReport,
   inventoryReport
@@ -116,11 +147,89 @@ export default function ReportsPage({
     )
   }
 
-  const todayTotal = sales
-    .filter((sale) => sale.status === 'completed' && isToday(sale.createdAt))
+  const completed = sales.filter((sale) => sale.status === 'completed')
+  const todayTotal = completed
+    .filter((sale) => isToday(sale.createdAt))
     .reduce((sum, sale) => sum + sale.totalCents, 0)
   const averageCents =
     salesReport.totalCount > 0 ? Math.round(salesReport.totalSalesCents / salesReport.totalCount) : 0
+
+  const daily: Bar[] = []
+  const maxDaily = Math.max(
+    1,
+    ...Array.from({ length: 7 }, (_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (6 - index))
+      const key = dayKey(date)
+      return completed
+        .filter((sale) => dayKey(new Date(sale.createdAt)) === key)
+        .reduce((sum, sale) => sum + sale.totalCents, 0)
+    })
+  )
+  for (let index = 0; index < 7; index++) {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - index))
+    const key = dayKey(date)
+    const total = completed
+      .filter((sale) => dayKey(new Date(sale.createdAt)) === key)
+      .reduce((sum, sale) => sum + sale.totalCents, 0)
+    daily.push({
+      label: date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB', {
+        weekday: 'short'
+      }),
+      value: formatMoney(total, currency),
+      ratio: total / maxDaily,
+      tone: index === 6 ? 'ok' : undefined
+    })
+  }
+
+  const paymentBars: Bar[] = Object.entries(salesReport.byPaymentMethod)
+    .sort((a, b) => b[1].totalCents - a[1].totalCents)
+    .map(([method, value]) => ({
+      label: text.methods[method as keyof typeof text.methods] ?? method,
+      value: `${value.count} · ${formatMoney(value.totalCents, currency)}`,
+      ratio: salesReport.totalSalesCents > 0 ? value.totalCents / salesReport.totalSalesCents : 0
+    }))
+
+  const cutoff = Date.now() - 30 * 86400000
+  const sold = new Map<string, { name: string; quantity: number; revenueCents: number }>()
+  for (const sale of completed) {
+    if (new Date(sale.createdAt).getTime() < cutoff) continue
+    for (const line of sale.lines) {
+      const entry = sold.get(line.productId) ?? {
+        name: line.productName,
+        quantity: 0,
+        revenueCents: 0
+      }
+      entry.quantity += line.quantity
+      entry.revenueCents += line.lineTotalCents
+      sold.set(line.productId, entry)
+    }
+  }
+  const productById = new Map(products.map((product) => [product._id, product]))
+  const topProducts = [...sold.entries()]
+    .map(([productId, entry]) => {
+      const product = productById.get(productId)
+      const dailyAverage = entry.quantity / 30
+      const stock = product?.stockQuantity ?? 0
+      return {
+        productId,
+        name: entry.name,
+        quantity: entry.quantity,
+        revenueCents: entry.revenueCents,
+        stock,
+        dailyAverage,
+        daysLeft: dailyAverage > 0 ? Math.floor(stock / dailyAverage) : null,
+        suggested: Math.max(0, Math.ceil(dailyAverage * 30) - stock)
+      }
+    })
+    .sort((a, b) => b.quantity - a.quantity)
+  const maxSold = Math.max(1, ...topProducts.map((item) => item.quantity))
+  const topBars: Bar[] = topProducts.slice(0, 8).map((item) => ({
+    label: item.name,
+    value: `${item.quantity}`,
+    ratio: item.quantity / maxSold
+  }))
 
   return (
     <section className="reports-page" aria-labelledby="reports-title">
@@ -131,71 +240,55 @@ export default function ReportsPage({
         </div>
       </div>
 
+      <div className="kpi-grid">
+        <div className="kpi-card">
+          <span>{text.totalSales}</span>
+          <strong>{formatMoney(salesReport.totalSalesCents, currency)}</strong>
+          <small>{salesReport.totalCount} · {text.invoices}</small>
+        </div>
+        <div className="kpi-card">
+          <span>{text.grossProfit}</span>
+          <strong className={salesReport.grossProfitCents < 0 ? 'danger-text' : 'ok-text'}>
+            {formatMoney(salesReport.grossProfitCents, currency)}
+          </strong>
+          <small>{text.cogs}: {formatMoney(salesReport.cogsCents, currency)}</small>
+        </div>
+        <div className="kpi-card">
+          <span>{text.today}</span>
+          <strong>{formatMoney(todayTotal, currency)}</strong>
+          <small>{text.average}: {formatMoney(averageCents, currency)}</small>
+        </div>
+        <div className="kpi-card">
+          <span>{text.returns}</span>
+          <strong className="danger-text">
+            {formatMoney(salesReport.returnsCents, currency)}
+          </strong>
+          <small>{salesReport.returnsCount} {text.invoices}</small>
+        </div>
+      </div>
+
       <div className="report-grid">
         <section className="panel">
           <h3>{text.sales}</h3>
-          <dl className="stat-list">
-            <div>
-              <dt>{text.totalSales}</dt>
-              <dd>{formatMoney(salesReport.totalSalesCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.completedCount}</dt>
-              <dd>{salesReport.totalCount}</dd>
-            </div>
-            <div>
-              <dt>{text.average}</dt>
-              <dd>{formatMoney(averageCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.today}</dt>
-              <dd>{formatMoney(todayTotal, currency)}</dd>
-            </div>
-          </dl>
-          <h4>{text.byMethod}</h4>
-          <table className="data-table compact">
-            <thead>
-              <tr>
-                <th>{text.method}</th>
-                <th>{text.count}</th>
-                <th>{text.total}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(salesReport.byPaymentMethod).length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="muted">
-                    {text.noData}
-                  </td>
-                </tr>
-              ) : (
-                Object.entries(salesReport.byPaymentMethod).map(([method, value]) => (
-                  <tr key={method}>
-                    <td>{text.methods[method as keyof typeof text.methods] ?? method}</td>
-                    <td>{value.count}</td>
-                    <td>{formatMoney(value.totalCents, currency)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <BarList bars={daily} />
         </section>
 
         <section className="panel">
-          <h3>{text.cashbox}</h3>
+          <h3>{text.paymentMethods}</h3>
+          <BarList bars={paymentBars} />
+        </section>
+
+        <section className="panel">
+          <h3>{text.profitability}</h3>
           <dl className="stat-list">
-            <div>
-              <dt>{text.totalIn}</dt>
-              <dd className="ok-text">{formatMoney(cashboxReport.totalInCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.totalOut}</dt>
-              <dd className="danger-text">{formatMoney(cashboxReport.totalOutCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.balance}</dt>
-              <dd className={cashboxReport.balanceCents < 0 ? 'danger-text' : ''}>
-                {formatMoney(cashboxReport.balanceCents, currency)}
+            <div><dt>{text.grossSales}</dt><dd>{formatMoney(salesReport.grossCents, currency)}</dd></div>
+            <div><dt>{text.discounts}</dt><dd className="warning-text">{formatMoney(salesReport.discountCents, currency)}</dd></div>
+            <div><dt>{text.taxes}</dt><dd>{formatMoney(salesReport.taxCents, currency)}</dd></div>
+            <div><dt>{text.cogs}</dt><dd>{formatMoney(salesReport.cogsCents, currency)}</dd></div>
+            <div className="total-row">
+              <dt>{text.grossProfit}</dt>
+              <dd className={salesReport.grossProfitCents < 0 ? 'danger-text' : 'ok-text'}>
+                {formatMoney(salesReport.grossProfitCents, currency)}
               </dd>
             </div>
           </dl>
@@ -204,138 +297,81 @@ export default function ReportsPage({
         <section className="panel">
           <h3>{text.inventory}</h3>
           <dl className="stat-list">
-            <div>
-              <dt>{text.products}</dt>
-              <dd>{inventoryReport.totalProducts}</dd>
-            </div>
-            <div>
-              <dt>{text.lowStock}</dt>
-              <dd className={inventoryReport.lowStock > 0 ? 'warning-text' : ''}>
-                {inventoryReport.lowStock}
-              </dd>
-            </div>
-            <div>
-              <dt>{text.stockValue}</dt>
-              <dd>{formatMoney(inventoryReport.totalValueCents, currency)}</dd>
-            </div>
+            <div><dt>{text.products}</dt><dd>{inventoryReport.totalProducts}</dd></div>
+            <div><dt>{text.lowStock}</dt><dd className={inventoryReport.lowStock > 0 ? 'warning-text' : ''}>{inventoryReport.lowStock}</dd></div>
+            <div><dt>{text.stockValue}</dt><dd>{formatMoney(inventoryReport.totalValueCents, currency)}</dd></div>
           </dl>
         </section>
 
         <section className="panel">
-          <h3>{text.profitability}</h3>
-          <dl className="stat-list">
-            <div>
-              <dt>{text.grossSales}</dt>
-              <dd>{formatMoney(salesReport.grossCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.discounts}</dt>
-              <dd className="warning-text">{formatMoney(salesReport.discountCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.taxes}</dt>
-              <dd>{formatMoney(salesReport.taxCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.cogs}</dt>
-              <dd>{formatMoney(salesReport.cogsCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.grossProfit}</dt>
-              <dd className={salesReport.grossProfitCents < 0 ? 'danger-text' : 'ok-text'}>
-                {formatMoney(salesReport.grossProfitCents, currency)}
-              </dd>
-            </div>
-            <div>
-              <dt>{text.returns}</dt>
-              <dd className="danger-text">
-                {formatMoney(salesReport.returnsCents, currency)} ({salesReport.returnsCount})
-              </dd>
-            </div>
-          </dl>
+          <h3>{text.topProducts}</h3>
+          <BarList bars={topBars} />
         </section>
       </div>
 
-      <div className="report-grid">
-        <section className="panel">
-          <h3>{text.cashierPerformance}</h3>
-          {Object.entries(salesReport.byCashier).length === 0 ? (
-            <p className="muted">{text.none}</p>
-          ) : (
-            <table className="data-table compact">
-              <thead>
-                <tr>
-                  <th>{text.cashier}</th>
-                  <th>{text.count}</th>
-                  <th>{text.total}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(salesReport.byCashier).map(([cashier, value]) => (
-                  <tr key={cashier}>
-                    <td>{cashier}</td>
-                    <td>{value.count}</td>
-                    <td>{formatMoney(value.totalCents, currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section className="panel">
-          <h3>{text.customerReport}</h3>
-          {salesReport.byCustomer.length === 0 ? (
-            <p className="muted">{text.none}</p>
-          ) : (
-            <table className="data-table compact">
-              <thead>
-                <tr>
-                  <th>{text.customer}</th>
-                  <th>{text.count}</th>
-                  <th>{text.total}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {salesReport.byCustomer.map((customer) => (
-                  <tr key={customer.customerId}>
-                    <td>{customer.name}</td>
-                    <td>{customer.count}</td>
-                    <td>{formatMoney(customer.totalCents, currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-
-        <section className="panel">
-          <h3>{text.productReport}</h3>
-          {salesReport.byProduct.length === 0 ? (
-            <p className="muted">{text.none}</p>
-          ) : (
+      <section className="panel report-wide">
+        <h3>{text.restock}</h3>
+        {topProducts.length === 0 ? <p className="muted">{text.none}</p> : (
+          <div className="table-wrap">
             <table className="data-table compact">
               <thead>
                 <tr>
                   <th>{text.product}</th>
-                  <th>{text.quantity}</th>
-                  <th>{text.revenue}</th>
-                  <th>{text.profit}</th>
+                  <th>{text.sold30}</th>
+                  <th>{text.stock}</th>
+                  <th>{text.dailyAverage}</th>
+                  <th>{text.daysLeft}</th>
+                  <th>{text.suggested}</th>
                 </tr>
               </thead>
               <tbody>
-                {salesReport.byProduct.map((product) => (
-                  <tr key={product.productId}>
-                    <td>{product.productName}</td>
-                    <td>{product.quantity}</td>
-                    <td>{formatMoney(product.revenueCents, currency)}</td>
-                    <td className={product.profitCents < 0 ? 'danger-text' : 'ok-text'}>
-                      {formatMoney(product.profitCents, currency)}
+                {topProducts.map((item) => (
+                  <tr key={item.productId}>
+                    <td>{item.name}</td>
+                    <td>{item.quantity}</td>
+                    <td className={item.stock <= 3 ? 'danger-text' : item.stock <= 6 ? 'warning-text' : ''}>
+                      {item.stock}
                     </td>
+                    <td>{item.dailyAverage.toFixed(1)}</td>
+                    <td className={item.daysLeft !== null && item.daysLeft <= 7 ? 'warning-text' : ''}>
+                      {item.daysLeft === null ? '—' : item.daysLeft}
+                    </td>
+                    <td><strong>{item.suggested}</strong></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </section>
+
+      <div className="report-grid">
+        <section className="panel">
+          <h3>{text.cashiers}</h3>
+          {Object.entries(salesReport.byCashier).length === 0 ? <p className="muted">{text.none}</p> : (
+            <BarList
+              bars={Object.entries(salesReport.byCashier)
+                .sort((a, b) => b[1].totalCents - a[1].totalCents)
+                .map(([cashier, value]) => ({
+                  label: cashier,
+                  value: `${value.count} · ${formatMoney(value.totalCents, currency)}`,
+                  ratio: salesReport.totalSalesCents > 0 ? value.totalCents / salesReport.totalSalesCents : 0
+                }))}
+            />
+          )}
+        </section>
+
+        <section className="panel">
+          <h3>{text.customers}</h3>
+          {salesReport.byCustomer.length === 0 ? <p className="muted">{text.none}</p> : (
+            <BarList
+              bars={salesReport.byCustomer.slice(0, 8).map((customer) => ({
+                label: customer.name,
+                value: `${customer.count} · ${formatMoney(customer.totalCents, currency)}`,
+                ratio:
+                  salesReport.totalSalesCents > 0 ? customer.totalCents / salesReport.totalSalesCents : 0
+              }))}
+            />
           )}
         </section>
       </div>

@@ -25,6 +25,7 @@ export type Product = {
   sellingPriceCents: number
   stockQuantity: number
   minStock: number
+  expiryDate?: string
   active: boolean
   createdAt: string
   updatedAt: string

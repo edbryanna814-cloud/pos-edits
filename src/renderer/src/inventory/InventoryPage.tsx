@@ -53,6 +53,12 @@ const copy = {
     lowStock: 'Low',
     outOfStock: 'Out',
     inactive: 'Inactive',
+    expiryDate: 'Expiry date (optional)',
+    expiry: 'Expiry',
+    expired: 'Expired',
+    expiresSoon: 'Expires soon',
+    noExpiry: '-',
+    criticalStock: 'Critical',
     saved: 'Saved successfully.',
     nameRequired: 'Product name is required.',
     skuRequired: 'SKU is required.',
@@ -62,7 +68,7 @@ const copy = {
     adjustInvalid: 'Enter a non-zero whole quantity that does not make stock negative.',
     reasonRequired: 'Enter a reason for the adjustment.',
     error: 'Could not save',
-    columns: ['Product', 'SKU', 'Price', 'Stock', 'Minimum', 'Status']
+    columns: ['Product', 'SKU', 'Price', 'Stock', 'Minimum', 'Expiry', 'Status']
   },
   ar: {
     title: 'المخزون',
@@ -106,6 +112,12 @@ const copy = {
     lowStock: 'منخفض',
     outOfStock: 'نفد',
     inactive: 'غير نشط',
+    expiryDate: 'تاريخ الانتهاء (اختياري)',
+    expiry: 'الانتهاء',
+    expired: 'منتهي الصلاحية',
+    expiresSoon: 'قارب على الانتهاء',
+    noExpiry: '-',
+    criticalStock: 'حرج',
     saved: 'تم الحفظ بنجاح.',
     nameRequired: 'اسم المنتج مطلوب.',
     skuRequired: 'كود المنتج مطلوب.',
@@ -115,9 +127,22 @@ const copy = {
     adjustInvalid: 'أدخل كمية صحيحة غير صفرية لا تجعل الرصيد سالبًا.',
     reasonRequired: 'أدخل سبب تعديل الرصيد.',
     error: 'تعذّر الحفظ',
-    columns: ['المنتج', 'الكود', 'السعر', 'الرصيد', 'الحد الأدنى', 'الحالة']
+    columns: ['المنتج', 'الكود', 'السعر', 'الرصيد', 'الحد الأدنى', 'الانتهاء', 'الحالة']
   }
 } as const
+
+const STOCK_CRITICAL = 3
+const STOCK_LOW = 6
+const EXPIRY_SOON_DAYS = 30
+
+function daysUntil(date: string | undefined): number | null {
+  if (!date) return null
+  const target = new Date(`${date.slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(target.getTime())) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.round((target.getTime() - today.getTime()) / 86400000)
+}
 
 interface FormState {
   name: string
@@ -125,6 +150,7 @@ interface FormState {
   barcode: string
   categoryId: string
   unitId: string
+  expiryDate: string
   purchase: string
   selling: string
   stock: string
@@ -139,6 +165,7 @@ function emptyForm(): FormState {
     barcode: '',
     categoryId: '',
     unitId: '',
+    expiryDate: '',
     purchase: '0.00',
     selling: '0.00',
     stock: '0',
@@ -154,6 +181,7 @@ function formFrom(product: Product): FormState {
     barcode: product.barcode ?? '',
     categoryId: product.categoryId ?? '',
     unitId: product.unitId ?? '',
+    expiryDate: product.expiryDate ? product.expiryDate.slice(0, 10) : '',
     purchase: centsToInput(product.purchaseCostCents),
     selling: centsToInput(product.sellingPriceCents),
     stock: String(product.stockQuantity),
@@ -272,6 +300,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
       barcode: form.barcode.trim() || undefined,
       categoryId: form.categoryId || undefined,
       unitId: form.unitId || undefined,
+      expiryDate: form.expiryDate || undefined,
       purchaseCostCents: purchase,
       sellingPriceCents: selling,
       minStock,
@@ -419,6 +448,14 @@ export default function InventoryPage({ products, language, currency, onChanged 
                 value={form.barcode}
                 onChange={(event) => update('barcode', event.target.value)}
                 maxLength={80}
+              />
+            </label>
+            <label>
+              <span>{text.expiryDate}</span>
+              <input
+                type="date"
+                value={form.expiryDate}
+                onChange={(event) => update('expiryDate', event.target.value)}
               />
             </label>
             <label>
@@ -640,7 +677,11 @@ export default function InventoryPage({ products, language, currency, onChanged 
             </thead>
             <tbody>
               {filtered.map((product) => {
-                const low = product.stockQuantity <= product.minStock
+                const remaining = daysUntil(product.expiryDate)
+                const expired = remaining !== null && remaining < 0
+                const expiresSoon = remaining !== null && remaining >= 0 && remaining <= EXPIRY_SOON_DAYS
+                const critical = !expired && product.stockQuantity <= STOCK_CRITICAL
+                const low = !expired && !critical && product.stockQuantity <= STOCK_LOW
                 const out = product.stockQuantity <= 0
                 return (
                   <tr key={product._id ?? product.sku} className={product.active ? '' : 'row-muted'}>
@@ -650,15 +691,30 @@ export default function InventoryPage({ products, language, currency, onChanged 
                     </td>
                     <td>{product.sku}</td>
                     <td>{formatMoney(product.sellingPriceCents, currency)}</td>
-                    <td className={out ? 'danger-text' : low ? 'warning-text' : ''}>{product.stockQuantity}</td>
+                    <td className={critical || expired ? 'danger-text' : low ? 'warning-text' : ''}>{product.stockQuantity}</td>
                     <td>{product.minStock}</td>
+                    <td>
+                      {product.expiryDate ? (
+                        <span className={`tag ${expired ? 'danger-tag' : expiresSoon ? 'warning-tag' : 'ok-tag'}`}>
+                          {product.expiryDate.slice(0, 10)}
+                        </span>
+                      ) : (
+                        <span className="muted">{text.noExpiry}</span>
+                      )}
+                    </td>
                     <td>
                       {!product.active ? (
                         <span className="tag">{text.inactive}</span>
+                      ) : expired ? (
+                        <span className="tag danger-tag">{text.expired}</span>
                       ) : out ? (
                         <span className="tag danger-tag">{text.outOfStock}</span>
+                      ) : critical ? (
+                        <span className="tag danger-tag">{text.criticalStock}</span>
                       ) : low ? (
                         <span className="tag warning-tag">{text.lowStock}</span>
+                      ) : expiresSoon ? (
+                        <span className="tag warning-tag">{text.expiresSoon}</span>
                       ) : (
                         <span className="tag ok-tag">OK</span>
                       )}

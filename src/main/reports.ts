@@ -122,10 +122,19 @@ export async function inventoryReport(): Promise<InventoryReport> {
   const products = await db.collection('inv_products').find({}).toArray() as any[]
   let lowStock = 0
   let totalValueCents = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
   for (const p of products) {
     const qty = Number(p.stockQuantity) || 0
-    const min = Number(p.minStock) || 0
-    if (qty <= min) lowStock++
+    let expiring = false
+    if (p.expiryDate) {
+      const target = new Date(`${String(p.expiryDate).slice(0, 10)}T00:00:00`)
+      if (!Number.isNaN(target.getTime())) {
+        const days = Math.round((target.getTime() - today.getTime()) / 86400000)
+        expiring = days <= 30
+      }
+    }
+    if (qty <= 6 || expiring) lowStock++
     totalValueCents += qty * (Number(p.purchaseCostCents) || 0)
   }
   return { totalProducts: products.length, lowStock, totalValueCents }
