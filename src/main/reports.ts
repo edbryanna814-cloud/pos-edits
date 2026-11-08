@@ -1,4 +1,4 @@
-import type { Db } from 'mongodb'
+import { ObjectId, type Db } from 'mongodb'
 import { getDb } from './db'
 import type { CashboxReport, InventoryReport, SalesReport } from '../shared/reports'
 
@@ -10,19 +10,98 @@ function requireDb(): Db {
 
 export async function salesReport(): Promise<SalesReport> {
   const db = requireDb()
-  const sales = await db.collection('pos_sales').find({}).toArray() as any[]
+  const sales = (await db.collection('pos_sales').find({}).toArray()) as any[]
+  const returns = (await db.collection('pos_returns').find({}).toArray()) as any[]
+  const completed = sales.filter((s) => s.status === 'completed')
   let totalSalesCents = 0
+  let grossCents = 0
+  let discountCents = 0
+  let taxCents = 0
+  let cogsCents = 0
   const byPaymentMethod: Record<string, { count: number; totalCents: number }> = {}
-  for (const s of sales) {
-    if (s.status === 'completed') {
-      totalSalesCents += Number(s.totalCents) || 0
-      const m = s.paymentMethod || 'other'
-      if (!byPaymentMethod[m]) byPaymentMethod[m] = { count: 0, totalCents: 0 }
-      byPaymentMethod[m].count++
-      byPaymentMethod[m].totalCents += Number(s.totalCents) || 0
+  const byCashier: Record<string, { count: number; totalCents: number }> = {}
+  const byCustomer = new Map<string, { count: number; totalCents: number }>()
+  const products = new Map<string, SalesReport['byProduct'][number]>()
+
+  for (const s of completed) {
+    const total = Number(s.totalCents) || 0
+    totalSalesCents += total
+    grossCents += Number(s.subtotalCents) || 0
+    discountCents += Number(s.discountCents) || 0
+    taxCents += Number(s.taxCents) || 0
+
+    const method = s.paymentMethod || 'other'
+    byPaymentMethod[method] ??= { count: 0, totalCents: 0 }
+    byPaymentMethod[method].count++
+    byPaymentMethod[method].totalCents += total
+
+    const cashier = s.cashierUsername || 'unknown'
+    byCashier[cashier] ??= { count: 0, totalCents: 0 }
+    byCashier[cashier].count++
+    byCashier[cashier].totalCents += total
+
+    if (s.customerId) {
+      const entry = byCustomer.get(s.customerId) ?? { count: 0, totalCents: 0 }
+      entry.count++
+      entry.totalCents += total
+      byCustomer.set(s.customerId, entry)
+    }
+
+    for (const line of Array.isArray(s.lines) ? s.lines : []) {
+      const quantity = Number(line.quantity) || 0
+      const revenue = Number(line.lineTotalCents) || 0
+      const cost = quantity * (Number(line.unitCostCents) || 0)
+      cogsCents += cost
+      const entry = products.get(line.productId) ?? {
+        productId: String(line.productId),
+        productName: String(line.productName ?? ''),
+        quantity: 0,
+        revenueCents: 0,
+        costCents: 0,
+        profitCents: 0
+      }
+      entry.quantity += quantity
+      entry.revenueCents += revenue
+      entry.costCents += cost
+      entry.profitCents = entry.revenueCents - entry.costCents
+      products.set(line.productId, entry)
     }
   }
-  return { totalSalesCents, totalCount: sales.filter((s) => s.status === 'completed').length, byPaymentMethod }
+
+  const returnsCents = returns.reduce((sum, r) => sum + (Number(r.refundCents) || 0), 0)
+
+  const customerIds = [...byCustomer.keys()].filter((id) => ObjectId.isValid(id))
+  const customers =
+    customerIds.length > 0
+      ? ((await db
+          .collection('crm_customers')
+          .find({ _id: { $in: customerIds.map((id) => new ObjectId(id)) } })
+          .toArray()) as any[])
+      : []
+  const customerNames = new Map(customers.map((c) => [String(c._id), String(c.name ?? '')]))
+  const byCustomerList = [...byCustomer.entries()]
+    .map(([customerId, value]) => ({
+      customerId,
+      name: customerNames.get(customerId) ?? customerId,
+      ...value
+    }))
+    .sort((a, b) => b.totalCents - a.totalCents)
+
+  return {
+    totalSalesCents,
+    totalCount: completed.length,
+    grossCents,
+    discountCents,
+    taxCents,
+    returnsCents,
+    returnsCount: returns.length,
+    cogsCents,
+    grossProfitCents: grossCents - discountCents - cogsCents,
+    byPaymentMethod,
+    byCashier,
+    byCustomer: byCustomerList,
+    byProduct: [...products.values()].sort((a, b) => b.revenueCents - a.revenueCents)
+  }
 }
 
 export async function cashboxReport(): Promise<CashboxReport> {

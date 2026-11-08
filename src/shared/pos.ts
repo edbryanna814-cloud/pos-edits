@@ -4,6 +4,7 @@ export type SaleLine = {
   sku: string
   quantity: number
   unitPriceCents: number
+  unitCostCents?: number
   discountCents: number
   taxCents: number
   lineTotalCents: number
@@ -12,6 +13,7 @@ export type SaleLine = {
 export type Sale = {
   _id?: string
   invoiceNo: string
+  clientRequestId?: string
   customerId?: string
   lines: SaleLine[]
   subtotalCents: number

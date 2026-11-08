@@ -2,16 +2,17 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { IPC } from '../shared/ipc'
+import { IPC, type IpcChannel } from '../shared/ipc'
+import type { Permission } from '../shared/auth'
 import { closeDb, connectDb, dbHealth } from './db'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { createDefaultAdminIfMissing, createUser, ensureAuthSchema, getAuthState, listAudit, listRoles, listUsers, login, logout, updateUser } from './auth'
+import { createDefaultAdminIfMissing, createUser, ensureAuthSchema, getAuthState, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, updateUser } from './auth'
 import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
-import { createPlan, createSubscription, ensureSubscriptionSchema, getSubscription, listPayments, listPlans, renewSubscription } from './subscription'
+import { createPlan, createSubscription, ensureSubscriptionSchema, getSubscription, listPayments, listPlans, renewSubscription, setSubscriptionStatus } from './subscription'
 import { activateDevice, approveReplacement, configureDeviceLimit, createLicense, ensureLicensingSchema, listDevices, listLicenses, listReplacements, rejectReplacement, requestReplacement, revokeDevice } from './licensing'
 import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
 
@@ -32,6 +33,85 @@ function senderWindow(event: IpcMainInvokeEvent): BrowserWindow {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (!win) throw new Error('Window unavailable')
   return win
+}
+
+type ChannelGuard = Permission[] | 'authenticated'
+
+const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
+  [IPC.SettingsSave]: ['settings.manage'],
+  [IPC.BackupExport]: ['settings.manage'],
+  [IPC.BackupImport]: ['settings.manage'],
+  [IPC.UsersList]: ['users.read'],
+  [IPC.UsersCreate]: ['users.manage'],
+  [IPC.UsersUpdate]: ['users.manage'],
+  [IPC.RolesList]: ['users.read'],
+  [IPC.AuditList]: ['audit.view'],
+  [IPC.CrmCustomersCreate]: ['crm.manage'],
+  [IPC.CrmCustomersUpdate]: ['crm.manage'],
+  [IPC.CrmContactsCreate]: ['crm.manage'],
+  [IPC.CrmLeadsCreate]: ['crm.manage'],
+  [IPC.CrmDealsCreate]: ['crm.manage'],
+  [IPC.CrmActivitiesCreate]: ['crm.manage'],
+  [IPC.CrmNotesCreate]: ['crm.manage'],
+  [IPC.CrmCustomersList]: 'authenticated',
+  [IPC.CrmContactsList]: 'authenticated',
+  [IPC.CrmLeadsList]: 'authenticated',
+  [IPC.CrmDealsList]: 'authenticated',
+  [IPC.CrmActivitiesList]: 'authenticated',
+  [IPC.CrmNotesList]: 'authenticated',
+  [IPC.InvCategoriesCreate]: ['inventory.manage'],
+  [IPC.InvUnitsCreate]: ['inventory.manage'],
+  [IPC.InvProductsCreate]: ['inventory.manage'],
+  [IPC.InvProductsUpdate]: ['inventory.manage'],
+  [IPC.InvStockAdjust]: ['inventory.manage'],
+  [IPC.InvSuppliersCreate]: ['inventory.manage'],
+  [IPC.InvPOCreate]: ['inventory.manage'],
+  [IPC.InvPOReceive]: ['inventory.manage'],
+  [IPC.InvCategoriesList]: 'authenticated',
+  [IPC.InvUnitsList]: 'authenticated',
+  [IPC.InvProductsList]: 'authenticated',
+  [IPC.InvStockMovementsList]: 'authenticated',
+  [IPC.InvSuppliersList]: 'authenticated',
+  [IPC.InvPOList]: 'authenticated',
+  [IPC.PosCheckout]: ['pos.use'],
+  [IPC.PosReturn]: ['pos.use'],
+  [IPC.PosCashIn]: ['pos.use'],
+  [IPC.PosCashOut]: ['pos.use'],
+  [IPC.PosShiftOpen]: ['pos.use'],
+  [IPC.PosShiftClose]: ['pos.use'],
+  [IPC.PosSalesList]: 'authenticated',
+  [IPC.PosCashboxList]: 'authenticated',
+  [IPC.PosShiftsList]: 'authenticated',
+  [IPC.ReportsSales]: ['reports.view'],
+  [IPC.ReportsCashbox]: ['reports.view'],
+  [IPC.ReportsInventory]: ['reports.view'],
+  [IPC.SubPlansList]: ['settings.manage'],
+  [IPC.SubPlansCreate]: ['settings.manage'],
+  [IPC.SubGet]: ['settings.manage'],
+  [IPC.SubCreate]: ['settings.manage'],
+  [IPC.SubRenew]: ['settings.manage'],
+  [IPC.SubSetStatus]: ['settings.manage'],
+  [IPC.SubPaymentsList]: ['settings.manage'],
+  [IPC.LicList]: ['settings.manage'],
+  [IPC.LicCreate]: ['settings.manage'],
+  [IPC.LicConfigureLimit]: ['settings.manage'],
+  [IPC.LicDevicesList]: ['settings.manage'],
+  [IPC.LicActivate]: ['settings.manage'],
+  [IPC.LicRevoke]: ['settings.manage'],
+  [IPC.LicReplList]: ['settings.manage'],
+  [IPC.LicReplRequest]: ['settings.manage'],
+  [IPC.LicReplApprove]: ['settings.manage'],
+  [IPC.LicReplReject]: ['settings.manage']
+}
+
+function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...args: any[]) => any): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    assertTrusted(event)
+    const guard = channelGuards[channel]
+    if (guard === 'authenticated') requireSession()
+    else if (guard) requirePermission(...guard)
+    return listener(event, ...args)
+  })
 }
 
 function createWindow(): BrowserWindow {
@@ -69,192 +149,193 @@ function createWindow(): BrowserWindow {
 }
 
 function registerIpc(): void {
-  ipcMain.handle(IPC.Ping, (event) => {
+  handle(IPC.Ping, (event) => {
     assertTrusted(event)
     return 'pong'
   })
 
-  ipcMain.handle(IPC.GetVersion, (event) => {
+  handle(IPC.GetVersion, (event) => {
     assertTrusted(event)
     return app.getVersion()
   })
 
-  ipcMain.handle(IPC.DbHealth, async (event) => {
+  handle(IPC.DbHealth, async (event) => {
     assertTrusted(event)
     return dbHealth()
   })
 
-  ipcMain.handle(IPC.LicenseStatus, async (event) => {
+  handle(IPC.LicenseStatus, async (event) => {
     assertTrusted(event)
     return getLicenseState()
   })
 
-  ipcMain.handle(IPC.LicenseApply, async (event, code: string) => {
+  handle(IPC.LicenseApply, async (event, code: string) => {
     assertTrusted(event)
     return applyLicenseCode(code)
   })
 
-  ipcMain.handle(IPC.SettingsGet, async (event) => {
+  handle(IPC.SettingsGet, async (event) => {
     assertTrusted(event)
     return getSettings()
   })
 
-  ipcMain.handle(IPC.SettingsSave, async (event, input: unknown) => {
+  handle(IPC.SettingsSave, async (event, input: unknown) => {
     assertTrusted(event)
     return saveSettings(input)
   })
 
-  ipcMain.handle(IPC.BackupExport, async (event) => {
+  handle(IPC.BackupExport, async (event) => {
     assertTrusted(event)
     return exportBackup(senderWindow(event))
   })
 
-  ipcMain.handle(IPC.BackupImport, async (event) => {
+  handle(IPC.BackupImport, async (event) => {
     assertTrusted(event)
     return importBackup(senderWindow(event))
   })
 
-  ipcMain.handle(IPC.AuthLogin, async (event, input: unknown) => {
+  handle(IPC.AuthLogin, async (event, input: unknown) => {
     assertTrusted(event)
     if (!(await hasValidLicense())) throw new Error('License required or expired')
     return login(input as any)
   })
 
-  ipcMain.handle(IPC.AuthLogout, async (event, token: string) => {
+  handle(IPC.AuthLogout, async (event, token: string) => {
     assertTrusted(event)
     await logout(token)
     return { success: true }
   })
 
-  ipcMain.handle(IPC.AuthState, async (event, token?: string) => {
+  handle(IPC.AuthState, async (event, token?: string) => {
     assertTrusted(event)
     return getAuthState(token)
   })
 
-  ipcMain.handle(IPC.UsersList, async (event) => {
+  handle(IPC.UsersList, async (event) => {
     assertTrusted(event)
     return listUsers()
   })
 
-  ipcMain.handle(IPC.UsersCreate, async (event, input: any) => {
+  handle(IPC.UsersCreate, async (event, input: any) => {
     assertTrusted(event)
     return createUser(input)
   })
 
-  ipcMain.handle(IPC.UsersUpdate, async (event, id: string, input: any) => {
+  handle(IPC.UsersUpdate, async (event, id: string, input: any) => {
     assertTrusted(event)
     return updateUser(id, input)
   })
 
-  ipcMain.handle(IPC.RolesList, async (event) => {
+  handle(IPC.RolesList, async (event) => {
     assertTrusted(event)
     return listRoles()
   })
 
-  ipcMain.handle(IPC.AuditList, async (event, limit?: number) => {
+  handle(IPC.AuditList, async (event, limit?: number) => {
     assertTrusted(event)
     return listAudit(limit)
   })
 
-  ipcMain.handle(IPC.CrmCustomersList, async (event) => {
+  handle(IPC.CrmCustomersList, async (event) => {
     assertTrusted(event)
     return listCustomers()
   })
-  ipcMain.handle(IPC.CrmCustomersCreate, async (event, input: any) => {
+  handle(IPC.CrmCustomersCreate, async (event, input: any) => {
     assertTrusted(event)
     return createCustomer(input)
   })
-  ipcMain.handle(IPC.CrmCustomersUpdate, async (event, id: string, input: any) => {
+  handle(IPC.CrmCustomersUpdate, async (event, id: string, input: any) => {
     assertTrusted(event)
     return updateCustomer(id, input)
   })
-  ipcMain.handle(IPC.CrmContactsList, async (event, customerId?: string) => {
+  handle(IPC.CrmContactsList, async (event, customerId?: string) => {
     assertTrusted(event)
     return listContacts(customerId)
   })
-  ipcMain.handle(IPC.CrmContactsCreate, async (event, input: any) => {
+  handle(IPC.CrmContactsCreate, async (event, input: any) => {
     assertTrusted(event)
     return createContact(input)
   })
-  ipcMain.handle(IPC.CrmLeadsList, async (event) => {
+  handle(IPC.CrmLeadsList, async (event) => {
     assertTrusted(event)
     return listLeads()
   })
-  ipcMain.handle(IPC.CrmLeadsCreate, async (event, input: any) => {
+  handle(IPC.CrmLeadsCreate, async (event, input: any) => {
     assertTrusted(event)
     return createLead(input)
   })
-  ipcMain.handle(IPC.CrmDealsList, async (event) => {
+  handle(IPC.CrmDealsList, async (event) => {
     assertTrusted(event)
     return listDeals()
   })
-  ipcMain.handle(IPC.CrmDealsCreate, async (event, input: any) => {
+  handle(IPC.CrmDealsCreate, async (event, input: any) => {
     assertTrusted(event)
     return createDeal(input)
   })
-  ipcMain.handle(IPC.CrmActivitiesList, async (event, customerId?: string) => {
+  handle(IPC.CrmActivitiesList, async (event, customerId?: string) => {
     assertTrusted(event)
     return listActivities(customerId)
   })
-  ipcMain.handle(IPC.CrmActivitiesCreate, async (event, input: any) => {
+  handle(IPC.CrmActivitiesCreate, async (event, input: any) => {
     assertTrusted(event)
     return createActivity(input)
   })
-  ipcMain.handle(IPC.CrmNotesList, async (event, customerId: string) => {
+  handle(IPC.CrmNotesList, async (event, customerId: string) => {
     assertTrusted(event)
     return listNotes(customerId)
   })
-  ipcMain.handle(IPC.CrmNotesCreate, async (event, input: any) => {
+  handle(IPC.CrmNotesCreate, async (event, input: any) => {
     assertTrusted(event)
     return createNote(input)
   })
 
-  ipcMain.handle(IPC.InvCategoriesList, async (event) => { assertTrusted(event); return listCategories() })
-  ipcMain.handle(IPC.InvCategoriesCreate, async (event, input: any) => { assertTrusted(event); return createCategory(input) })
-  ipcMain.handle(IPC.InvUnitsList, async (event) => { assertTrusted(event); return listUnits() })
-  ipcMain.handle(IPC.InvUnitsCreate, async (event, input: any) => { assertTrusted(event); return createUnit(input) })
-  ipcMain.handle(IPC.InvProductsList, async (event) => { assertTrusted(event); return listProducts() })
-  ipcMain.handle(IPC.InvProductsCreate, async (event, input: any) => { assertTrusted(event); return createProduct(input) })
-  ipcMain.handle(IPC.InvProductsUpdate, async (event, id: string, input: any) => { assertTrusted(event); return updateProduct(id, input) })
-  ipcMain.handle(IPC.InvStockMovementsList, async (event, productId?: string) => { assertTrusted(event); return listStockMovements(productId) })
-  ipcMain.handle(IPC.InvStockAdjust, async (event, input: any) => { assertTrusted(event); return stockAdjust(input) })
-  ipcMain.handle(IPC.InvSuppliersList, async (event) => { assertTrusted(event); return listSuppliers() })
-  ipcMain.handle(IPC.InvSuppliersCreate, async (event, input: any) => { assertTrusted(event); return createSupplier(input) })
-  ipcMain.handle(IPC.InvPOList, async (event) => { assertTrusted(event); return listPO() })
-  ipcMain.handle(IPC.InvPOCreate, async (event, input: any) => { assertTrusted(event); return createPO(input) })
-  ipcMain.handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, notes?: string) => { assertTrusted(event); return receivePO(purchaseOrderId, notes) })
+  handle(IPC.InvCategoriesList, async (event) => { assertTrusted(event); return listCategories() })
+  handle(IPC.InvCategoriesCreate, async (event, input: any) => { assertTrusted(event); return createCategory(input) })
+  handle(IPC.InvUnitsList, async (event) => { assertTrusted(event); return listUnits() })
+  handle(IPC.InvUnitsCreate, async (event, input: any) => { assertTrusted(event); return createUnit(input) })
+  handle(IPC.InvProductsList, async (event) => { assertTrusted(event); return listProducts() })
+  handle(IPC.InvProductsCreate, async (event, input: any) => { assertTrusted(event); return createProduct(input) })
+  handle(IPC.InvProductsUpdate, async (event, id: string, input: any) => { assertTrusted(event); return updateProduct(id, input) })
+  handle(IPC.InvStockMovementsList, async (event, productId?: string) => { assertTrusted(event); return listStockMovements(productId) })
+  handle(IPC.InvStockAdjust, async (event, input: any) => { assertTrusted(event); return stockAdjust(input) })
+  handle(IPC.InvSuppliersList, async (event) => { assertTrusted(event); return listSuppliers() })
+  handle(IPC.InvSuppliersCreate, async (event, input: any) => { assertTrusted(event); return createSupplier(input) })
+  handle(IPC.InvPOList, async (event) => { assertTrusted(event); return listPO() })
+  handle(IPC.InvPOCreate, async (event, input: any) => { assertTrusted(event); return createPO(input) })
+  handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, notes?: string) => { assertTrusted(event); return receivePO(purchaseOrderId, notes) })
 
-  ipcMain.handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input) })
-  ipcMain.handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
-  ipcMain.handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input) })
-  ipcMain.handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason) })
-  ipcMain.handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason) })
-  ipcMain.handle(IPC.PosCashboxList, async (event) => { assertTrusted(event); return listCashbox() })
-  ipcMain.handle(IPC.PosShiftOpen, async (event, openingBalanceCents: number) => { assertTrusted(event); const win = BrowserWindow.fromWebContents(event.sender); return openShift('cashier', openingBalanceCents) })
-  ipcMain.handle(IPC.PosShiftClose, async (event) => { assertTrusted(event); return closeShift() })
-  ipcMain.handle(IPC.PosShiftsList, async (event) => { assertTrusted(event); return listShifts() })
+  handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input, requireSession().username) })
+  handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
+  handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input, requireSession().username) })
+  handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason) })
+  handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason) })
+  handle(IPC.PosCashboxList, async (event) => { assertTrusted(event); return listCashbox() })
+  handle(IPC.PosShiftOpen, async (event, openingBalanceCents: number) => { assertTrusted(event); return openShift(requireSession().username, openingBalanceCents) })
+  handle(IPC.PosShiftClose, async (event) => { assertTrusted(event); return closeShift() })
+  handle(IPC.PosShiftsList, async (event) => { assertTrusted(event); return listShifts() })
 
-  ipcMain.handle(IPC.ReportsSales, async (event) => { assertTrusted(event); return salesReport() })
-  ipcMain.handle(IPC.ReportsCashbox, async (event) => { assertTrusted(event); return cashboxReport() })
-  ipcMain.handle(IPC.ReportsInventory, async (event) => { assertTrusted(event); return inventoryReport() })
+  handle(IPC.ReportsSales, async (event) => { assertTrusted(event); return salesReport() })
+  handle(IPC.ReportsCashbox, async (event) => { assertTrusted(event); return cashboxReport() })
+  handle(IPC.ReportsInventory, async (event) => { assertTrusted(event); return inventoryReport() })
 
-  ipcMain.handle(IPC.SubPlansList, async (event) => { assertTrusted(event); return listPlans() })
-  ipcMain.handle(IPC.SubPlansCreate, async (event, input: any) => { assertTrusted(event); return createPlan(input) })
-  ipcMain.handle(IPC.SubGet, async (event) => { assertTrusted(event); return getSubscription() })
-  ipcMain.handle(IPC.SubCreate, async (event, input: any) => { assertTrusted(event); return createSubscription(input) })
-  ipcMain.handle(IPC.SubRenew, async (event) => { assertTrusted(event); return renewSubscription() })
-  ipcMain.handle(IPC.SubPaymentsList, async (event) => { assertTrusted(event); return listPayments() })
+  handle(IPC.SubPlansList, async (event) => { assertTrusted(event); return listPlans() })
+  handle(IPC.SubPlansCreate, async (event, input: any) => { assertTrusted(event); return createPlan(input) })
+  handle(IPC.SubGet, async (event) => { assertTrusted(event); return getSubscription() })
+  handle(IPC.SubCreate, async (event, input: any) => { assertTrusted(event); return createSubscription(input) })
+  handle(IPC.SubRenew, async (event) => { assertTrusted(event); return renewSubscription() })
+  handle(IPC.SubSetStatus, async (event, status: string) => { assertTrusted(event); return setSubscriptionStatus(status as any) })
+  handle(IPC.SubPaymentsList, async (event) => { assertTrusted(event); return listPayments() })
 
-  ipcMain.handle(IPC.LicList, async (event) => { assertTrusted(event); return listLicenses() })
-  ipcMain.handle(IPC.LicCreate, async (event, input: any) => { assertTrusted(event); return createLicense(input) })
-  ipcMain.handle(IPC.LicConfigureLimit, async (event, licenseId: string, maxActiveDevices: number) => { assertTrusted(event); return configureDeviceLimit(licenseId, maxActiveDevices) })
-  ipcMain.handle(IPC.LicDevicesList, async (event, licenseId?: string) => { assertTrusted(event); return listDevices(licenseId) })
-  ipcMain.handle(IPC.LicActivate, async (event, input: any) => { assertTrusted(event); return activateDevice(input) })
-  ipcMain.handle(IPC.LicRevoke, async (event, deviceId: string, reason: string) => { assertTrusted(event); return revokeDevice(deviceId, reason) })
-  ipcMain.handle(IPC.LicReplList, async (event, status?: string) => { assertTrusted(event); return listReplacements(status) })
-  ipcMain.handle(IPC.LicReplRequest, async (event, input: any) => { assertTrusted(event); return requestReplacement(input) })
-  ipcMain.handle(IPC.LicReplApprove, async (event, requestId: string, reviewedBy: string, decisionReason: string) => { assertTrusted(event); return approveReplacement(requestId, reviewedBy, decisionReason) })
-  ipcMain.handle(IPC.LicReplReject, async (event, requestId: string, reviewedBy: string, decisionReason: string) => { assertTrusted(event); return rejectReplacement(requestId, reviewedBy, decisionReason) })
+  handle(IPC.LicList, async (event) => { assertTrusted(event); return listLicenses() })
+  handle(IPC.LicCreate, async (event, input: any) => { assertTrusted(event); return createLicense(input) })
+  handle(IPC.LicConfigureLimit, async (event, licenseId: string, maxActiveDevices: number) => { assertTrusted(event); return configureDeviceLimit(licenseId, maxActiveDevices) })
+  handle(IPC.LicDevicesList, async (event, licenseId?: string) => { assertTrusted(event); return listDevices(licenseId) })
+  handle(IPC.LicActivate, async (event, input: any) => { assertTrusted(event); return activateDevice(input) })
+  handle(IPC.LicRevoke, async (event, deviceId: string, reason: string) => { assertTrusted(event); return revokeDevice(deviceId, reason) })
+  handle(IPC.LicReplList, async (event, status?: string) => { assertTrusted(event); return listReplacements(status) })
+  handle(IPC.LicReplRequest, async (event, input: any) => { assertTrusted(event); return requestReplacement(input) })
+  handle(IPC.LicReplApprove, async (event, requestId: string, reviewedBy: string, decisionReason: string) => { assertTrusted(event); return approveReplacement(requestId, reviewedBy, decisionReason) })
+  handle(IPC.LicReplReject, async (event, requestId: string, reviewedBy: string, decisionReason: string) => { assertTrusted(event); return rejectReplacement(requestId, reviewedBy, decisionReason) })
 }
 
 if (!app.requestSingleInstanceLock()) {

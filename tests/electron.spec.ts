@@ -112,6 +112,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'subPlansCreate',
         'subPlansList',
         'subRenew',
+      'subSetStatus',
         'usersCreate',
         'usersList',
         'usersUpdate'
@@ -296,6 +297,143 @@ test.describe.serial('Phase 2 - database and settings', () => {
       ).toBeVisible()
       await expect(window.getByText(/Could not load settings/)).toBeVisible()
       await window.screenshot({ path: join(dir, 'phase2-settings-unavailable.png') })
+    } finally {
+      await app.close()
+    }
+  })
+})
+
+test.describe.serial('Business flow - inventory, sale, return', () => {
+  test('adds a product, sells it, returns it, and blocks duplicate checkout', async () => {
+    await cleanTestDatabase()
+
+    const app = await electron.launch({
+      args: ['.'],
+      env: { ...process.env, MONGODB_DB: TEST_DB }
+    })
+
+    try {
+      const window = await app.firstWindow()
+      await expect(window).toHaveTitle(/Pharmacy POS/)
+      await window.getByLabel('Username').fill('admin')
+      await window.getByLabel('Password').fill('admin')
+      await window.getByRole('button', { name: /Login|Sign in/ }).click()
+      await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({
+        timeout: 10000
+      })
+
+      await window.getByRole('button', { name: 'Settings', exact: true }).click()
+      await window.getByLabel('Company name').fill('E2E Pharmacy')
+      await window.getByLabel('Currency code (ISO 4217)').fill('USD')
+      await window.getByLabel('Currency decimal places').fill('2')
+      await window.getByLabel('Tax rate (%)').fill('10')
+      await window.getByLabel('Default language').selectOption('en')
+      await window.getByRole('button', { name: 'Save settings' }).click()
+      await expect(window.locator('.success')).toContainText('Settings saved')
+
+      await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+      await expect(window.getByRole('heading', { name: 'Inventory', level: 2 })).toBeVisible()
+      await window.getByRole('button', { name: 'Add product' }).click()
+      await window.getByLabel('Product name').fill('Paracetamol 500mg')
+      await window.getByLabel('SKU', { exact: true }).fill('PARA-500')
+      await window.getByLabel('Barcode (optional)').fill('1234567890')
+      await window.getByLabel('Purchase cost').fill('5.00')
+      await window.getByLabel('Selling price').fill('10.00')
+      await window.getByLabel('Opening stock').fill('20')
+      await window.getByLabel('Minimum stock').fill('5')
+      await window.getByRole('button', { name: 'Save product' }).click()
+      await expect(window.locator('.data-table')).toContainText('Paracetamol 500mg')
+      await expect(window.locator('.data-table')).toContainText('20')
+
+      await window.getByRole('button', { name: 'POS', exact: true }).click()
+      await expect(window.getByRole('heading', { name: 'Point of sale', level: 2 })).toBeVisible()
+      await window.getByRole('button', { name: /Paracetamol 500mg/ }).click()
+      await expect(window.locator('.cart-lines')).toContainText('Paracetamol 500mg')
+      await window.getByLabel('Paid amount (leave empty for exact)').fill('20.00')
+      await window.getByRole('button', { name: /Complete sale/ }).click()
+
+      await expect(window.getByRole('heading', { name: 'Receipt' })).toBeVisible()
+      await expect(window.locator('.receipt-panel')).toContainText('11.00 USD')
+      await expect(window.locator('.receipt-panel')).toContainText('9.00 USD')
+
+      const sale = await window.evaluate(async () => {
+        const sales = await (window as any).api.posSalesList()
+        return sales[0]
+      })
+      expect(sale.totalCents).toBe(1100)
+      expect(sale.taxCents).toBe(100)
+      expect(sale.status).toBe('completed')
+
+      await window.getByRole('button', { name: 'New sale' }).click()
+      await window.getByRole('button', { name: 'Return', exact: true }).click()
+      await window.getByLabel('Return reason').fill('Damaged box')
+      await window.getByRole('button', { name: 'Confirm return' }).click()
+      await expect(window.locator('.success')).toContainText('Invoice returned.')
+
+      const afterReturn = await window.evaluate(async () => {
+        const products = await (window as any).api.invProductsList()
+        const sales = await (window as any).api.posSalesList()
+        return { stock: products[0].stockQuantity, status: sales[0].status }
+      })
+      expect(afterReturn.stock).toBe(20)
+      expect(afterReturn.status).toBe('returned')
+
+      const idempotency = await window.evaluate(async () => {
+        const api = (window as any).api
+        const products = await api.invProductsList()
+        const product = products[0]
+        const before = product.stockQuantity
+        const input = {
+          clientRequestId: 'e2e-idempotency-1',
+          lines: [{ productId: product._id, quantity: 2, unitPriceCents: 1 }],
+          discountCents: 0,
+          taxCents: 0,
+          paymentMethod: 'cash',
+          paidCents: 2000
+        }
+        const first = await api.posCheckout(input)
+        const second = await api.posCheckout(input)
+        const after = (await api.invProductsList())[0].stockQuantity
+
+        let rejectedLowPayment = false
+        try {
+          await api.posCheckout({
+            clientRequestId: 'e2e-low-payment',
+            lines: [{ productId: product._id, quantity: 1 }],
+            discountCents: 0,
+            taxCents: 0,
+            paymentMethod: 'cash',
+            paidCents: 1
+          })
+        } catch {
+          rejectedLowPayment = true
+        }
+
+        return {
+          sameSale: first._id === second._id,
+          before,
+          after,
+          serverPriceTotal: first.totalCents,
+          rejectedLowPayment
+        }
+      })
+
+      expect(idempotency.sameSale).toBe(true)
+      expect(idempotency.before - idempotency.after).toBe(2)
+      expect(idempotency.serverPriceTotal).toBe(2000)
+      expect(idempotency.rejectedLowPayment).toBe(true)
+
+      const report = await window.evaluate(() => (window as any).api.reportsSales())
+      expect(report.totalCount).toBe(1)
+      expect(report.cogsCents).toBe(1000)
+      expect(report.grossProfitCents).toBe(1000)
+      expect(report.returnsCount).toBe(1)
+      expect(report.byProduct[0].quantity).toBe(2)
+      expect(report.byCashier.admin).toEqual({ count: 1, totalCents: 2000 })
+
+      const dir = join(process.cwd(), 'screenshots')
+      mkdirSync(dir, { recursive: true })
+      await window.screenshot({ path: join(dir, 'phase6-pos.png') })
     } finally {
       await app.close()
     }

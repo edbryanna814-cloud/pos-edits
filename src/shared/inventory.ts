@@ -53,10 +53,17 @@ export type Supplier = {
   updatedAt: string
 }
 
+export type PurchaseOrderLine = {
+  productId: string
+  quantity: number
+  unitCostCents: number
+}
+
 export type PurchaseOrder = {
   _id?: string
   supplierId: string
   status: 'draft' | 'ordered' | 'received' | 'canceled'
+  lines: PurchaseOrderLine[]
   totalCents: number
   notes?: string
   createdAt: string
@@ -67,6 +74,7 @@ export type PurchaseReceipt = {
   _id?: string
   purchaseOrderId: string
   receivedAt: string
+  lines: PurchaseOrderLine[]
   notes?: string
   createdAt: string
 }

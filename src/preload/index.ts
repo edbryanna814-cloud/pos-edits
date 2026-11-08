@@ -61,6 +61,7 @@ const api: PreloadApi = {
   subGet: () => ipcRenderer.invoke(IPC.SubGet),
   subCreate: (input) => ipcRenderer.invoke(IPC.SubCreate, input),
   subRenew: () => ipcRenderer.invoke(IPC.SubRenew),
+  subSetStatus: (status) => ipcRenderer.invoke(IPC.SubSetStatus, status),
   subPaymentsList: () => ipcRenderer.invoke(IPC.SubPaymentsList),
   licList: () => ipcRenderer.invoke(IPC.LicList),
   licCreate: (input) => ipcRenderer.invoke(IPC.LicCreate, input),

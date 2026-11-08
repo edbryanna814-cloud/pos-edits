@@ -42,6 +42,10 @@ export function getDb(): Db | null {
   return db
 }
 
+export function getClient(): MongoClient | null {
+  return client
+}
+
 export async function dbHealth(): Promise<DbHealth> {
   if (!db) await connectDb()
 

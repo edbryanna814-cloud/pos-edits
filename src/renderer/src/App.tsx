@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component,
   useEffect,
   useState,
@@ -6,11 +6,21 @@ import {
   type ReactNode
 } from 'react'
 import type { DbHealth, LicenseState } from '../../shared/ipc'
+import type { Permission } from '../../shared/auth'
 import type { Language, StoredCompanySettings } from '../../shared/settings'
 import { t, type TranslationKey } from './i18n'
 import SettingsPage from './SettingsPage'
 import LoginPage from './auth/LoginPage'
 import ActivationPage from './license/ActivationPage'
+import InventoryPage from './inventory/InventoryPage'
+import ProcurementPanel from './inventory/ProcurementPanel'
+import PosPage from './pos/PosPage'
+import ShiftPanel from './pos/ShiftPanel'
+import DashboardPage from './dashboard/DashboardPage'
+import ReportsPage from './reports/ReportsPage'
+import CrmPage from './crm/CrmPage'
+import UsersPage from './users/UsersPage'
+import SubscriptionLicensingPanel from './settings/SubscriptionLicensingPanel'
 
 type SectionId = 'dashboard' | 'pos' | 'inventory' | 'crm' | 'reports' | 'settings' | 'users' | 'audit'
 
@@ -19,7 +29,7 @@ interface Section {
   labelKey: TranslationKey
   titleKey: TranslationKey
   descriptionKey: TranslationKey
-  phaseKey: TranslationKey
+  permission?: Permission
 }
 
 const sections: Section[] = [
@@ -27,57 +37,56 @@ const sections: Section[] = [
     id: 'dashboard',
     labelKey: 'dashboard',
     titleKey: 'dashboardTitle',
-    descriptionKey: 'dashboardDesc',
-    phaseKey: 'nextPhase2'
+    descriptionKey: 'dashboardDesc'
   },
   {
     id: 'pos',
     labelKey: 'pos',
     titleKey: 'posTitle',
     descriptionKey: 'posDesc',
-    phaseKey: 'nextPhase6'
+    permission: 'pos.use'
   },
   {
     id: 'inventory',
     labelKey: 'inventory',
     titleKey: 'inventoryTitle',
     descriptionKey: 'inventoryDesc',
-    phaseKey: 'nextPhase5'
+    permission: 'inventory.manage'
   },
   {
     id: 'crm',
     labelKey: 'crm',
     titleKey: 'crmTitle',
     descriptionKey: 'crmDesc',
-    phaseKey: 'nextPhase4'
+    permission: 'crm.manage'
   },
   {
     id: 'reports',
     labelKey: 'reports',
     titleKey: 'reportsTitle',
     descriptionKey: 'reportsDesc',
-    phaseKey: 'nextPhase7'
+    permission: 'reports.view'
   },
   {
     id: 'users',
     labelKey: 'users',
     titleKey: 'users',
     descriptionKey: 'settingsDesc',
-    phaseKey: 'nextPhase3'
+    permission: 'users.read'
   },
   {
     id: 'audit',
     labelKey: 'audit',
     titleKey: 'audit',
     descriptionKey: 'settingsDesc',
-    phaseKey: 'nextPhase3'
+    permission: 'audit.view'
   },
   {
     id: 'settings',
     labelKey: 'settings',
     titleKey: 'settingsTitle',
     descriptionKey: 'settingsDesc',
-    phaseKey: 'nextPhase2'
+    permission: 'settings.manage'
   }
 ]
 
@@ -219,10 +228,6 @@ export default function App() {
   const [users, setUsers] = useState<any[]>([])
   const [roles, setRoles] = useState<any[]>([])
   const [audit, setAudit] = useState<any[]>([])
-  const [customers, setCustomers] = useState<any[]>([])
-  const [leads, setLeads] = useState<any[]>([])
-  const [deals, setDeals] = useState<any[]>([])
-  const [activities, setActivities] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([])
@@ -234,10 +239,14 @@ export default function App() {
   const [subscription, setSubscription] = useState<any>(null)
   const [subPlans, setSubPlans] = useState<any[]>([])
   const [licenses, setLicenses] = useState<any[]>([])
-  const [devices, setDevices] = useState<any[]>([])
   const [replacements, setReplacements] = useState<any[]>([])
 
   const section = sections.find((item) => item.id === active) ?? sections[0]
+  const visibleSections = sections.filter(
+    (item) => !item.permission || (authUser?.permissions ?? []).includes(item.permission)
+  )
+  const currency = settings?.currencyCode ?? ''
+  const taxRateBasisPoints = settings?.taxRateBasisPoints ?? 0
   const dbConnected = db?.status === 'connected'
   const dbState = dbConnected ? 'ready' : db ? 'failed' : 'checking'
   const dbLabel = dbConnected
@@ -310,16 +319,24 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (active === 'users' && token) void loadUsers()
-    if (active === 'users' && token) void loadRoles()
-    if (active === 'audit' && token) void loadAudit()
-    if (active === 'crm' && token) void loadCrm()
-    if (active === 'inventory' && token) void loadInventory()
-    if (active === 'pos' && token) void loadPos()
-    if (active === 'reports' && token) void loadReports()
-    if (active === 'settings' && token) void loadSubscription()
-    if (active === 'settings' && token) void loadLicensing()
-  }, [active, token])
+    if (!authUser) return
+    if (active === 'users') {
+      void loadUsers()
+      void loadRoles()
+    }
+    if (active === 'audit') void loadAudit()
+    if (active === 'settings') {
+      void loadSubscription()
+      void loadLicensing()
+    }
+  }, [active, authUser])
+
+  useEffect(() => {
+    if (!authUser) return
+    void loadInventory()
+    void loadPos()
+    void loadReports()
+  }, [authUser])
 
   useEffect(() => {
     document.documentElement.lang = language
@@ -385,16 +402,6 @@ export default function App() {
     } catch {}
   }
 
-  async function loadCrm(): Promise<void> {
-    if (!window.api) return
-    try {
-      setCustomers(await window.api.crmCustomersList())
-      setLeads(await window.api.crmLeadsList())
-      setDeals(await window.api.crmDealsList())
-      setActivities(await window.api.crmActivitiesList())
-    } catch {}
-  }
-
   async function loadInventory(): Promise<void> {
     if (!window.api) return
     try {
@@ -434,8 +441,13 @@ export default function App() {
     try {
       setLicenses(await window.api.licList())
       setReplacements(await window.api.licReplList())
-      setDevices([])
     } catch {}
+  }
+
+  function refreshBusinessData(): void {
+    void loadInventory()
+    void loadPos()
+    void loadReports()
   }
 
   const languageToggle = (
@@ -490,7 +502,7 @@ export default function App() {
         </div>
 
         <nav aria-label={t(language, 'mainNavigation')}>
-          {sections.map((item) => (
+          {visibleSections.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -520,7 +532,6 @@ export default function App() {
       <main className="content">
         <header className="content-header">
           <div>
-            <p className="eyebrow">{t(language, 'phase')}</p>
             <h1>{t(language, section.titleKey)}</h1>
             <p className="muted">{t(language, section.descriptionKey)}</p>
           </div>
@@ -556,69 +567,14 @@ export default function App() {
               onSaved={handleSaved}
               onReload={handleReload}
             />
-            <section className="panel" style={{ marginTop: 16 }}>
-              <h2>Subscription</h2>
-              {subscription ? (
-                <div>
-                  <p>Status: {subscription.status}</p>
-                  <p>Next renewal: {subscription.nextRenewalDate}</p>
-                  <button type="button" onClick={async () => { await window.api.subRenew(); void loadSubscription() }}>Renew</button>
-                </div>
-              ) : (
-                <p>No subscription</p>
-              )}
-              <h3 style={{ marginTop: 16 }}>Plans</h3>
-              <ul>
-                {subPlans.map((p: any) => (
-                  <li key={p._id || p.name}>{p.name} - {p.priceCents} {p.currency} / {p.billingPeriod}</li>
-                ))}
-              </ul>
-            </section>
-            <section className="panel" style={{ marginTop: 16 }}>
-              <h2>Licensing</h2>
-              <p>Licenses: {licenses.length}, Devices: {devices.length}, Replacements: {replacements.length}</p>
-              <ul>
-                {licenses.map((l: any) => (
-                  <li key={l.licenseId}>License {l.licenseId} - max {l.maxActiveDevices}, active {l.currentActiveDeviceCount}, status {l.status}</li>
-                ))}
-              </ul>
-              <h3 style={{ marginTop: 12 }}>Replacement Requests</h3>
-              <ul>
-                {replacements.map((r: any) => (
-                  <li key={r.requestId}>{r.requestId} - {r.status}</li>
-                ))}
-              </ul>
-            </section>
+            <SubscriptionLicensingPanel
+              language={language}
+              currency={currency || 'USD'}
+              reviewer={authUser.username}
+            />
           </>
         ) : active === 'users' ? (
-          <section className="panel">
-            <h2>{t(language, 'users')}</h2>
-            <table style={{ width: '100%', marginTop: 16 }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left' }}>{t(language, 'username')}</th>
-                  <th style={{ textAlign: 'left' }}>{t(language, 'role')}</th>
-                  <th style={{ textAlign: 'left' }}>{t(language, 'active')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u: any) => (
-                  <tr key={u._id || u.username}>
-                    <td>{u.username}</td>
-                    <td>{u.role}</td>
-                    <td>{u.active ? 'Yes' : 'No'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <h3 style={{ marginTop: 24 }}>{t(language, 'roles')}</h3>
-            <ul>
-              {roles.map((r: any) => (
-                <li key={r.name}>{r.name}: {(r.permissions || []).join(', ')}</li>
-              ))}
-            </ul>
-          </section>
-        ) : active === 'audit' ? (
+          <UsersPage language={language} />        ) : active === 'audit' ? (
           <section className="panel">
             <h2>{t(language, 'audit')}</h2>
             <table style={{ width: '100%', marginTop: 16 }}>
@@ -643,165 +599,74 @@ export default function App() {
             </table>
           </section>
         ) : active === 'crm' ? (
-          <section className="panel">
-            <h2>{t(language, 'crmTitle')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
-              <div>
-                <h3>Customers</h3>
-                <ul>
-                  {customers.slice(0, 20).map((c: any) => (
-                    <li key={c._id || c.name}>{c.name} {c.phone ? `- ${c.phone}` : ''}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Leads</h3>
-                <ul>
-                  {leads.slice(0, 20).map((l: any) => (
-                    <li key={l._id || l.name}>{l.name} - {l.status}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Deals</h3>
-                <ul>
-                  {deals.slice(0, 20).map((d: any) => (
-                    <li key={d._id || d.title}>{d.title} - {d.stage}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Activities</h3>
-                <ul>
-                  {activities.slice(0, 20).map((a: any) => (
-                    <li key={a._id || a.subject}>{a.subject} - {a.type}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        ) : active === 'inventory' ? (
-          <section className="panel">
-            <h2>{t(language, 'inventoryTitle')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
-              <div>
-                <h3>Products</h3>
-                <ul>
-                  {products.slice(0, 20).map((p: any) => (
-                    <li key={p._id || p.sku}>{p.name} (SKU:{p.sku}) - {p.stockQuantity} in stock</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Suppliers</h3>
-                <ul>
-                  {suppliers.slice(0, 20).map((s: any) => (
-                    <li key={s._id || s.name}>{s.name}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Purchase Orders</h3>
-                <ul>
-                  {purchaseOrders.slice(0, 20).map((po: any) => (
-                    <li key={po._id || po.createdAt}>{po.status} - {po.totalCents} cents</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        ) : active === 'pos' ? (
-          <section className="panel">
-            <h2>{t(language, 'posTitle')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
-              <div>
-                <h3>Sales</h3>
-                <ul>
-                  {sales.slice(0, 20).map((s: any) => (
-                    <li key={s._id || s.invoiceNo}>{s.invoiceNo} - {s.totalCents} cents ({s.status})</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3>Cashbox</h3>
-                <ul>
-                  {cashbox.slice(0, 20).map((m: any, i: number) => (
-                    <li key={i}>{m.type}: {m.amountCents} cents - {m.reason}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </section>
-        ) : active === 'reports' ? (
-          <section className="panel">
-            <h2>{t(language, 'reportsTitle')}</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginTop: 16 }}>
-              <div>
-                <h3>Sales</h3>
-                <p>Total: {reportSales?.totalSalesCents || 0} cents</p>
-                <p>Count: {reportSales?.totalCount || 0}</p>
-              </div>
-              <div>
-                <h3>Cashbox</h3>
-                <p>In: {reportCashbox?.totalInCents || 0} cents</p>
-                <p>Out: {reportCashbox?.totalOutCents || 0} cents</p>
-                <p>Balance: {reportCashbox?.balanceCents || 0} cents</p>
-              </div>
-              <div>
-                <h3>Inventory</h3>
-                <p>Products: {reportInv?.totalProducts || 0}</p>
-                <p>Low stock: {reportInv?.lowStock || 0}</p>
-                <p>Value: {reportInv?.totalValueCents || 0} cents</p>
-              </div>
-            </div>
-          </section>
-        ) : (
+          <CrmPage language={language} currency={currency} />        ) : active === 'inventory' ? (
           <>
-            {active === 'dashboard' ? (
-              <DatabasePanel db={db} language={language} onRetry={handleReload} />
-            ) : null}
-
+            <InventoryPage
+              products={products}
+              language={language}
+              currency={currency}
+              onChanged={refreshBusinessData}
+            />
+            <ProcurementPanel
+              products={products}
+              suppliers={suppliers}
+              purchaseOrders={purchaseOrders}
+              language={language}
+              currency={currency}
+              onChanged={refreshBusinessData}
+            />
+          </>
+        ) : active === 'pos' ? (
+          <>
+            <PosPage
+              products={products}
+              sales={sales}
+              cashbox={cashbox}
+              language={language}
+              currency={currency}
+              taxRateBasisPoints={taxRateBasisPoints}
+              cashier={authUser.username}
+              onChanged={refreshBusinessData}
+            />
+            <ShiftPanel
+              language={language}
+              currency={currency}
+              cashier={authUser.username}
+              onChanged={refreshBusinessData}
+            />
+          </>
+        ) : active === 'reports' ? (
+          <ReportsPage
+            language={language}
+            currency={currency}
+            sales={sales}
+            salesReport={reportSales}
+            cashboxReport={reportCashbox}
+            inventoryReport={reportInv}
+          />
+        ) : active === 'dashboard' ? (
+          <>
             {settingsError ? (
               <p className="error banner" role="alert">
                 {t(language, 'settingsLoadError')}: {settingsError}
               </p>
             ) : null}
 
-            {active === 'dashboard' && settingsLoaded && !settings && !settingsError ? (
+            {settingsLoaded && !settings && !settingsError ? (
               <SetupBanner language={language} onOpen={() => setActive('settings')} />
             ) : null}
 
-            <section className="panel" aria-labelledby={`${section.id}-title`}>
-              <h2 id={`${section.id}-title`}>{t(language, section.titleKey)}</h2>
-              <p className="muted">{t(language, section.descriptionKey)}</p>
-              <div className="empty-state">
-                <strong>{t(language, 'notImplemented')}</strong>
-                <p>
-                  {t(language, 'phasePlaceholder', {
-                    phase: t(language, section.phaseKey)
-                  })}
-                </p>
-              </div>
-            </section>
-
-            {active === 'dashboard' ? (
-              <section className="grid" aria-label={t(language, 'foundationChecks')}>
-                <article className="card">
-                  <h3>{t(language, 'secureRenderer')}</h3>
-                  <p>{t(language, 'secureRendererBody')}</p>
-                </article>
-                <article className="card">
-                  <h3>{t(language, 'typedIpc')}</h3>
-                  <p>{t(language, 'typedIpcBody')}</p>
-                </article>
-                <article className="card">
-                  <h3>{t(language, 'nextStep')}</h3>
-                  <p>{t(language, 'nextStepBody')}</p>
-                </article>
-              </section>
-            ) : null}
+            <DashboardPage
+              language={language}
+              currency={currency}
+              products={products}
+              sales={sales}
+              cashbox={cashbox}
+              onNavigate={(target) => setActive(target)}
+            />
+            <DatabasePanel db={db} language={language} onRetry={handleReload} />
           </>
-        )}
+        ) : null}
 
         <footer className="content-footer">
           <span className={`status-dot ${ipc === 'ready' ? 'ready' : ipc === 'failed' ? 'failed' : 'checking'}`} />

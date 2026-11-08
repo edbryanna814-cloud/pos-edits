@@ -64,6 +64,7 @@ export const IPC = {
   SubGet: 'sub:get',
   SubCreate: 'sub:create',
   SubRenew: 'sub:renew',
+  SubSetStatus: 'sub:set-status',
   SubPaymentsList: 'sub:payments:list',
   LicList: 'lic:list',
   LicCreate: 'lic:create',
@@ -172,6 +173,7 @@ export interface PreloadApi {
   subGet(): Promise<any>
   subCreate(input: any): Promise<any>
   subRenew(): Promise<any>
+  subSetStatus(status: string): Promise<any>
   subPaymentsList(): Promise<any[]>
   licList(): Promise<any[]>
   licCreate(input: any): Promise<any>
