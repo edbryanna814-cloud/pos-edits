@@ -889,7 +889,9 @@ h3 {
 .pos-page button,
 .dashboard-page button,
 .receipt-panel button,
-.inline-panel button {
+.inline-panel button,
+.subscription-page button,
+.shift-panel button {
   padding: 8px 13px;
   border: 1px solid #cbd5e1;
   border-radius: 9px;
@@ -903,7 +905,9 @@ h3 {
 .pos-page button:hover,
 .dashboard-page button:hover,
 .receipt-panel button:hover,
-.inline-panel button:hover {
+.inline-panel button:hover,
+.subscription-page button:hover,
+.shift-panel button:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -912,7 +916,9 @@ h3 {
 .pos-page button.primary,
 .dashboard-page button.primary,
 .receipt-panel button.primary,
-.inline-panel button.primary {
+.inline-panel button.primary,
+.subscription-page button.primary,
+.shift-panel button.primary {
   border-color: var(--accent);
   background: var(--accent);
   color: #ffffff;
@@ -922,7 +928,9 @@ h3 {
 .pos-page button.primary:hover,
 .dashboard-page button.primary:hover,
 .receipt-panel button.primary:hover,
-.inline-panel button.primary:hover {
+.inline-panel button.primary:hover,
+.subscription-page button.primary:hover,
+.shift-panel button.primary:hover {
   background: #115e59;
   color: #ffffff;
 }
@@ -931,14 +939,18 @@ h3 {
 .pos-page button:disabled,
 .dashboard-page button:disabled,
 .receipt-panel button:disabled,
-.inline-panel button:disabled {
+.inline-panel button:disabled,
+.subscription-page button:disabled,
+.shift-panel button:disabled {
   cursor: wait;
   opacity: 0.6;
 }
 
 .link-button,
 .inventory-page .link-button,
-.pos-page .link-button {
+.pos-page .link-button,
+.subscription-page .link-button,
+.shift-panel .link-button {
   padding: 0;
   border: 0;
   background: transparent;
@@ -949,7 +961,9 @@ h3 {
 
 .link-button:hover,
 .inventory-page .link-button:hover,
-.pos-page .link-button:hover {
+.pos-page .link-button:hover,
+.subscription-page .link-button:hover,
+.shift-panel .link-button:hover {
   color: #115e59;
 }
 
@@ -1968,6 +1982,69 @@ h3 {
   margin: 0;
 }
 
+.subscription-page .section-header,
+.shift-panel .section-header {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.subscription-page .section-header > button,
+.shift-panel .section-header > button {
+  flex: none;
+}
+
+.subscription-page .form-actions,
+.shift-panel .form-actions {
+  align-items: end;
+}
+
+.subscription-page .form-actions label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.subscription-page .form-actions select {
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.subscription-page .form-actions select:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(15 118 110 / 14%);
+}
+
+.subscription-page .cash-form,
+.shift-panel .cash-form {
+  grid-template-columns: minmax(180px, 260px) auto;
+  align-items: end;
+}
+
+.subscription-page .cash-form > p,
+.shift-panel .cash-form > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.subscription-page .cash-form .form-actions,
+.shift-panel .cash-form .form-actions {
+  grid-column: auto;
+}
+
+.subscription-page .section-header .inline-field input {
+  width: min(280px, 40vw);
+}
+
+.subscription-page .device-list > .inline-field input {
+  width: min(320px, 100%);
+}
+
 @media (max-width: 900px) {
   .order-line,
   .crm-details-grid,
@@ -1978,5 +2055,10 @@ h3 {
 
   .crm-list-panel {
     max-height: 280px;
+  }
+
+  .subscription-page .cash-form,
+  .shift-panel .cash-form {
+    grid-template-columns: 1fr;
   }
 }
