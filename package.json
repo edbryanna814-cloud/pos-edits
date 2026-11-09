@@ -18,7 +18,7 @@
     "db:init": "powershell -ExecutionPolicy Bypass -File scripts/mongodb.ps1 init",
     "pretest": "npm run build",
     "test": "playwright test",
-    "dist": "npm run build && electron-builder --win nsis --x64"
+    "dist": "powershell -ExecutionPolicy Bypass -File scripts/prepare-mongodb.ps1 && npm run build && electron-builder --win nsis --x64"
   },
   "build": {
     "appId": "com.pharmacy.pos",
