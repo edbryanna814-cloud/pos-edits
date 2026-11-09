@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { IPC, type IpcChannel } from '../shared/ipc'
 import type { Permission } from '../shared/auth'
 import { closeDb, connectDb, dbHealth } from './db'
+import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { createDefaultAdminIfMissing, createUser, ensureAuthSchema, getAuthState, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, updateUser } from './auth'
@@ -352,6 +353,11 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(async () => {
+    try {
+      await startBundledMongo()
+    } catch (error) {
+      console.error('[main] bundled MongoDB failed to start', error)
+    }
     await connectDb()
     try {
       await ensureSettingsSchema()
@@ -397,8 +403,20 @@ if (!app.requestSingleInstanceLock()) {
     })
   })
 
-  app.on('before-quit', () => {
-    void closeDb()
+  let quitting = false
+  app.on('before-quit', (event) => {
+    if (quitting) return
+    if (!app.isPackaged) {
+      void closeDb()
+      return
+    }
+    event.preventDefault()
+    quitting = true
+    void (async () => {
+      await closeDb()
+      await stopBundledMongo()
+      app.quit()
+    })()
   })
 
   app.on('window-all-closed', () => {

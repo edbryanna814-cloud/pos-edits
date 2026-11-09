@@ -1,8 +1,12 @@
 import { MongoClient, type Db } from 'mongodb'
 import type { DbHealth } from '../shared/ipc'
 
-const uri = process.env['MONGODB_URI'] ?? 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
+const defaultUri = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
 const databaseName = process.env['MONGODB_DB'] ?? 'pharmacy_pos'
+
+function mongoUri(): string {
+  return process.env['MONGODB_URI'] ?? defaultUri
+}
 
 let client: MongoClient | null = null
 let db: Db | null = null
@@ -14,7 +18,7 @@ export async function connectDb(): Promise<Db | null> {
   let next: MongoClient | null = null
 
   try {
-    next = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 })
+    next = new MongoClient(mongoUri(), { serverSelectionTimeoutMS: 3000 })
     await next.connect()
     const nextDb = next.db(databaseName)
     await nextDb.command({ ping: 1 })
