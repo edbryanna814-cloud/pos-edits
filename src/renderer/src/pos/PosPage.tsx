@@ -13,6 +13,7 @@ interface Props {
   currency: string
   taxRateBasisPoints: number
   cashier: string
+  companyName: string
   onChanged: () => void
 }
 
@@ -31,6 +32,9 @@ const copy = {
     outOfStock: 'Out of stock',
     low: 'Low stock',
     quantity: 'Qty',
+    strip: 'Strip',
+    box: 'Box',
+    boxPriceMissing: 'Box price is not set for this product.',
     remove: 'Remove',
     subtotal: 'Subtotal',
     discount: 'Discount',
@@ -98,6 +102,9 @@ const copy = {
     outOfStock: 'نفد المخزون',
     low: 'منخفض',
     quantity: 'الكمية',
+    strip: 'شريط',
+    box: 'علبة',
+    boxPriceMissing: 'سعر العلبة غير محدد لهذا المنتج.',
     remove: 'حذف',
     subtotal: 'الإجمالي الفرعي',
     discount: 'الخصم',
@@ -156,6 +163,20 @@ const copy = {
 interface CartItem {
   productId: string
   quantity: number
+  unit: 'base' | 'box'
+}
+
+function unitsPerBox(product: Product): number {
+  return Math.max(1, Math.trunc(product.unitsPerBox ?? 1))
+}
+
+function canSellBox(product: Product): boolean {
+  return unitsPerBox(product) > 1 && (product.boxPriceCents ?? 0) > 0
+}
+
+function baseOf(item: CartItem, product: Product | undefined): number {
+  if (!product) return item.quantity
+  return item.unit === 'box' ? item.quantity * unitsPerBox(product) : item.quantity
 }
 
 function errorText(error: unknown): string {
@@ -181,6 +202,7 @@ export default function PosPage({
   currency,
   taxRateBasisPoints,
   cashier,
+  companyName,
   onChanged
 }: Props) {
   const text = copy[language]
@@ -231,11 +253,14 @@ export default function PosPage({
       cart.flatMap((item) => {
         const product = byId.get(item.productId)
         if (!product) return []
+        const unitPriceCents =
+          item.unit === 'box' ? (product.boxPriceCents ?? 0) : product.sellingPriceCents
         return [
           {
+            ...item,
             product,
-            quantity: item.quantity,
-            lineTotalCents: product.sellingPriceCents * item.quantity
+            unitPriceCents,
+            lineTotalCents: unitPriceCents * item.quantity
           }
         ]
       }),
@@ -264,43 +289,99 @@ export default function PosPage({
       .catch(() => undefined)
   }, [])
 
-  function addProduct(product: Product): void {
+  useEffect(() => {
+    let buffer = ''
+    let last = 0
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+      const now = Date.now()
+      if (now - last > 120) buffer = ''
+      last = now
+      if (event.key === 'Enter') {
+        const code = buffer.trim()
+        buffer = ''
+        if (code.length < 4) return
+        const match = products.find((product) => product.barcode === code)
+        if (match) {
+          event.preventDefault()
+          addProductRef.current(match, 'base')
+          setQuery('')
+        }
+        return
+      }
+      if (event.key.length === 1) buffer += event.key
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [products])
+
+  function addProduct(product: Product, unit: 'base' | 'box' = 'base'): void {
     if (!product._id || product.stockQuantity <= 0) return
     if (isExpired(product.expiryDate)) {
       setError(`${text.expiredError} ${product.name}`)
       return
     }
-    const existing = cart.find((item) => item.productId === product._id)
-    if (existing && existing.quantity >= product.stockQuantity) {
+    if (unit === 'box' && !canSellBox(product)) {
+      setError(`${text.boxPriceMissing} ${product.name}`)
+      return
+    }
+    const pack = unitsPerBox(product)
+    const addBase = unit === 'box' ? pack : 1
+    const reserved = cart.reduce(
+      (sum, item) =>
+        sum + (item.productId === product._id ? baseOf(item, product) : 0),
+      0
+    )
+    if (reserved + addBase > product.stockQuantity) {
       setError(`${text.outOfStock}: ${product.name}`)
       return
     }
     setError('')
     setSuccess('')
+    const existing = cart.find((item) => item.productId === product._id && item.unit === unit)
     if (existing) {
       setCart((current) =>
         current.map((item) =>
-          item.productId === product._id ? { ...item, quantity: item.quantity + 1 } : item
+          item.productId === product._id && item.unit === unit
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
         )
       )
     } else {
-      setCart((current) => [...current, { productId: product._id as string, quantity: 1 }])
+      setCart((current) => [
+        ...current,
+        { productId: product._id as string, quantity: 1, unit }
+      ])
     }
   }
 
-  function setQuantity(productId: string, value: string): void {
+  const addProductRef = useRef(addProduct)
+  addProductRef.current = addProduct
+
+  function setQuantity(productId: string, unit: 'base' | 'box', value: string): void {
     const product = byId.get(productId)
     if (!product) return
     const parsed = Number(value)
-    const quantity = Number.isFinite(parsed) ? Math.trunc(parsed) : 1
-    const clamped = Math.max(1, Math.min(product.stockQuantity, quantity))
+    const pool = Math.max(1, Math.trunc(parsed) || 1)
+    const pack = unit === 'box' ? unitsPerBox(product) : 1
+    const reservedElsewhere = cart.reduce(
+      (sum, item) =>
+        sum +
+        (item.productId === productId && item.unit !== unit ? baseOf(item, product) : 0),
+      0
+    )
+    const maxPacks = Math.max(1, Math.floor((product.stockQuantity - reservedElsewhere) / pack))
+    const clamped = Math.max(1, Math.min(maxPacks, pool))
     setCart((current) =>
-      current.map((item) => (item.productId === productId ? { ...item, quantity: clamped } : item))
+      current.map((item) =>
+        item.productId === productId && item.unit === unit ? { ...item, quantity: clamped } : item
+      )
     )
   }
 
-  function removeLine(productId: string): void {
-    setCart((current) => current.filter((item) => item.productId !== productId))
+  function removeLine(productId: string, unit: 'base' | 'box'): void {
+    setCart((current) => current.filter((item) => !(item.productId === productId && item.unit === unit)))
   }
 
   function clearCart(): void {
@@ -325,7 +406,11 @@ export default function PosPage({
       if (!requestIdRef.current) requestIdRef.current = newRequestId()
       const sale = await window.api.posCheckout({
         clientRequestId: requestIdRef.current,
-        lines: cart.map((item) => ({ productId: item.productId, quantity: item.quantity })),
+        lines: cart.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          saleUnit: item.unit
+        })),
         discountCents: safeDiscountCents,
         taxCents,
         paymentMethod,
@@ -412,6 +497,9 @@ export default function PosPage({
               </button>
             </div>
           </div>
+          <div className="receipt-brand">
+            <strong>{companyName}</strong>
+          </div>
           <div className="receipt-meta">
             <div>
               <span>{text.invoice}</span>
@@ -446,6 +534,7 @@ export default function PosPage({
                 <tr key={line.productId}>
                   <td>
                     {line.productName} × {line.quantity}
+                    {line.saleUnit === 'box' ? ` ${text.box}` : ''}
                   </td>
                   <td>{formatMoney(line.lineTotalCents, currency)}</td>
                 </tr>
@@ -523,7 +612,11 @@ export default function PosPage({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter' && visibleProducts[0]) addProduct(visibleProducts[0])
+                if (event.key !== 'Enter') return
+                const code = query.trim()
+                const exact = products.find((product) => product.barcode === code)
+                if (exact) addProduct(exact)
+                else if (visibleProducts[0]) addProduct(visibleProducts[0])
               }}
               placeholder={text.search}
               aria-label={text.search}
@@ -543,22 +636,32 @@ export default function PosPage({
               {visibleProducts.map((product) => {
                 const low = product.stockQuantity <= product.minStock
                 return (
-                  <button
-                    key={product._id ?? product.sku}
-                    type="button"
-                    className="product-card"
-                    onClick={() => addProduct(product)}
-                  >
-                    <span className="product-name">{product.name}</span>
-                    <span className="product-meta">
-                      {product.sku}
-                      {product.barcode ? ` · ${product.barcode}` : ''}
-                    </span>
-                    <span className="product-footer">
-                      <strong>{formatMoney(product.sellingPriceCents, currency)}</strong>
-                      <span className={low ? 'warning-text' : 'muted'}>{product.stockQuantity}</span>
-                    </span>
-                  </button>
+                  <div key={product._id ?? product.sku} className="product-card">
+                    <button
+                      type="button"
+                      className="product-card-main"
+                      onClick={() => addProduct(product)}
+                    >
+                      <span className="product-name">{product.name}</span>
+                      <span className="product-meta">
+                        {product.sku}
+                        {product.barcode ? ` · ${product.barcode}` : ''}
+                      </span>
+                      <span className="product-footer">
+                        <strong>{formatMoney(product.sellingPriceCents, currency)}</strong>
+                        <span className={low ? 'warning-text' : 'muted'}>{product.stockQuantity}</span>
+                      </span>
+                    </button>
+                    {canSellBox(product) ? (
+                      <button
+                        type="button"
+                        className="product-card-box"
+                        onClick={() => addProduct(product, 'box')}
+                      >
+                        {text.box}: {formatMoney(product.boxPriceCents ?? 0, currency)}
+                      </button>
+                    ) : null}
+                  </div>
                 )
               })}
             </div>
@@ -583,23 +686,35 @@ export default function PosPage({
           ) : (
             <div className="cart-lines">
               {cartLines.map((line) => (
-                <div className="cart-line" key={line.product._id}>
+                <div className="cart-line" key={`${line.product._id}:${line.unit}`}>
                   <div className="cart-line-main">
                     <strong>{line.product.name}</strong>
-                    <span className="muted">{formatMoney(line.product.sellingPriceCents, currency)}</span>
+                    <span className="muted">
+                      {line.unit === 'box'
+                        ? `${text.box} · `
+                        : unitsPerBox(line.product) > 1
+                          ? `${text.strip} · `
+                          : ''}
+                      {formatMoney(line.unitPriceCents, currency)}
+                    </span>
                   </div>
                   <div className="cart-line-controls">
                     <input
                       type="number"
                       min={1}
-                      max={line.product.stockQuantity}
                       step={1}
                       value={line.quantity}
-                      onChange={(event) => setQuantity(line.product._id as string, event.target.value)}
+                      onChange={(event) =>
+                        setQuantity(line.product._id as string, line.unit, event.target.value)
+                      }
                       aria-label={text.quantity}
                     />
                     <strong>{formatMoney(line.lineTotalCents, currency)}</strong>
-                    <button type="button" className="link-button danger-text" onClick={() => removeLine(line.product._id as string)}>
+                    <button
+                      type="button"
+                      className="link-button danger-text"
+                      onClick={() => removeLine(line.product._id as string, line.unit)}
+                    >
                       {text.remove}
                     </button>
                   </div>

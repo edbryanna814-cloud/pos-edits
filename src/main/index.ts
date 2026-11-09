@@ -9,7 +9,7 @@ import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { createDefaultAdminIfMissing, createUser, ensureAuthSchema, getAuthState, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, updateUser } from './auth'
 import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
-import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receivePO, stockAdjust, updateProduct } from './inventory'
+import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { createPlan, createSubscription, ensureSubscriptionSchema, getSubscription, listPayments, listPlans, renewSubscription, setSubscriptionStatus } from './subscription'
@@ -63,6 +63,7 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvUnitsCreate]: ['inventory.manage'],
   [IPC.InvProductsCreate]: ['inventory.manage'],
   [IPC.InvProductsUpdate]: ['inventory.manage'],
+  [IPC.InvReceiveCarton]: ['inventory.manage'],
   [IPC.InvStockAdjust]: ['inventory.manage'],
   [IPC.InvSuppliersCreate]: ['inventory.manage'],
   [IPC.InvPOCreate]: ['inventory.manage'],
@@ -296,6 +297,7 @@ function registerIpc(): void {
   handle(IPC.InvProductsList, async (event) => { assertTrusted(event); return listProducts() })
   handle(IPC.InvProductsCreate, async (event, input: any) => { assertTrusted(event); return createProduct(input) })
   handle(IPC.InvProductsUpdate, async (event, id: string, input: any) => { assertTrusted(event); return updateProduct(id, input) })
+  handle(IPC.InvReceiveCarton, async (event, input: any) => { assertTrusted(event); return receiveCarton(input) })
   handle(IPC.InvStockMovementsList, async (event, productId?: string) => { assertTrusted(event); return listStockMovements(productId) })
   handle(IPC.InvStockAdjust, async (event, input: any) => { assertTrusted(event); return stockAdjust(input) })
   handle(IPC.InvSuppliersList, async (event) => { assertTrusted(event); return listSuppliers() })

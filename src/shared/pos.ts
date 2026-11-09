@@ -3,6 +3,9 @@ export type SaleLine = {
   productName: string
   sku: string
   quantity: number
+  saleUnit?: 'base' | 'box'
+  baseQuantity?: number
+  unitsPerBox?: number
   unitPriceCents: number
   unitCostCents?: number
   discountCents: number

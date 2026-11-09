@@ -1198,19 +1198,45 @@ h3 {
 .product-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   min-height: 96px;
-  padding: 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
-  text-align: start;
+  overflow: hidden;
 }
 
 .product-card:hover {
   border-color: var(--accent);
   color: var(--text);
   box-shadow: 0 2px 8px rgb(15 118 110 / 12%);
+}
+
+.product-card-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  text-align: start;
+  color: inherit;
+  cursor: pointer;
+}
+
+.product-card-box {
+  border: 0;
+  border-top: 1px dashed var(--border);
+  padding: 6px 12px;
+  background: var(--surface-alt, #f1f5f4);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.product-card-box:hover {
+  color: var(--text);
 }
 
 .product-name {
@@ -1352,6 +1378,12 @@ h3 {
 
 .receipt-panel-header h3 {
   margin: 0;
+}
+
+.receipt-brand {
+  margin-bottom: 12px;
+  text-align: center;
+  font-size: 18px;
 }
 
 .receipt-meta {
@@ -1496,6 +1528,15 @@ h3 {
 }
 
 @media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  .receipt-brand strong {
+    font-size: 15pt;
+  }
+
   .sidebar,
   .content-header,
   .content-footer,

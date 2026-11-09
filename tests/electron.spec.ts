@@ -73,6 +73,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'invProductsCreate',
         'invProductsList',
         'invProductsUpdate',
+        'invReceiveCarton',
         'invStockAdjust',
         'invStockMovementsList',
         'invSuppliersCreate',
@@ -438,6 +439,79 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await app.close()
     }
   })
+})
+
+test('receives cartons and sells whole boxes in base units', async () => {
+  await cleanTestDatabase()
+
+  const app = await electron.launch({
+    args: ['.'],
+    env: { ...process.env, MONGODB_DB: TEST_DB }
+  })
+
+  try {
+    const window = await app.firstWindow()
+    await expect(window).toHaveTitle(/Pharmacy POS/)
+    await window.getByLabel('Username').fill('admin')
+    await window.getByLabel('Password').fill('admin')
+    await window.getByRole('button', { name: /Login|Sign in/ }).click()
+    await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({
+      timeout: 10000
+    })
+
+    const result = await window.evaluate(async () => {
+      const api = (window as any).api
+      const product = await api.invProductsCreate({
+        name: 'Boxed Amoxicillin',
+        sku: 'BOX-AMOX',
+        barcode: '555000111',
+        purchaseCostCents: 100,
+        sellingPriceCents: 200,
+        unitsPerBox: 10,
+        boxPriceCents: 1800,
+        stockQuantity: 0,
+        minStock: 0
+      })
+      await api.invReceiveCarton({
+        productId: product._id,
+        cartons: 2,
+        boxesPerCarton: 5
+      })
+      const afterIntake = (await api.invProductsList())[0].stockQuantity
+      const movements = await api.invStockMovementsList(product._id)
+
+      const sale = await api.posCheckout({
+        clientRequestId: 'box-sale-1',
+        lines: [{ productId: product._id, quantity: 2, saleUnit: 'box' }],
+        discountCents: 0,
+        taxCents: 0,
+        paymentMethod: 'cash',
+        paidCents: 3600
+      })
+      const afterSale = (await api.invProductsList())[0].stockQuantity
+      await api.posReturn({ saleId: sale._id, reason: 'Packaging test' })
+      const afterReturn = (await api.invProductsList())[0].stockQuantity
+
+      return {
+        afterIntake,
+        afterSale,
+        afterReturn,
+        purchaseQty: movements[0]?.quantity,
+        line: sale.lines[0],
+        totalCents: sale.totalCents
+      }
+    })
+
+    expect(result.afterIntake).toBe(100)
+    expect(result.afterSale).toBe(80)
+    expect(result.afterReturn).toBe(100)
+    expect(result.purchaseQty).toBe(100)
+    expect(result.line.saleUnit).toBe('box')
+    expect(result.line.baseQuantity).toBe(20)
+    expect(result.totalCents).toBe(3600)
+  } finally {
+    await app.close()
+  }
 })
 
 test.afterAll(async () => {

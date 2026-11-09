@@ -37,6 +37,7 @@ const api: PreloadApi = {
   invProductsList: () => ipcRenderer.invoke(IPC.InvProductsList),
   invProductsCreate: (input) => ipcRenderer.invoke(IPC.InvProductsCreate, input),
   invProductsUpdate: (id, input) => ipcRenderer.invoke(IPC.InvProductsUpdate, id, input),
+  invReceiveCarton: (input) => ipcRenderer.invoke(IPC.InvReceiveCarton, input),
   invStockMovementsList: (productId) => ipcRenderer.invoke(IPC.InvStockMovementsList, productId),
   invStockAdjust: (input) => ipcRenderer.invoke(IPC.InvStockAdjust, input),
   invSuppliersList: () => ipcRenderer.invoke(IPC.InvSuppliersList),

@@ -23,6 +23,8 @@ export type Product = {
   unitId?: string
   purchaseCostCents: number
   sellingPriceCents: number
+  unitsPerBox?: number
+  boxPriceCents?: number
   stockQuantity: number
   minStock: number
   expiryDate?: string

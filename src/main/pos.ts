@@ -81,8 +81,27 @@ async function createSale(db: Db, input: any): Promise<Sale> {
     )
     if (!product) throw new Error('Product not found')
     if (product.active === false) throw new Error(`Product is inactive: ${product.name}`)
+    if ((product as any).expiryDate) {
+      const expiry = new Date(`${String((product as any).expiryDate).slice(0, 10)}T23:59:59`)
+      if (!Number.isNaN(expiry.getTime()) && expiry.getTime() < Date.now()) {
+        throw new Error(`Product is expired: ${product.name}`)
+      }
+    }
 
-    const unitPriceCents = serverPrice(product)
+    const saleUnit = raw?.saleUnit === 'box' ? 'box' : 'base'
+    const unitsPerBox = Math.max(1, Math.trunc(Number((product as any).unitsPerBox) || 1))
+    let unitPriceCents: number
+    let baseQuantity: number
+    if (saleUnit === 'box') {
+      if (unitsPerBox <= 1) throw new Error(`${product.name} is not sold by box`)
+      unitPriceCents = Math.max(0, Math.trunc(Number((product as any).boxPriceCents) || 0))
+      if (unitPriceCents <= 0) throw new Error(`Box price is not set for ${product.name}`)
+      baseQuantity = quantity * unitsPerBox
+    } else {
+      unitPriceCents = serverPrice(product)
+      baseQuantity = quantity
+    }
+
     const discountCents = toCents(raw?.discountCents ?? 0, 'Line discount')
     const lineTotalCents = unitPriceCents * quantity - discountCents
     if (lineTotalCents < 0) throw new Error(`Discount exceeds line total for ${product.name}`)
@@ -92,6 +111,9 @@ async function createSale(db: Db, input: any): Promise<Sale> {
       productName: String(product.name ?? ''),
       sku: String(product.sku ?? ''),
       quantity,
+      saleUnit,
+      baseQuantity,
+      unitsPerBox,
       unitPriceCents,
       unitCostCents: Math.max(0, Math.trunc(Number(product.purchaseCostCents) || 0)),
       discountCents,
@@ -118,9 +140,10 @@ async function createSale(db: Db, input: any): Promise<Sale> {
   if (paidCents < totalCents) throw new Error('Paid amount is less than total')
 
   for (const line of lines) {
+    const baseQuantity = line.baseQuantity ?? line.quantity
     const result = await db.collection('inv_products').updateOne(
-      { _id: new ObjectId(line.productId), stockQuantity: { $gte: line.quantity } } as any,
-      { $inc: { stockQuantity: -line.quantity }, $set: { updatedAt: now } },
+      { _id: new ObjectId(line.productId), stockQuantity: { $gte: baseQuantity } } as any,
+      { $inc: { stockQuantity: -baseQuantity }, $set: { updatedAt: now } },
       { session: input.session }
     )
     if (result.matchedCount !== 1) throw new Error(`Insufficient stock for ${line.productName}`)
@@ -164,7 +187,7 @@ async function createSale(db: Db, input: any): Promise<Sale> {
       {
         productId: line.productId,
         type: 'sale',
-        quantity: -line.quantity,
+        quantity: -(line.baseQuantity ?? line.quantity),
         reason: `Sale ${sale.invoiceNo}`,
         reference: saleId,
         createdAt: now
@@ -236,16 +259,17 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
 
       const now = new Date().toISOString()
       for (const line of sale.lines) {
+        const baseQuantity = line.baseQuantity ?? line.quantity
         await db.collection('inv_products').updateOne(
           { _id: new ObjectId(line.productId) } as any,
-          { $inc: { stockQuantity: line.quantity }, $set: { updatedAt: now } },
+          { $inc: { stockQuantity: baseQuantity }, $set: { updatedAt: now } },
           { session }
         )
         await db.collection('inv_stock_movements').insertOne(
           {
             productId: line.productId,
             type: 'return',
-            quantity: line.quantity,
+            quantity: baseQuantity,
             reason: `Return ${sale.invoiceNo}`,
             reference: input.saleId,
             createdAt: now
@@ -265,7 +289,7 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
         invoiceNo: sale.invoiceNo,
         lines: sale.lines.map((line) => ({
           productId: line.productId,
-          quantity: line.quantity,
+          quantity: line.baseQuantity ?? line.quantity,
           amountCents: line.lineTotalCents
         })),
         refundCents: sale.totalCents,

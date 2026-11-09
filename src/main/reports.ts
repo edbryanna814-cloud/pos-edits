@@ -48,7 +48,7 @@ export async function salesReport(): Promise<SalesReport> {
     }
 
     for (const line of Array.isArray(s.lines) ? s.lines : []) {
-      const quantity = Number(line.quantity) || 0
+      const quantity = Number(line.baseQuantity ?? line.quantity) || 0
       const revenue = Number(line.lineTotalCents) || 0
       const cost = quantity * (Number(line.unitCostCents) || 0)
       cogsCents += cost

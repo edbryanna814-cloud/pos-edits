@@ -89,6 +89,9 @@ export async function createProduct(input: Partial<Product>): Promise<Product> {
     unitId: input.unitId,
     purchaseCostCents: toInteger(input.purchaseCostCents ?? 0, 'Purchase cost'),
     sellingPriceCents: toInteger(input.sellingPriceCents ?? 0, 'Selling price'),
+    unitsPerBox: toInteger(input.unitsPerBox ?? 1, 'Units per box', 1),
+    boxPriceCents:
+      input.boxPriceCents !== undefined ? toInteger(input.boxPriceCents, 'Box price') : undefined,
     stockQuantity: toInteger(input.stockQuantity ?? 0, 'Stock quantity'),
     minStock: toInteger(input.minStock ?? 0, 'Minimum stock'),
     expiryDate: input.expiryDate ? String(input.expiryDate).trim() : undefined,
@@ -119,6 +122,8 @@ export async function updateProduct(id: string, input: Partial<Product>): Promis
   if (input.unitId !== undefined) update.unitId = input.unitId
   if (input.purchaseCostCents !== undefined) update.purchaseCostCents = toInteger(input.purchaseCostCents, 'Purchase cost')
   if (input.sellingPriceCents !== undefined) update.sellingPriceCents = toInteger(input.sellingPriceCents, 'Selling price')
+  if (input.unitsPerBox !== undefined) update.unitsPerBox = toInteger(input.unitsPerBox, 'Units per box', 1)
+  if (input.boxPriceCents !== undefined) update.boxPriceCents = toInteger(input.boxPriceCents, 'Box price')
   if (input.minStock !== undefined) update.minStock = toInteger(input.minStock, 'Minimum stock')
   if (input.expiryDate !== undefined)
     update.expiryDate = input.expiryDate ? String(input.expiryDate).trim() : undefined
@@ -137,6 +142,56 @@ export async function updateProduct(id: string, input: Partial<Product>): Promis
     throw error
   }
   if (!updated) throw new Error('Product not found')
+  return { ...updated, _id: updated._id.toString() } as Product
+}
+
+export interface CartonIntakeInput {
+  productId: string
+  cartons: number
+  boxesPerCarton: number
+  sellingPriceCents?: number
+  boxPriceCents?: number
+  expiryDate?: string
+}
+
+export async function receiveCarton(input: CartonIntakeInput): Promise<Product> {
+  const db = requireDb()
+  if (!ObjectId.isValid(input.productId)) throw new Error('Invalid product')
+  const cartons = toInteger(input.cartons, 'Cartons', 1)
+  const boxesPerCarton = toInteger(input.boxesPerCarton, 'Boxes per carton', 1)
+  const product = await db.collection(PRODUCTS).findOne({ _id: new ObjectId(input.productId) } as any)
+  if (!product) throw new Error('Product not found')
+  const unitsPerBox = Math.max(1, Math.trunc(Number((product as any).unitsPerBox) || 1))
+  const quantity = cartons * boxesPerCarton * unitsPerBox
+  const now = new Date().toISOString()
+  const update: Record<string, unknown> = { updatedAt: now }
+  if (input.sellingPriceCents !== undefined) {
+    update.sellingPriceCents = toInteger(input.sellingPriceCents, 'Selling price')
+  }
+  if (input.boxPriceCents !== undefined) {
+    update.boxPriceCents = toInteger(input.boxPriceCents, 'Box price')
+  }
+  if (input.expiryDate !== undefined) {
+    update.expiryDate = input.expiryDate ? String(input.expiryDate).slice(0, 10) : null
+  }
+  const updated = await db.collection(PRODUCTS).findOneAndUpdate(
+    { _id: new ObjectId(input.productId) } as any,
+    { $inc: { stockQuantity: quantity }, $set: update },
+    { returnDocument: 'after' }
+  )
+  if (!updated) throw new Error('Product not found')
+  await db.collection(STOCK).insertOne({
+    productId: input.productId,
+    type: 'purchase',
+    quantity,
+    reason: `Carton intake: ${cartons} x ${boxesPerCarton}`,
+    createdAt: now
+  } as any)
+  await logAudit({
+    action: 'inventory.carton.receive',
+    resource: PRODUCTS,
+    resourceId: input.productId
+  })
   return { ...updated, _id: updated._id.toString() } as Product
 }
 

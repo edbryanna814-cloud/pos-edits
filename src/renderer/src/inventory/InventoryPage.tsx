@@ -33,6 +33,26 @@ const copy = {
     noUnits: 'No units yet.',
     purchaseCost: 'Purchase cost',
     sellingPrice: 'Selling price',
+    unitsPerBox: 'Strips per box (1 = no box selling)',
+    perBox: 'per box',
+    boxPrice: 'Box selling price',
+    cartonTitle: 'Receive carton',
+    cartonHint: 'Scan the barcode, enter cartons and boxes per carton; stock is added automatically.',
+    cartonBarcode: 'Barcode',
+    cartonFind: 'Find',
+    cartonProduct: 'Product',
+    cartonSelect: 'Select a product',
+    cartons: 'Cartons',
+    boxesPerCarton: 'Boxes per carton',
+    cartonSelling: 'Strip price (optional)',
+    cartonBoxPrice: 'Box price (optional)',
+    cartonReceive: 'Receive carton',
+    cartonExpiry: 'Expiry date (optional)',
+    cartonSummary: 'Will add',
+    cartonUnits: 'units to stock',
+    cartonNotFound: 'No product with this barcode.',
+    unitsPerBoxInvalid: 'Strips per box must be 1 or more.',
+    boxPriceRequired: 'Enter the box selling price when strips per box is more than 1.',
     stock: 'Opening stock',
     minStock: 'Minimum stock',
     active: 'Active (available for sale)',
@@ -92,6 +112,26 @@ const copy = {
     noUnits: 'لا توجد وحدات بعد.',
     purchaseCost: 'سعر الشراء',
     sellingPrice: 'سعر البيع',
+    unitsPerBox: 'عدد الشرائط في العلبة (1 = بدون بيع بالعلبة)',
+    perBox: 'لكل علبة',
+    boxPrice: 'سعر بيع العلبة',
+    cartonTitle: 'استلام كرتونة',
+    cartonHint: 'امسح الباركود، أدخل عدد الكراتين والعلب في الكرتونة، ويُضاف المخزون تلقائيًا.',
+    cartonBarcode: 'الباركود',
+    cartonFind: 'بحث',
+    cartonProduct: 'المنتج',
+    cartonSelect: 'اختر منتجًا',
+    cartons: 'عدد الكراتين',
+    boxesPerCarton: 'علب في الكرتونة',
+    cartonSelling: 'سعر الشريط (اختياري)',
+    cartonBoxPrice: 'سعر العلبة (اختياري)',
+    cartonReceive: 'استلام الكرتونة',
+    cartonExpiry: 'تاريخ الانتهاء (اختياري)',
+    cartonSummary: 'سيُضاف',
+    cartonUnits: 'وحدة للمخزون',
+    cartonNotFound: 'لا يوجد منتج بهذا الباركود.',
+    unitsPerBoxInvalid: 'عدد الشرائط في العلبة يجب أن يكون 1 أو أكثر.',
+    boxPriceRequired: 'أدخل سعر بيع العلبة عندما يكون عدد الشرائط أكبر من 1.',
     stock: 'الرصيد الافتتاحي',
     minStock: 'الحد الأدنى',
     active: 'نشط (متاح للبيع)',
@@ -153,6 +193,8 @@ interface FormState {
   expiryDate: string
   purchase: string
   selling: string
+  unitsPerBox: string
+  boxPrice: string
   stock: string
   minStock: string
   active: boolean
@@ -168,6 +210,8 @@ function emptyForm(): FormState {
     expiryDate: '',
     purchase: '0.00',
     selling: '0.00',
+    unitsPerBox: '1',
+    boxPrice: '',
     stock: '0',
     minStock: '0',
     active: true
@@ -184,6 +228,8 @@ function formFrom(product: Product): FormState {
     expiryDate: product.expiryDate ? product.expiryDate.slice(0, 10) : '',
     purchase: centsToInput(product.purchaseCostCents),
     selling: centsToInput(product.sellingPriceCents),
+    unitsPerBox: String(product.unitsPerBox ?? 1),
+    boxPrice: product.boxPriceCents ? centsToInput(product.boxPriceCents) : '',
     stock: String(product.stockQuantity),
     minStock: String(product.minStock),
     active: product.active !== false
@@ -217,6 +263,13 @@ export default function InventoryPage({ products, language, currency, onChanged 
   const [categoryName, setCategoryName] = useState('')
   const [unitName, setUnitName] = useState('')
   const [unitAbbreviation, setUnitAbbreviation] = useState('')
+  const [cartonBarcode, setCartonBarcode] = useState('')
+  const [cartonProductId, setCartonProductId] = useState('')
+  const [cartons, setCartons] = useState('1')
+  const [boxesPerCarton, setBoxesPerCarton] = useState('1')
+  const [cartonSelling, setCartonSelling] = useState('')
+  const [cartonBoxPrice, setCartonBoxPrice] = useState('')
+  const [cartonExpiry, setCartonExpiry] = useState('')
 
   async function loadCatalog(): Promise<void> {
     if (!window.api) return
@@ -293,6 +346,14 @@ export default function InventoryPage({ products, language, currency, onChanged 
     if (minStock === null) return setError(text.minInvalid)
     const openingStock = wholeNumber(form.stock, 0)
     if (openingStock === null) return setError(text.stockInvalid)
+    const unitsPerBox = wholeNumber(form.unitsPerBox, 1)
+    if (unitsPerBox === null) return setError(text.unitsPerBoxInvalid)
+    let boxPriceCents: number | undefined
+    if (unitsPerBox > 1) {
+      const boxPrice = parseMoney(form.boxPrice)
+      if (boxPrice === null || boxPrice <= 0) return setError(text.boxPriceRequired)
+      boxPriceCents = boxPrice
+    }
 
     const payload: Partial<Product> = {
       name,
@@ -303,9 +364,11 @@ export default function InventoryPage({ products, language, currency, onChanged 
       expiryDate: form.expiryDate || undefined,
       purchaseCostCents: purchase,
       sellingPriceCents: selling,
+      unitsPerBox,
       minStock,
       active: form.active
     }
+    if (boxPriceCents !== undefined) payload.boxPriceCents = boxPriceCents
     if (!editing) payload.stockQuantity = openingStock
 
     setBusy(true)
@@ -347,6 +410,70 @@ export default function InventoryPage({ products, language, currency, onChanged 
       onChanged()
     } catch (adjustError) {
       setError(`${text.error}: ${message(adjustError)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const cartonProduct = products.find((product) => product._id === cartonProductId) ?? null
+  const cartonUnits =
+    (wholeNumber(cartons, 1) ?? 0) *
+    (wholeNumber(boxesPerCarton, 1) ?? 0) *
+    Math.max(1, cartonProduct?.unitsPerBox ?? 1)
+
+  function selectCartonProduct(product: Product): void {
+    setCartonProductId(product._id ?? '')
+    setCartonSelling(centsToInput(product.sellingPriceCents))
+    setCartonBoxPrice(product.boxPriceCents ? centsToInput(product.boxPriceCents) : '')
+    setCartonExpiry(product.expiryDate ? product.expiryDate.slice(0, 10) : '')
+  }
+
+  function findCartonProduct(): void {
+    const code = cartonBarcode.trim()
+    const product = products.find(
+      (item) => item.barcode === code || item.sku.toLowerCase() === code.toLowerCase()
+    )
+    if (!product) return setError(text.cartonNotFound)
+    setError('')
+    selectCartonProduct(product)
+  }
+
+  async function handleReceiveCarton(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault()
+    setError('')
+    setSuccess('')
+    if (!cartonProduct?._id) return setError(text.cartonNotFound)
+    const cartonCount = wholeNumber(cartons, 1)
+    const boxCount = wholeNumber(boxesPerCarton, 1)
+    if (cartonCount === null || boxCount === null) return setError(text.adjustInvalid)
+    const selling = cartonSelling.trim() ? parseMoney(cartonSelling) ?? undefined : undefined
+    const boxPrice = cartonBoxPrice.trim() ? parseMoney(cartonBoxPrice) ?? undefined : undefined
+    if (cartonSelling.trim() && selling === undefined) return setError(text.priceInvalid)
+    if (cartonBoxPrice.trim() && boxPrice === undefined) return setError(text.priceInvalid)
+
+    setBusy(true)
+    try {
+      await window.api.invReceiveCarton({
+        productId: cartonProduct._id,
+        cartons: cartonCount,
+        boxesPerCarton: boxCount,
+        ...(selling !== undefined ? { sellingPriceCents: selling } : {}),
+        ...(boxPrice !== undefined ? { boxPriceCents: boxPrice } : {}),
+        ...(cartonExpiry ? { expiryDate: cartonExpiry } : {})
+      })
+      setSuccess(
+        `${text.saved} ${text.cartonSummary} ${cartonCount * boxCount * Math.max(1, cartonProduct.unitsPerBox ?? 1)} ${text.cartonUnits}.`
+      )
+      setCartonBarcode('')
+      setCartonProductId('')
+      setCartons('1')
+      setBoxesPerCarton('1')
+      setCartonSelling('')
+      setCartonBoxPrice('')
+      setCartonExpiry('')
+      onChanged()
+    } catch (cartonError) {
+      setError(`${text.error}: ${message(cartonError)}`)
     } finally {
       setBusy(false)
     }
@@ -495,6 +622,28 @@ export default function InventoryPage({ products, language, currency, onChanged 
               />
             </label>
             <label>
+              <span>{text.unitsPerBox}</span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={form.unitsPerBox}
+                onChange={(event) => update('unitsPerBox', event.target.value)}
+                required
+              />
+            </label>
+            {Number(form.unitsPerBox) > 1 ? (
+              <label>
+                <span>{text.boxPrice}</span>
+                <input
+                  inputMode="decimal"
+                  value={form.boxPrice}
+                  onChange={(event) => update('boxPrice', event.target.value)}
+                  required
+                />
+              </label>
+            ) : null}
+            <label>
               <span>{text.stock}</span>
               <input
                 type="number"
@@ -542,6 +691,79 @@ export default function InventoryPage({ products, language, currency, onChanged 
           </div>
         </form>
       ) : null}
+
+      <form className="crud-form carton-form" onSubmit={handleReceiveCarton}>
+        <div className="crud-form-header">
+          <div>
+            <h3>{text.cartonTitle}</h3>
+            <p className="muted">{text.cartonHint}</p>
+          </div>
+        </div>
+        <div className="crud-grid">
+          <label>
+            <span>{text.cartonBarcode}</span>
+            <input
+              value={cartonBarcode}
+              onChange={(event) => setCartonBarcode(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  findCartonProduct()
+                }
+              }}
+              maxLength={80}
+            />
+          </label>
+          <label>
+            <span>{text.cartonProduct}</span>
+            <select
+              value={cartonProductId}
+              onChange={(event) => {
+                const product = products.find((item) => item._id === event.target.value)
+                if (product) selectCartonProduct(product)
+                else setCartonProductId('')
+              }}
+            >
+              <option value="">{text.cartonSelect}</option>
+              {products.map((product) => (
+                <option key={product._id} value={product._id}>{product.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{text.cartons}</span>
+            <input type="number" min={1} step={1} value={cartons} onChange={(event) => setCartons(event.target.value)} required />
+          </label>
+          <label>
+            <span>{text.boxesPerCarton}</span>
+            <input type="number" min={1} step={1} value={boxesPerCarton} onChange={(event) => setBoxesPerCarton(event.target.value)} required />
+          </label>
+          <label>
+            <span>{text.cartonSelling}</span>
+            <input inputMode="decimal" value={cartonSelling} onChange={(event) => setCartonSelling(event.target.value)} />
+          </label>
+          {(cartonProduct?.unitsPerBox ?? 1) > 1 ? (
+            <label>
+              <span>{text.cartonBoxPrice}</span>
+              <input inputMode="decimal" value={cartonBoxPrice} onChange={(event) => setCartonBoxPrice(event.target.value)} />
+            </label>
+          ) : null}
+          <label>
+            <span>{text.cartonExpiry}</span>
+            <input type="date" value={cartonExpiry} onChange={(event) => setCartonExpiry(event.target.value)} />
+          </label>
+          <div className="readout">
+            <span>{text.cartonSummary}</span>
+            <strong>{cartonUnits} {text.cartonUnits}</strong>
+          </div>
+        </div>
+        <div className="form-actions">
+          <button type="submit" className="primary" disabled={busy || !cartonProduct}>
+            {busy ? text.saving : text.cartonReceive}
+          </button>
+          <button type="button" onClick={findCartonProduct}>{text.cartonFind}</button>
+        </div>
+      </form>
 
       <section className="panel inline-panel">
         <h3>{text.manageCatalog}</h3>
@@ -688,6 +910,11 @@ export default function InventoryPage({ products, language, currency, onChanged 
                     <td>
                       <strong>{product.name}</strong>
                       {product.barcode ? <small className="block-muted">{product.barcode}</small> : null}
+                      {(product.unitsPerBox ?? 1) > 1 ? (
+                        <small className="block-muted">
+                          {text.boxPrice}: {formatMoney(product.boxPriceCents ?? 0, currency)} ({product.unitsPerBox} {text.perBox})
+                        </small>
+                      ) : null}
                     </td>
                     <td>{product.sku}</td>
                     <td>{formatMoney(product.sellingPriceCents, currency)}</td>

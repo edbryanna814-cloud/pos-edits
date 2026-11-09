@@ -40,6 +40,7 @@ export const IPC = {
   InvProductsList: 'inv:products:list',
   InvProductsCreate: 'inv:products:create',
   InvProductsUpdate: 'inv:products:update',
+  InvReceiveCarton: 'inv:receive-carton',
   InvStockMovementsList: 'inv:stock:list',
   InvStockAdjust: 'inv:stock:adjust',
   InvSuppliersList: 'inv:suppliers:list',
@@ -149,6 +150,14 @@ export interface PreloadApi {
   invProductsList(): Promise<Product[]>
   invProductsCreate(input: Partial<Product>): Promise<Product>
   invProductsUpdate(id: string, input: Partial<Product>): Promise<Product>
+  invReceiveCarton(input: {
+    productId: string
+    cartons: number
+    boxesPerCarton: number
+    sellingPriceCents?: number
+    boxPriceCents?: number
+    expiryDate?: string
+  }): Promise<Product>
   invStockMovementsList(productId?: string): Promise<StockMovement[]>
   invStockAdjust(input: { productId: string; quantity: number; reason: string }): Promise<StockMovement>
   invSuppliersList(): Promise<Supplier[]>
