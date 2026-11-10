@@ -18,6 +18,8 @@
     "db:init": "powershell -ExecutionPolicy Bypass -File scripts/mongodb.ps1 init",
     "pretest": "npm run build",
     "test": "playwright test",
+    "test:unit": "vitest run --dir tests/unit",
+    "scan:signing": "node scripts/scan-signing.mjs",
     "dist": "powershell -ExecutionPolicy Bypass -File scripts/prepare-mongodb.ps1 && npm run build && electron-builder --win nsis --x64"
   },
   "build": {
@@ -67,6 +69,7 @@
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.7"
+    "vite": "^7.3.7",
+    "vitest": "^5.1.0"
   }
 }
