@@ -50,6 +50,20 @@ D-LIC-01…18 (`docs/licensing/TD-RULINGS-001.md`). Key ones: reverse enrolment 
 - Closed: NFR-LIC-012, ADR E1. Partly: M1 (rotation record pending, A1/A3), FR-LIC-020 (entry still exists, guarded; removed in B3).
 - Deferred: Playwright E2E not in CI (needs Electron + MongoDB on Windows); apply rate limit is in-memory (resets on restart); guard messages English only (ActivationPage unchanged by ruling, removed in B3).
 
+## Development environment (builder machine)
+
+Checked 2026-11-10:
+- **MongoDB Community Server 9.0.8** is installed as the Windows service `MongoDB` (running, automatic start). Community edition: the build lists no enterprise modules.
+- Binary: `C:\Program Files\MongoDB\Server\9.0\bin\mongod.exe`.
+- Config: `...\bin\mongod.cfg`, listening on `127.0.0.1:27017`.
+- Data: `...\Server\9.0\data`.
+- Log: `...\Server\9.0\log\mongod.log`.
+- `mongosh` is not installed.
+- `npm run db:start|stop|status|init` (`scripts/mongodb.ps1`) controls this same service.
+- **The server runs standalone, with no replica set.** The `hello` command reports no `setName`, and `mongod.cfg` has no `replication` section. The app's default URI (`src/main/db.ts:4`) and the E2E tests (`tests/electron.spec.ts:8`) expect `?replicaSet=rs0`. Until the service runs as `rs0`, a dev run and the E2E tests cannot use it.
+  - The fix is a machine change, not a repo change: add `replication: { replSetName: rs0 }` to `mongod.cfg`, restart the service from an elevated shell, then run `npm run db:init`. It has not been done; it needs the owner's OK.
+- The installer bundles its own MongoDB (`vendor/mongodb` → `localDb.ts`). This service is used for development only.
+
 ## Next
 
 A1 panel skeleton, auth, audit — in the owner's account (`Talaat-hub`), **not started**; waits for C0 review.
