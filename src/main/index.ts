@@ -13,8 +13,6 @@ import { createActivity, createContact, createCustomer, createDeal, createLead, 
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
-import { createPlan, createSubscription, ensureSubscriptionSchema, getSubscription, listPayments, listPlans, renewSubscription, setSubscriptionStatus } from './subscription'
-import { activateDevice, approveReplacement, configureDeviceLimit, createLicense, ensureLicensingSchema, listDevices, listLicenses, listReplacements, rejectReplacement, requestReplacement, revokeDevice } from './licensing'
 import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
 
 const rendererUrl = process.env['ELECTRON_RENDERER_URL']
@@ -86,24 +84,7 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.PosShiftsList]: 'authenticated',
   [IPC.ReportsSales]: ['reports.view'],
   [IPC.ReportsCashbox]: ['reports.view'],
-  [IPC.ReportsInventory]: ['reports.view'],
-  [IPC.SubPlansList]: ['settings.manage'],
-  [IPC.SubPlansCreate]: ['settings.manage'],
-  [IPC.SubGet]: ['settings.manage'],
-  [IPC.SubCreate]: ['settings.manage'],
-  [IPC.SubRenew]: ['settings.manage'],
-  [IPC.SubSetStatus]: ['settings.manage'],
-  [IPC.SubPaymentsList]: ['settings.manage'],
-  [IPC.LicList]: ['settings.manage'],
-  [IPC.LicCreate]: ['settings.manage'],
-  [IPC.LicConfigureLimit]: ['settings.manage'],
-  [IPC.LicDevicesList]: ['settings.manage'],
-  [IPC.LicActivate]: ['settings.manage'],
-  [IPC.LicRevoke]: ['settings.manage'],
-  [IPC.LicReplList]: ['settings.manage'],
-  [IPC.LicReplRequest]: ['settings.manage'],
-  [IPC.LicReplApprove]: ['settings.manage'],
-  [IPC.LicReplReject]: ['settings.manage']
+  [IPC.ReportsInventory]: ['reports.view']
 }
 
 function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...args: any[]) => any): void {
@@ -320,25 +301,6 @@ function registerIpc(): void {
   handle(IPC.ReportsSales, async (event) => { assertTrusted(event); return salesReport() })
   handle(IPC.ReportsCashbox, async (event) => { assertTrusted(event); return cashboxReport() })
   handle(IPC.ReportsInventory, async (event) => { assertTrusted(event); return inventoryReport() })
-
-  handle(IPC.SubPlansList, async (event) => { assertTrusted(event); return listPlans() })
-  handle(IPC.SubPlansCreate, async (event, input: any) => { assertTrusted(event); return createPlan(input) })
-  handle(IPC.SubGet, async (event) => { assertTrusted(event); return getSubscription() })
-  handle(IPC.SubCreate, async (event, input: any) => { assertTrusted(event); return createSubscription(input) })
-  handle(IPC.SubRenew, async (event) => { assertTrusted(event); return renewSubscription() })
-  handle(IPC.SubSetStatus, async (event, status: string) => { assertTrusted(event); return setSubscriptionStatus(status as any) })
-  handle(IPC.SubPaymentsList, async (event) => { assertTrusted(event); return listPayments() })
-
-  handle(IPC.LicList, async (event) => { assertTrusted(event); return listLicenses() })
-  handle(IPC.LicCreate, async (event, input: any) => { assertTrusted(event); return createLicense(input) })
-  handle(IPC.LicConfigureLimit, async (event, licenseId: string, maxActiveDevices: number) => { assertTrusted(event); return configureDeviceLimit(licenseId, maxActiveDevices) })
-  handle(IPC.LicDevicesList, async (event, licenseId?: string) => { assertTrusted(event); return listDevices(licenseId) })
-  handle(IPC.LicActivate, async (event, input: any) => { assertTrusted(event); return activateDevice(input) })
-  handle(IPC.LicRevoke, async (event, deviceId: string, reason: string) => { assertTrusted(event); return revokeDevice(deviceId, reason) })
-  handle(IPC.LicReplList, async (event, status?: string) => { assertTrusted(event); return listReplacements(status) })
-  handle(IPC.LicReplRequest, async (event, input: any) => { assertTrusted(event); return requestReplacement(input) })
-  handle(IPC.LicReplApprove, async (event, requestId: string, reviewedBy: string, decisionReason: string) => { assertTrusted(event); return approveReplacement(requestId, reviewedBy, decisionReason) })
-  handle(IPC.LicReplReject, async (event, requestId: string, reviewedBy: string, decisionReason: string) => { assertTrusted(event); return rejectReplacement(requestId, reviewedBy, decisionReason) })
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -384,16 +346,6 @@ if (!app.requestSingleInstanceLock()) {
       await ensurePosSchema()
     } catch (error) {
       console.error('[main] pos schema setup failed', error)
-    }
-    try {
-      await ensureSubscriptionSchema()
-    } catch (error) {
-      console.error('[main] subscription schema setup failed', error)
-    }
-    try {
-      await ensureLicensingSchema()
-    } catch (error) {
-      console.error('[main] licensing schema setup failed', error)
     }
     registerIpc()
     createWindow()

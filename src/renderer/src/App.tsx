@@ -20,7 +20,6 @@ import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
 import CrmPage from './crm/CrmPage'
 import UsersPage from './users/UsersPage'
-import SubscriptionLicensingPanel from './settings/SubscriptionLicensingPanel'
 
 type SectionId = 'dashboard' | 'pos' | 'inventory' | 'crm' | 'reports' | 'settings' | 'users' | 'audit'
 
@@ -236,10 +235,6 @@ export default function App() {
   const [reportSales, setReportSales] = useState<any>(null)
   const [reportCashbox, setReportCashbox] = useState<any>(null)
   const [reportInv, setReportInv] = useState<any>(null)
-  const [subscription, setSubscription] = useState<any>(null)
-  const [subPlans, setSubPlans] = useState<any[]>([])
-  const [licenses, setLicenses] = useState<any[]>([])
-  const [replacements, setReplacements] = useState<any[]>([])
 
   const section = sections.find((item) => item.id === active) ?? sections[0]
   const visibleSections = sections.filter(
@@ -325,10 +320,6 @@ export default function App() {
       void loadRoles()
     }
     if (active === 'audit') void loadAudit()
-    if (active === 'settings') {
-      void loadSubscription()
-      void loadLicensing()
-    }
   }, [active, authUser])
 
   useEffect(() => {
@@ -425,22 +416,6 @@ export default function App() {
       setReportSales(await window.api.reportsSales())
       setReportCashbox(await window.api.reportsCashbox())
       setReportInv(await window.api.reportsInventory())
-    } catch {}
-  }
-
-  async function loadSubscription(): Promise<void> {
-    if (!window.api) return
-    try {
-      setSubscription(await window.api.subGet())
-      setSubPlans(await window.api.subPlansList())
-    } catch {}
-  }
-
-  async function loadLicensing(): Promise<void> {
-    if (!window.api) return
-    try {
-      setLicenses(await window.api.licList())
-      setReplacements(await window.api.licReplList())
     } catch {}
   }
 
@@ -559,20 +534,13 @@ export default function App() {
         </header>
 
         {active === 'settings' ? (
-          <>
-            <SettingsPage
-              settings={settings}
-              language={language}
-              settingsError={settingsError}
-              onSaved={handleSaved}
-              onReload={handleReload}
-            />
-            <SubscriptionLicensingPanel
-              language={language}
-              currency={currency || 'USD'}
-              reviewer={authUser.username}
-            />
-          </>
+          <SettingsPage
+            settings={settings}
+            language={language}
+            settingsError={settingsError}
+            onSaved={handleSaved}
+            onReload={handleReload}
+          />
         ) : active === 'users' ? (
           <UsersPage language={language} />        ) : active === 'audit' ? (
           <section className="panel">

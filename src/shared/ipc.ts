@@ -60,23 +60,6 @@ export const IPC = {
   ReportsSales: 'reports:sales',
   ReportsCashbox: 'reports:cashbox',
   ReportsInventory: 'reports:inventory',
-  SubPlansList: 'sub:plans:list',
-  SubPlansCreate: 'sub:plans:create',
-  SubGet: 'sub:get',
-  SubCreate: 'sub:create',
-  SubRenew: 'sub:renew',
-  SubSetStatus: 'sub:set-status',
-  SubPaymentsList: 'sub:payments:list',
-  LicList: 'lic:list',
-  LicCreate: 'lic:create',
-  LicConfigureLimit: 'lic:configureLimit',
-  LicDevicesList: 'lic:devices:list',
-  LicActivate: 'lic:activate',
-  LicRevoke: 'lic:revoke',
-  LicReplList: 'lic:repl:list',
-  LicReplRequest: 'lic:repl:request',
-  LicReplApprove: 'lic:repl:approve',
-  LicReplReject: 'lic:repl:reject',
   LicenseStatus: 'license:status',
   LicenseApply: 'license:apply'
 } as const
@@ -177,23 +160,6 @@ export interface PreloadApi {
   reportsSales(): Promise<any>
   reportsCashbox(): Promise<any>
   reportsInventory(): Promise<any>
-  subPlansList(): Promise<any[]>
-  subPlansCreate(input: any): Promise<any>
-  subGet(): Promise<any>
-  subCreate(input: any): Promise<any>
-  subRenew(): Promise<any>
-  subSetStatus(status: string): Promise<any>
-  subPaymentsList(): Promise<any[]>
-  licList(): Promise<any[]>
-  licCreate(input: any): Promise<any>
-  licConfigureLimit(licenseId: string, maxActiveDevices: number): Promise<any>
-  licDevicesList(licenseId?: string): Promise<any[]>
-  licActivate(input: any): Promise<any>
-  licRevoke(deviceId: string, reason: string): Promise<void>
-  licReplList(status?: string): Promise<any[]>
-  licReplRequest(input: any): Promise<any>
-  licReplApprove(requestId: string, reviewedBy: string, decisionReason: string): Promise<any>
-  licReplReject(requestId: string, reviewedBy: string, decisionReason: string): Promise<void>
   licenseStatus(): Promise<LicenseState>
   licenseApply(code: string): Promise<LicenseState>
 }

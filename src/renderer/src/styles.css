@@ -890,7 +890,6 @@ h3 {
 .dashboard-page button,
 .receipt-panel button,
 .inline-panel button,
-.subscription-page button,
 .shift-panel button {
   padding: 8px 13px;
   border: 1px solid #cbd5e1;
@@ -906,7 +905,6 @@ h3 {
 .dashboard-page button:hover,
 .receipt-panel button:hover,
 .inline-panel button:hover,
-.subscription-page button:hover,
 .shift-panel button:hover {
   border-color: var(--accent);
   color: var(--accent);
@@ -917,7 +915,6 @@ h3 {
 .dashboard-page button.primary,
 .receipt-panel button.primary,
 .inline-panel button.primary,
-.subscription-page button.primary,
 .shift-panel button.primary {
   border-color: var(--accent);
   background: var(--accent);
@@ -929,7 +926,6 @@ h3 {
 .dashboard-page button.primary:hover,
 .receipt-panel button.primary:hover,
 .inline-panel button.primary:hover,
-.subscription-page button.primary:hover,
 .shift-panel button.primary:hover {
   background: #115e59;
   color: #ffffff;
@@ -940,7 +936,6 @@ h3 {
 .dashboard-page button:disabled,
 .receipt-panel button:disabled,
 .inline-panel button:disabled,
-.subscription-page button:disabled,
 .shift-panel button:disabled {
   cursor: wait;
   opacity: 0.6;
@@ -949,7 +944,6 @@ h3 {
 .link-button,
 .inventory-page .link-button,
 .pos-page .link-button,
-.subscription-page .link-button,
 .shift-panel .link-button {
   padding: 0;
   border: 0;
@@ -962,7 +956,6 @@ h3 {
 .link-button:hover,
 .inventory-page .link-button:hover,
 .pos-page .link-button:hover,
-.subscription-page .link-button:hover,
 .shift-panel .link-button:hover {
   color: #115e59;
 }
@@ -1586,7 +1579,6 @@ h3 {
 .procurement-page,
 .crm-page,
 .users-page,
-.subscription-page,
 .shift-panel {
   margin-top: 16px;
 }
@@ -1636,8 +1628,7 @@ h3 {
   border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
 
-.crm-details-grid,
-.settings-split {
+.crm-details-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
@@ -1686,31 +1677,6 @@ h3 {
   padding: 10px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 8px;
-}
-
-.license-list {
-  display: grid;
-  gap: 12px;
-}
-
-.license-card {
-  padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  border-radius: 10px;
-}
-
-.license-head {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-}
-
-.device-list {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .shift-current {
@@ -1850,45 +1816,6 @@ h3 {
   margin-top: 8px;
 }
 
-.plan-card {
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2, rgba(148, 163, 184, 0.04));
-  display: grid;
-  gap: 10px;
-}
-
-.plan-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.progress {
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.2);
-  overflow: hidden;
-}
-
-.progress > span {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: var(--ok, #22c55e);
-  transition: width 0.3s ease;
-}
-
-.progress > span.warning {
-  background: var(--warning, #f59e0b);
-}
-
-.progress > span.danger {
-  background: var(--danger, #ef4444);
-}
-
 .bar-list {
   display: grid;
   gap: 10px;
@@ -1982,74 +1909,37 @@ h3 {
   margin: 0;
 }
 
-.subscription-page .section-header,
 .shift-panel .section-header {
   align-items: center;
   flex-wrap: wrap;
 }
 
-.subscription-page .section-header > button,
 .shift-panel .section-header > button {
   flex: none;
 }
 
-.subscription-page .form-actions,
 .shift-panel .form-actions {
   align-items: end;
 }
 
-.subscription-page .form-actions label {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.subscription-page .form-actions select {
-  padding: 9px 11px;
-  border: 1px solid #cbd5e1;
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-}
-
-.subscription-page .form-actions select:focus {
-  border-color: var(--accent);
-  outline: none;
-  box-shadow: 0 0 0 3px rgb(15 118 110 / 14%);
-}
-
-.subscription-page .cash-form,
 .shift-panel .cash-form {
   grid-template-columns: minmax(180px, 260px) auto;
   align-items: end;
 }
 
-.subscription-page .cash-form > p,
 .shift-panel .cash-form > p {
   grid-column: 1 / -1;
   margin: 0;
 }
 
-.subscription-page .cash-form .form-actions,
 .shift-panel .cash-form .form-actions {
   grid-column: auto;
-}
-
-.subscription-page .section-header .inline-field input {
-  width: min(280px, 40vw);
-}
-
-.subscription-page .device-list > .inline-field input {
-  width: min(320px, 100%);
 }
 
 @media (max-width: 900px) {
   .order-line,
   .crm-details-grid,
-  .crm-split,
-  .settings-split {
+  .crm-split {
     grid-template-columns: 1fr;
   }
 
@@ -2057,7 +1947,6 @@ h3 {
     max-height: 280px;
   }
 
-  .subscription-page .cash-form,
   .shift-panel .cash-form {
     grid-template-columns: 1fr;
   }

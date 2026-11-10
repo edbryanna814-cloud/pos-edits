@@ -182,6 +182,7 @@ Mandatory rules:
 7. Local files are not authoritative licensing records.
 8. Offline grace duration is not invented.
 9. Licensing failures never delete business data.
+10. Subscription and license issuance/management stays outside the app in the trusted generator. The app must not expose plan creation, subscription creation/renewal, license creation, device-limit changes, revocation, or replacement approval, including to administrators.
 
 ## 9. QA Agent
 
