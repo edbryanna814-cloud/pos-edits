@@ -198,6 +198,11 @@ Test report totals against source records.
 
 ## Phase 8 — Monthly Software Subscription
 
+> **Status (C0, D-LIC-14): panel workstream, not app screens. Not
+> implemented.** Plans, prices, renewal, and payment history live in the
+> separate, owner-controlled licence panel (`docs/licensing/`). The app never
+> prices or manages a subscription in any role.
+
 Important: this is the subscription paid by the company to use the application.
 
 Implement:
@@ -227,6 +232,12 @@ Test:
 Automated recurring billing requires a trusted backend and verified payment provider webhooks.
 
 ## Phase 9 — Hardware-Based Device Licensing
+
+> **Status (C0, D-LIC-14): panel workstream, not app screens. Not
+> implemented.** No licensing backend exists. Licence management, activation
+> limits, replacement approval, and the administration dashboard are the
+> separate licence panel. App work is limited to the verifier, gate, and
+> read-only status in `docs/licensing/BUILDER-BRIEF.md` (B1–B5).
 
 Read DEVICE_LICENSING.md.
 

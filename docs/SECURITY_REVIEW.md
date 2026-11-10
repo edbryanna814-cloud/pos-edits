@@ -12,17 +12,32 @@
 ## Input Validation
 - IPC handlers validate/trust boundaries; services enforce rules
 - POS uses integer cents, idempotency considered
-- Licensing enforces device limits server-side
 
 ## Authentication/Authorization
 - Login gate, roles/permissions
 - Audit logs present
 
 ## Licensing/Security
-- Private signing key only on trusted backend (env), Electron uses verification logic
-- Signed entitlements verified conceptually; local files not authoritative
-- Device limits enforced in backend
-- Replacement requires admin approval
+
+Corrected in C0 (`docs/licensing/TD-RULINGS-001.md` D-LIC-14). An earlier
+version of this section described a backend that does not exist.
+
+Actual state at baseline `3f70318`:
+- **No licensing backend exists.** There is no HTTP client, server, or admin
+  dashboard. Device limits are **not** enforced anywhere; the payload count is
+  display-only (`docs/licensing/FINDINGS.md` F-04).
+- The app verifies an Ed25519-signed `PHM1` code in the main process against
+  one hard-coded public key and stores it in a plain `license.json`.
+- A pre-login activation screen accepts a licence code. C0 adds a guard
+  (no apply while valid, no expiry downgrade, 5 attempts/hour, audited); the
+  screen is removed in B3.
+- The old signing key was generated on a developer workstation and is treated
+  as exposed. The issuance scripts are removed from this repo in C0, and CI
+  scans for private keys and issuance code.
+
+Target (not implemented): a separate, owner-controlled licence panel issues
+signed `PHM2` entitlements; the app only verifies them. See
+`docs/licensing/ADR-001-licence-authority.md`.
 
 ## Data Safety
 - Licensing/DB failures do not delete business data
@@ -33,6 +48,6 @@
 - Use HTTPS for any remote calls
 - Rotate signing keys deliberately
 - Restrict admin operations by permissions
-- Rate-limit activation endpoints
+- Rate-limit the panel's enrolment and check-in endpoints (none exist yet)
 - Never log raw hardware identifiers
 - Review packaging/signing per platform

@@ -62,6 +62,11 @@ Do not invent prices, providers or billing policies.
 
 ### Hardware Licensing
 
+> **Status (C0, D-LIC-14): target, not implemented.** No licensing backend
+> exists. "Administration" and "backend" below mean the separate,
+> owner-controlled licence panel repo, not this app. The app only verifies
+> signed entitlements. See `docs/licensing/`.
+
 - Administration determines the allowed device count for each license.
 - Device replacement requires administrator approval.
 - Use multiple hardware identifiers.

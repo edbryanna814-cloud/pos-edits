@@ -275,6 +275,12 @@ If transactions are unavailable, document and implement a safe recovery strategy
 
 ## 6. Monthly Software Subscription
 
+> **Status (C0, D-LIC-14): panel workstream, not app screens.** Plans, prices,
+> renewal, and payment history belong to the separate, owner-controlled licence
+> panel (`docs/licensing/ADR-001-licence-authority.md`). The app never prices,
+> renews, or manages a subscription in any role. Nothing in this section is
+> implemented.
+
 This subscription is the fee paid by the company to use this software.
 
 It is NOT a subscription sold to the company's CRM customers.
@@ -334,6 +340,11 @@ Never place payment gateway secrets inside Electron.
 ---
 
 ## 7. Hardware-Based Device Licensing
+
+> **Status (C0, D-LIC-14): target, not implemented.** No licensing backend
+> exists. Device limits, activation, replacement, and administration are panel
+> work in a separate private repo; the app only verifies signed entitlements.
+> See `docs/licensing/`.
 
 The software subscription must be protected by hardware-based device licensing.
 
