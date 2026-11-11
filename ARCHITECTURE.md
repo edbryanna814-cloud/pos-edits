@@ -245,6 +245,13 @@ Never expose arbitrary filesystem or shell access.
 
 ## 9. Subscription and Licensing Architecture
 
+> **Status (C0, D-LIC-14): target, not implemented.** No licensing backend
+> exists at baseline `3f70318`. The "trusted licensing backend", subscription
+> module, and licensing module below are the separate, owner-controlled licence
+> panel (private repo), not part of this app. The app only verifies signed
+> entitlements and shows read-only status. See
+> `docs/licensing/ADR-001-licence-authority.md`.
+
 ### Separation of Responsibilities
 
 Subscription module:

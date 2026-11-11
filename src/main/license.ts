@@ -6,6 +6,8 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { networkInterfaces } from 'node:os'
 import type { LicenseState } from '../shared/ipc'
+import { logAudit } from './auth'
+import { expiryRefusal, preApplyRefusal } from './licenseApplyGuard'
 
 const execFileAsync = promisify(execFile)
 
@@ -169,10 +171,33 @@ export async function getLicenseState(): Promise<LicenseState> {
   }
 }
 
+// shortcut: in-memory, so an app restart resets the 5/hour limit; acceptable because B3 removes license:apply.
+const applyAttempts: number[] = []
+
 export async function applyLicenseCode(code: string): Promise<LicenseState> {
+  const now = Date.now()
+  const current = await getLicenseState()
+  let refusal = preApplyRefusal(current.status, applyAttempts, now)
+  applyAttempts.push(now)
   const info = await getHardwareInfo()
-  const payload = verifyCode(String(code ?? ''), info.deviceId)
-  if (payload.exp <= Date.now()) throw new Error('This license code has already expired')
+  let payload: LicensePayload | undefined
+  if (!refusal) {
+    try {
+      payload = verifyCode(String(code ?? ''), info.deviceId)
+      refusal = expiryRefusal(current.expiresAt, payload.exp, now)
+    } catch (error) {
+      refusal = error instanceof Error ? error.message : String(error)
+    }
+  }
+  // Audit before writing: if the audit fails, nothing is installed. The code itself is never logged.
+  await logAudit({
+    actorUsername: 'system:license-apply',
+    action: 'license.apply',
+    resource: 'license',
+    resourceId: payload?.lid,
+    details: { outcome: refusal ? 'refused' : 'accepted', reason: refusal ?? undefined, previousStatus: current.status }
+  })
+  if (refusal || !payload) throw new Error(refusal ?? 'License code rejected')
   await writeFile(LICENSE_FILE(), JSON.stringify({ code: code.trim(), appliedAt: new Date().toISOString() }, null, 2), 'utf8')
   return validState(info, payload)
 }

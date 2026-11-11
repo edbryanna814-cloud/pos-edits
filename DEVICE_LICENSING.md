@@ -1,5 +1,12 @@
 # DEVICE LICENSING — Hardware Binding and Subscription Protection
 
+> **Status (C0, D-LIC-14): target specification only — NOT implemented.**
+> No licensing backend, administration dashboard, HTTPS activation, or signed
+> entitlement exists at baseline `3f70318`. The backend and dashboard described
+> here are the **licence panel**, a separate private owner-controlled repo, not
+> app screens. Where this file disagrees with `docs/licensing/` (notably
+> `TD-RULINGS-001.md` and `PANEL-CONTRACT.md`), `docs/licensing/` wins.
+
 ## 1. Purpose
 
 Implement hardware-based software licensing for the Electron desktop application.
