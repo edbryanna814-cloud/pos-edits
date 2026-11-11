@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MongoClient } from 'mongodb'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { adminUri, appUri, createSecrets, directUri, isSecrets, secureBundledMongo, shutdownBundledMongo, type Endpoint } from '../../src/main/mongoAuth'
 
 // Gate 1 S4: real mongod with --keyFile. Binary: MONGOD_BIN (CI copies it from the mongo:9.0 service
@@ -11,6 +11,9 @@ import { adminUri, appUri, createSecrets, directUri, isSecrets, secureBundledMon
 const candidates = [process.env['MONGOD_BIN'], join('vendor', 'mongodb', 'mongod.exe'), 'C:\\Program Files\\MongoDB\\Server\\9.0\\bin\\mongod.exe']
 const MONGOD = candidates.find((p) => p && existsSync(p))
 if (!MONGOD && process.env['CI']) throw new Error('MONGOD_BIN is required in CI for the MongoDB auth tests')
+
+// Starting mongod and initiating a replica set takes seconds, more on CI runners.
+vi.setConfig({ testTimeout: 120_000, hookTimeout: 60_000 })
 
 const dir = mkdtempSync(join(tmpdir(), 'mongo-auth-test-'))
 const running: ChildProcess[] = []
