@@ -578,6 +578,62 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
   }
 })
 
+test('Gate 1 S2: CSP, window, navigation and permission guards hold in the built app', async () => {
+  const app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  try {
+    const window = await app.firstWindow()
+    const cspErrors: string[] = []
+    window.on('console', (msg) => {
+      if (/Content Security Policy/i.test(msg.text())) cspErrors.push(msg.text())
+    })
+    // Any first screen will do (a session saved by an earlier test may open the Dashboard).
+    await expect(window.getByRole('heading', { name: /^(Sign in|Create the administrator account|Dashboard)$/, level: 1 })).toBeVisible({ timeout: 10000 })
+
+    const csp = await window.evaluate(() => document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content') ?? '')
+    expect(csp).toContain("script-src 'self'")
+    expect(csp).toContain("object-src 'none'")
+    expect(csp).not.toContain('unsafe-inline')
+    expect(csp).not.toContain('unsafe-eval')
+    expect(cspErrors).toEqual([]) // the app renders without violating its own policy
+
+    const injected = await window.evaluate(async () => {
+      const s = document.createElement('script')
+      s.textContent = '(window as any).__injected = 1'.replace(' as any', '')
+      document.body.appendChild(s)
+      return (window as any).__injected === 1
+    })
+    // Inline script is refused. (eval is not tested here: Playwright evaluates over the DevTools
+    // protocol, which bypasses CSP; the policy above has no 'unsafe-eval'.)
+    expect(injected).toBe(false)
+
+    // New windows are denied; navigation away from the app is blocked.
+    expect(await window.evaluate(() => globalThis.open('https://example.com') === null)).toBe(true)
+    expect(app.windows()).toHaveLength(1)
+    const before = window.url()
+    await window.evaluate(() => { globalThis.location.href = 'https://example.com' })
+    await window.waitForTimeout(500)
+    expect(window.url()).toBe(before)
+
+    // Permissions are denied (camera/microphone/geolocation/notifications).
+    const perms = await window.evaluate(async () => {
+      const media = await navigator.mediaDevices.getUserMedia({ video: true }).then(() => 'granted', (e) => e.name)
+      const notifications = await Notification.requestPermission()
+      const geo = await new Promise((resolve) => navigator.geolocation.getCurrentPosition(() => resolve('granted'), (e) => resolve(e.code)))
+      return { media, notifications, geo }
+    })
+    expect(perms.media).not.toBe('granted')
+    expect(perms.notifications).toBe('denied')
+    expect(perms.geo).not.toBe('granted')
+
+    // No webview tag is attached.
+    await window.evaluate(() => { const w = document.createElement('webview'); w.setAttribute('src', 'https://example.com'); document.body.appendChild(w) })
+    await window.waitForTimeout(500)
+    expect(app.windows()).toHaveLength(1)
+  } finally {
+    await app.close()
+  }
+})
+
 test.afterAll(async () => {
   await cleanTestDatabase()
 })

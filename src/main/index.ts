@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -111,7 +111,9 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webSecurity: true
+      webSecurity: true,
+      // Gate 1 S2: no DevTools in a packaged (production) build.
+      devTools: !app.isPackaged
     }
   })
 
@@ -324,7 +326,18 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
+  // Gate 1 S2: app-wide guards for every webContents, not only the main window.
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-attach-webview', (event) => event.preventDefault())
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  })
+
   app.whenReady().then(async () => {
+    // Deny every permission (camera, microphone, geolocation, notifications, …) except the
+    // clipboard write used by the device-code copy button.
+    const allowedPermissions = new Set(['clipboard-sanitized-write'])
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowedPermissions.has(permission)))
+    session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowedPermissions.has(permission))
     setAuditFallbackFile(join(app.getPath('userData'), 'audit-fallback.jsonl'))
     try {
       await startBundledMongo()
