@@ -634,6 +634,28 @@ test('Gate 1 S2: CSP, window, navigation and permission guards hold in the built
   }
 })
 
+test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', async () => {
+  const app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  try {
+    const window = await app.firstWindow()
+    await expect(window.getByRole('heading', { name: /^(Sign in|Create the administrator account|Dashboard)$/, level: 1 })).toBeVisible({ timeout: 10000 })
+    const results = await window.evaluate(async () => {
+      const api = (window as any).api
+      const outcome = (p: Promise<unknown>) => p.then(() => 'resolved', (e: Error) => e.message)
+      return {
+        loginOperators: await outcome(api.authLogin({ username: { $ne: null }, password: { $gt: '' } })),
+        updateBadId: await outcome(api.usersUpdate({ $ne: null }, { role: 'Administrator' })),
+        dottedKey: await outcome(api.saveSettings({ 'company.name': 'x' })),
+        movementsOperator: await outcome(api.invStockMovementsList({ $ne: null })),
+        cashInFloat: await outcome(api.posCashIn(1.5, 'x'))
+      }
+    })
+    for (const [name, message] of Object.entries(results)) expect(message, name).toMatch(/VALIDATION_FAILED/)
+  } finally {
+    await app.close()
+  }
+})
+
 test.afterAll(async () => {
   await cleanTestDatabase()
 })

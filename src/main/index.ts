@@ -14,6 +14,7 @@ import { createCategory, createPO, createProduct, createSupplier, createUnit, en
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
+import { publicError, validateIpcArgs } from './ipcSchema'
 
 const rendererUrl = process.env['ELECTRON_RENDERER_URL']
 const isDev = Boolean(rendererUrl)
@@ -89,11 +90,18 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
 
 function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...args: any[]) => any): void {
   ipcMain.handle(channel, async (event, ...args) => {
-    assertTrusted(event)
-    const guard = channelGuards[channel]
-    if (guard === 'authenticated') requireSession()
-    else if (guard) requirePermission(...guard)
-    return listener(event, ...args)
+    try {
+      assertTrusted(event)
+      validateIpcArgs(channel, args) // Gate 1 S3: schema + NoSQL-operator/size checks for every channel
+      const guard = channelGuards[channel]
+      if (guard === 'authenticated') requireSession()
+      else if (guard) requirePermission(...guard)
+      return await listener(event, ...args)
+    } catch (error) {
+      const safe = publicError(error)
+      if (safe.message !== (error as Error)?.message) console.error(`[ipc] ${channel} failed`, error)
+      throw safe
+    }
   })
 }
 
