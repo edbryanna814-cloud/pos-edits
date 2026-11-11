@@ -43,8 +43,7 @@ them to a customer.
 
 - Hash-chained and verified at every start. If verification fails, the app records `audit.chain_broken`.
   Treat that as a possible tampering incident.
-- If MongoDB was unavailable, failed sign-ins are written to `%APPDATA%\Pharmacy POS\audit-fallback.jsonl`
-  (the folder may differ with the product name).
+- If MongoDB was unavailable, failed sign-ins are written to `%APPDATA%\pharmacy-pos-management\audit-fallback.jsonl`.
 
 ## Renew, transfer, support lease
 

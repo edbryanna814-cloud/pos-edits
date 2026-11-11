@@ -1,0 +1,802 @@
+{
+  "$schema": "http://cyclonedx.org/schema/bom-1.5.schema.json",
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:91b23744-18c4-47b5-8ba4-87dd8cc7c781",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-11T02:59:29.190Z",
+    "lifecycles": [
+      {
+        "phase": "build"
+      }
+    ],
+    "tools": [
+      {
+        "vendor": "npm",
+        "name": "cli",
+        "version": "11.17.0"
+      }
+    ],
+    "component": {
+      "bom-ref": "pharmacy-pos-management@0.2.0",
+      "type": "library",
+      "name": "pharmacy-pos",
+      "version": "0.2.0",
+      "scope": "required",
+      "description": "Pharmacy POS and management desktop application for one company.",
+      "purl": "pkg:npm/pharmacy-pos-management@0.2.0",
+      "properties": [
+        {
+          "name": "cdx:npm:package:private",
+          "value": "true"
+        }
+      ],
+      "externalReferences": []
+    }
+  },
+  "components": [
+    {
+      "bom-ref": "@mongodb-js/saslprep@1.6.1",
+      "type": "library",
+      "name": "@mongodb-js/saslprep",
+      "version": "1.6.1",
+      "scope": "required",
+      "author": "Dmitry Tsvettsikh <me@reklatsmasters.com>",
+      "description": "SASLprep: Stringprep Profile for User Names and Passwords, rfc4013",
+      "purl": "pkg:npm/%40mongodb-js/saslprep@1.6.1",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@mongodb-js/saslprep/-/saslprep-1.6.1.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/mongodb-js/devtools-shared.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/mongodb-js/devtools-shared/tree/main/packages/saslprep"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://jira.mongodb.org/projects/COMPASS/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "0f8090b64f48c2308b02f09fd71bc7128777f7ad2af17314cdf99d454f6a8d43651e77ac1ae4cebc970e4da3e6f64a19d5c694280d9a4dbb336620247264a09a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "@types/webidl-conversions@7.0.3",
+      "type": "library",
+      "name": "@types/webidl-conversions",
+      "version": "7.0.3",
+      "scope": "required",
+      "description": "TypeScript definitions for webidl-conversions",
+      "purl": "pkg:npm/%40types/webidl-conversions@7.0.3",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@types/webidl-conversions/-/webidl-conversions-7.0.3.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/webidl-conversions"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "0a2249bdc46d220cda7470985f0edda849cc3518e11999582b4e4c8fd3b292da95f2e553f1f0f6045381ed2d6ec011372a3d99fb85323e6170fc8c60c3f2c094"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "@types/whatwg-url@13.0.0",
+      "type": "library",
+      "name": "@types/whatwg-url",
+      "version": "13.0.0",
+      "scope": "required",
+      "description": "TypeScript definitions for whatwg-url",
+      "purl": "pkg:npm/%40types/whatwg-url@13.0.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/@types/whatwg-url/-/whatwg-url-13.0.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/whatwg-url"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "37c597a5b13a5a0ae2eca512beb99072aacc965299f6ec6461632dfa60921b035cd07b30f554135bb029a88e1736bc7afd268cd904090b330f0c45c4d39f2cf9"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "bson@7.3.3",
+      "type": "library",
+      "name": "bson",
+      "version": "7.3.3",
+      "scope": "required",
+      "author": "The MongoDB NodeJS Team",
+      "description": "A bson parser for node.js and the browser",
+      "purl": "pkg:npm/bson@7.3.3",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/bson/-/bson-7.3.3.tgz"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://jira.mongodb.org/projects/NODE/issues/"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a33dcbc04dea184853092ca1cd044b637063d4d2ceb2314c7fab5c998e49f0cfb747b115726a017d21d6be350adf25c22c352c1a922e0776902f89c3675115fe"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "hash-wasm@4.12.0",
+      "type": "library",
+      "name": "hash-wasm",
+      "version": "4.12.0",
+      "scope": "required",
+      "author": "Dani Biró <danibiro93@gmail.com> (https://danibiro.com)",
+      "description": "Lightning fast hash functions for browsers and Node.js using hand-tuned WebAssembly binaries (MD4, MD5, SHA-1, SHA-2, SHA-3, Keccak, BLAKE2, BLAKE3, PBKDF2, Argon2, bcrypt, scrypt, Adler-32, CRC32, CRC32C, RIPEMD-160, HMAC, xxHash, SM3, Whirlpool)",
+      "purl": "pkg:npm/hash-wasm@4.12.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/hash-wasm/-/hash-wasm-4.12.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git+https://github.com/Daninet/hash-wasm.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/Daninet/hash-wasm#readme"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/Daninet/hash-wasm/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "fbfd81dab60b6f8f08fdebdd38884ff8afc30f671ad9f8018e9e8ef860449c20e4d9ee2ba5e5c82bc1af23244f8d37b38265a7f6098ac244238f1e81b6a0c755"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "memory-pager@1.5.0",
+      "type": "library",
+      "name": "memory-pager",
+      "version": "1.5.0",
+      "scope": "required",
+      "author": "Mathias Buus (@mafintosh)",
+      "description": "Access memory using small fixed sized buffers",
+      "purl": "pkg:npm/memory-pager@1.5.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/memory-pager/-/memory-pager-1.5.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/mafintosh/memory-pager.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/mafintosh/memory-pager"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/mafintosh/memory-pager/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "652e01a78aff6687aaebe34b2693fed19ce6d2947cc21b463dfd5713128b24101ccc63274a2dc8b75e0e88d092b6342333a354d689234064b180464df1e0582a"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "mongodb@7.8.0",
+      "type": "library",
+      "name": "mongodb",
+      "version": "7.8.0",
+      "scope": "required",
+      "author": "The MongoDB NodeJS Team",
+      "description": "The official MongoDB driver for Node.js",
+      "purl": "pkg:npm/mongodb@7.8.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/mongodb/-/mongodb-7.8.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "git@github.com:mongodb/node-mongodb-native.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/mongodb/node-mongodb-native"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://jira.mongodb.org/projects/NODE/issues/"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a7634a6a06d0e35f9d680086fd94af853cde028f83a04c9613d0a6a5ffd2c8fde94c2e37f97d26c0a13fe383e92ad0b1a79c0ec675f3fadda95c46514a4b7d62"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "mongodb-connection-string-url@7.0.2",
+      "type": "library",
+      "name": "mongodb-connection-string-url",
+      "version": "7.0.2",
+      "scope": "required",
+      "description": "MongoDB connection strings, based on the WhatWG URL API",
+      "purl": "pkg:npm/mongodb-connection-string-url@7.0.2",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/mongodb-connection-string-url/-/mongodb-connection-string-url-7.0.2.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/mongodb-js/mongodb-connection-string-url.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/mongodb-js/mongodb-connection-string-url"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/mongodb-js/mongodb-connection-string-url/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6684b4ed1a05aa9298430024e7daa6af1f3e8c91cd1d4df4523954f7a424b621a7d65b6f0ebfaf0b39cb5f90e25012c4a4c0076ad1cd595d6733fef8ba5eba90"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "punycode@2.3.1",
+      "type": "library",
+      "name": "punycode",
+      "version": "2.3.1",
+      "scope": "required",
+      "author": "Mathias Bynens",
+      "description": "A robust Punycode converter that fully complies to RFC 3492 and RFC 5891, and works on nearly all JavaScript platforms.",
+      "purl": "pkg:npm/punycode@2.3.1",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/punycode/-/punycode-2.3.1.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/mathiasbynens/punycode.js.git"
+        },
+        {
+          "type": "website",
+          "url": "https://mths.be/punycode"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "bd8b7b503d54f5683ad77f2c84bb4b3af740bbef03b02fe2945b44547707fb0c9d712a4d136d007d239db9fe8c91115a84be4563b5f5a14ee7295645b5fabc16"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "react@19.3.1",
+      "type": "library",
+      "name": "react",
+      "version": "19.3.1",
+      "scope": "required",
+      "description": "React is a JavaScript library for building user interfaces.",
+      "purl": "pkg:npm/react@19.3.1",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/react/-/react-19.3.1.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/react/react.git"
+        },
+        {
+          "type": "website",
+          "url": "https://react.dev/"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "40d85676dee7ae05565901b9f10b86b004778efdc76dee266f8bf3ef0d9cb271dabdc89926075ad423cd6a5745e9e571bfdd2e7778d45e92a51cbebd80edfccb"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "react-dom@19.3.1",
+      "type": "library",
+      "name": "react-dom",
+      "version": "19.3.1",
+      "scope": "required",
+      "description": "React package for working with the DOM.",
+      "purl": "pkg:npm/react-dom@19.3.1",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/react-dom/-/react-dom-19.3.1.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/react/react.git"
+        },
+        {
+          "type": "website",
+          "url": "https://react.dev/"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/react/react/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6346c0473e77961102d4d302012b34fe3f9f681ff3aaddd1f21a6f8357bcfbad59549e142f451d0b87016d77d931c22e86b7e07882d32def9978109abd03ed29"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "scheduler@0.28.0",
+      "type": "library",
+      "name": "scheduler",
+      "version": "0.28.0",
+      "scope": "required",
+      "description": "Cooperative scheduler for the browser environment.",
+      "purl": "pkg:npm/scheduler@0.28.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/scheduler/-/scheduler-0.28.0.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/react/react.git"
+        },
+        {
+          "type": "website",
+          "url": "https://react.dev/"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/react/react/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8eea2b7c2988908c3cb53fa9e415d29ba3c98d017fc9c11898acb3511088b7f45a64884bf8fba56d0f58bb6cf51dd3890dda834e5c40d7ec4a0661d726c73303"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "sparse-bitfield@3.0.3",
+      "type": "library",
+      "name": "sparse-bitfield",
+      "version": "3.0.3",
+      "scope": "required",
+      "author": "Mathias Buus (@mafintosh)",
+      "description": "Bitfield that allocates a series of small buffers to support sparse bits without allocating a massive buffer",
+      "purl": "pkg:npm/sparse-bitfield@3.0.3",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/sparse-bitfield/-/sparse-bitfield-3.0.3.tgz"
+        },
+        {
+          "type": "vcs",
+          "url": "https://github.com/mafintosh/sparse-bitfield.git"
+        },
+        {
+          "type": "website",
+          "url": "https://github.com/mafintosh/sparse-bitfield"
+        },
+        {
+          "type": "issue-tracker",
+          "url": "https://github.com/mafintosh/sparse-bitfield/issues"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "92fce18bbbea2937e48743d953ed83d8f225970db29aa24aba351cc8f31df58ef936fe273db189657361c6c81d41a6f606694372dd589df40282e12f1ebed5b1"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "tr46@5.1.1",
+      "type": "library",
+      "name": "tr46",
+      "version": "5.1.1",
+      "scope": "required",
+      "author": "Sebastian Mayr <npm@smayr.name>",
+      "description": "An implementation of the Unicode UTS #46: Unicode IDNA Compatibility Processing",
+      "purl": "pkg:npm/tr46@5.1.1",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/tr46/-/tr46-5.1.1.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "85d1796608d3aa0027b4a924958c34474dcc1b6c7f6d2cd3b64c66211c3fb13355f185ec089d6d7cb017db7961c611c99447f709108e086196c37bc8dc66923f"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "webidl-conversions@7.0.0",
+      "type": "library",
+      "name": "webidl-conversions",
+      "version": "7.0.0",
+      "scope": "required",
+      "author": "Domenic Denicola <d@domenic.me> (https://domenic.me/)",
+      "description": "Implements the WebIDL algorithms for converting to and from JavaScript values",
+      "purl": "pkg:npm/webidl-conversions@7.0.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-7.0.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "57075d06e903ceeef5a1f7c0411f7be6e9c1206a9f299a4cfbc657eb24a4f27621568a39098699cb3b77601bd8b51b4ef9aa0696ac4f83f07cecd19567f7eeea"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-2-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "bom-ref": "whatwg-url@14.2.0",
+      "type": "library",
+      "name": "whatwg-url",
+      "version": "14.2.0",
+      "scope": "required",
+      "author": "Sebastian Mayr <github@smayr.name>",
+      "description": "An implementation of the WHATWG URL Standard's URL API and parsing machinery",
+      "purl": "pkg:npm/whatwg-url@14.2.0",
+      "properties": [],
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://registry.npmjs.org/whatwg-url/-/whatwg-url-14.2.0.tgz"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "0deef619d419ccd4d40410a1b17b9e4149cf283920ff9039ce9ee9143b90023e5416810da62002534c250afce90069d3923fbe8a1a4ac0ac987b09ff5cd51b2b"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "framework",
+      "name": "electron",
+      "version": "45.2.1",
+      "purl": "pkg:npm/electron@45.2.1",
+      "bom-ref": "pkg:npm/electron@45.2.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "pharmacy-pos:note",
+          "value": "Runtime; bundles Chromium, Node.js and V8 (see electron LICENSES.chromium.html in the package)."
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "mongodb-server",
+      "version": "9.0.8",
+      "purl": "pkg:generic/mongodb/mongodb-server@9.0.8",
+      "bom-ref": "pkg:generic/mongodb/mongodb-server@9.0.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "SSPL-1.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "pharmacy-pos:note",
+          "value": "Bundled mongod.exe (vendor/mongodb). SSPL: owner legal decision required before distribution."
+        }
+      ]
+    },
+    {
+      "type": "application",
+      "name": "microsoft-vc-runtime",
+      "version": "14.x",
+      "purl": "pkg:generic/microsoft/vc-runtime@14",
+      "bom-ref": "pkg:generic/microsoft/vc-runtime@14",
+      "licenses": [
+        {
+          "license": {
+            "name": "LicenseRef-Microsoft-VC-Redistributable"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "pharmacy-pos:note",
+          "value": "vcruntime140*.dll / msvcp140*.dll copied beside mongod.exe."
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pharmacy-pos-management@0.2.0",
+      "dependsOn": [
+        "hash-wasm@4.12.0",
+        "mongodb@7.8.0",
+        "react@19.3.1",
+        "react-dom@19.3.1"
+      ]
+    },
+    {
+      "ref": "@mongodb-js/saslprep@1.6.1",
+      "dependsOn": [
+        "sparse-bitfield@3.0.3"
+      ]
+    },
+    {
+      "ref": "@types/webidl-conversions@7.0.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "@types/whatwg-url@13.0.0",
+      "dependsOn": [
+        "@types/webidl-conversions@7.0.3"
+      ]
+    },
+    {
+      "ref": "bson@7.3.3",
+      "dependsOn": []
+    },
+    {
+      "ref": "hash-wasm@4.12.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "memory-pager@1.5.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "mongodb@7.8.0",
+      "dependsOn": [
+        "@mongodb-js/saslprep@1.6.1",
+        "bson@7.3.3",
+        "mongodb-connection-string-url@7.0.2"
+      ]
+    },
+    {
+      "ref": "mongodb-connection-string-url@7.0.2",
+      "dependsOn": [
+        "@types/whatwg-url@13.0.0",
+        "whatwg-url@14.2.0"
+      ]
+    },
+    {
+      "ref": "punycode@2.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "react@19.3.1",
+      "dependsOn": []
+    },
+    {
+      "ref": "react-dom@19.3.1",
+      "dependsOn": [
+        "react@19.3.1",
+        "scheduler@0.28.0"
+      ]
+    },
+    {
+      "ref": "scheduler@0.28.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "sparse-bitfield@3.0.3",
+      "dependsOn": [
+        "memory-pager@1.5.0"
+      ]
+    },
+    {
+      "ref": "tr46@5.1.1",
+      "dependsOn": [
+        "punycode@2.3.1"
+      ]
+    },
+    {
+      "ref": "webidl-conversions@7.0.0",
+      "dependsOn": []
+    },
+    {
+      "ref": "whatwg-url@14.2.0",
+      "dependsOn": [
+        "tr46@5.1.1",
+        "webidl-conversions@7.0.0"
+      ]
+    }
+  ]
+}
