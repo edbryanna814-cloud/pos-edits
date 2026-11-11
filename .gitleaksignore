@@ -1,0 +1,9 @@
+# Gate 1 S1: triaged gitleaks findings. Test-only credentials in commit 14f9f64 (now marked gitleaks:allow inline).
+# Each line is an exact fingerprint (commit:file:rule:line). Never add a real secret here; remove it and rotate it instead.
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/electron.spec.ts:generic-api-key:542
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:79
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:85
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:91
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:103
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:118
+14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:122

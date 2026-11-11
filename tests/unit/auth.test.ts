@@ -76,19 +76,19 @@ describe('with MongoDB', () => {
   })
 
   it('setup creates one Administrator with an Argon2id hash, then refuses a second setup', async () => {
-    const result = await auth.setupFirstAdmin({ username: 'owner', password: 'Owner-Pass-2026' })
+    const result = await auth.setupFirstAdmin({ username: 'owner', password: 'Owner-Pass-2026' }) // gitleaks:allow test-only credential
     expect(result.mustChangePassword).toBe(false)
     expect(result.user.role).toBe('Administrator')
     const owner = await users().findOne({ username: 'owner' })
     expect(owner?.passwordHash).toMatch(/^\$argon2id\$/)
     expect(await auth.isSetupRequired()).toBe(false)
-    await expect(auth.setupFirstAdmin({ username: 'intruder', password: 'Intruder-Pass-2026' })).rejects.toThrow('SETUP_NOT_ALLOWED')
+    await expect(auth.setupFirstAdmin({ username: 'intruder', password: 'Intruder-Pass-2026' })).rejects.toThrow('SETUP_NOT_ALLOWED') // gitleaks:allow test-only credential
     const actions = (await audit()).map((e) => e.action)
     expect(actions).toEqual(expect.arrayContaining(['setup.admin_created', 'setup.refused']))
   })
 
   it('stores only the session token hash at rest', async () => {
-    const { token } = await auth.login({ username: 'owner', password: 'Owner-Pass-2026' })
+    const { token } = await auth.login({ username: 'owner', password: 'Owner-Pass-2026' }) // gitleaks:allow test-only credential
     const stored = await raw.db(DB_NAME).collection('sessions').findOne({ tokenHash: sha256(token) })
     expect(stored).not.toBeNull()
     expect(stored).not.toHaveProperty('token')
@@ -100,7 +100,7 @@ describe('with MongoDB', () => {
   })
 
   it('audits both success and failure', async () => {
-    await auth.login({ username: 'owner', password: 'Owner-Pass-2026' })
+    await auth.login({ username: 'owner', password: 'Owner-Pass-2026' }) // gitleaks:allow test-only credential
     await expect(auth.login({ username: 'owner', password: 'wrong-password-1' })).rejects.toThrow('LOGIN_FAILED')
     await expect(auth.login({ username: 'ghost', password: 'whatever-password' })).rejects.toThrow('LOGIN_FAILED')
     const events = await audit()
@@ -115,11 +115,11 @@ describe('with MongoDB', () => {
       await expect(auth.login({ username: 'owner', password: `wrong-password-${i}` })).rejects.toThrow('LOGIN_FAILED')
     }
     expect((await users().findOne({ username: 'owner' }))?.lockedUntil).toBeTruthy()
-    await expect(auth.login({ username: 'owner', password: 'Owner-Pass-2026' })).rejects.toThrow('LOGIN_FAILED')
+    await expect(auth.login({ username: 'owner', password: 'Owner-Pass-2026' })).rejects.toThrow('LOGIN_FAILED') // gitleaks:allow test-only credential
     expect(await audit()).toContainEqual(expect.objectContaining({ action: 'login.failure', details: { reason: 'locked' } }))
     // Lock expires: the right password works again and clears the lock.
     await users().updateOne({ username: 'owner' }, { $set: { lockedUntil: new Date(Date.now() - 1000).toISOString() } })
-    await auth.login({ username: 'owner', password: 'Owner-Pass-2026' })
+    await auth.login({ username: 'owner', password: 'Owner-Pass-2026' }) // gitleaks:allow test-only credential
     expect((await users().findOne({ username: 'owner' }))?.lockedUntil).toBeUndefined()
   })
 
