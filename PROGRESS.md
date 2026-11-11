@@ -102,6 +102,14 @@ Still open in Gate 1:
 
 Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Pharmacy-POS-Setup-0.2.0.exe`, SHA-256 `25606fe34b487bd59ef9032d04a263cae61f072dc1456109e0c6ac0c7fc1178b`. An older build of it (pre-auth) is installed on the builder PC; installing the new one secures that data folder on first start.
 
+## Field-test backup (owner request, 2026-11-11)
+
+- Branch `field-test/0.2.0` (from `gate1/security-baseline` at `12dcfc7`), commit `384caaf`, CI 42950835732 green.
+- `installation/` (installer via Git LFS, EN/AR manual, SHA256SUMS, SBOM).
+- Pre-release `field-test-0.2.0`: zip of the folder, the installer, and checksums.
+- Installer SHA-256 `b6fe9a4394df30094b5f629b7fe670a02a8bc1b90ae4557d72a5c78aba9c2217`.
+- Blocker for on-site use: the packaged app stops at PHM1 activation (no code can be issued: generator removed, panel not built).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
