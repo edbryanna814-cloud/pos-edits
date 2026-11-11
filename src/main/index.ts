@@ -8,7 +8,7 @@ import { closeDb, connectDb, dbHealth } from './db'
 import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { createDefaultAdminIfMissing, createUser, ensureAuthSchema, getAuthState, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, updateUser } from './auth'
+import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser } from './auth'
 import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
@@ -194,6 +194,16 @@ function registerIpc(): void {
     return getAuthState(token)
   })
 
+  handle(IPC.AuthSetupRequired, async () => isSetupRequired())
+
+  handle(IPC.AuthSetup, async (_event, input: unknown) => {
+    if (!(await hasValidLicense())) throw new Error('License required or expired')
+    return setupFirstAdmin(input as any)
+  })
+
+  // No channel guard: a session that must change its password may call this, and only this.
+  handle(IPC.AuthChangePassword, async (_event, input: unknown) => changePassword(input as any))
+
   handle(IPC.UsersList, async (event) => {
     assertTrusted(event)
     return listUsers()
@@ -315,6 +325,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   app.whenReady().then(async () => {
+    setAuditFallbackFile(join(app.getPath('userData'), 'audit-fallback.jsonl'))
     try {
       await startBundledMongo()
     } catch (error) {
@@ -328,7 +339,6 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       await ensureAuthSchema()
-      await createDefaultAdminIfMissing()
     } catch (error) {
       console.error('[main] auth schema setup failed', error)
     }

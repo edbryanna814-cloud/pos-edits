@@ -1,4 +1,4 @@
-import { test, expect, _electron as electron } from '@playwright/test'
+import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import { MongoClient } from 'mongodb'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -6,6 +6,24 @@ import { join } from 'node:path'
 
 const TEST_DB = 'pharmacy_pos_test'
 const MONGO_URI = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
+
+// Gate 1: there is no default account. A clean database shows the first-run setup screen;
+// later launches show the sign-in screen. Test-only credentials, local test database only.
+const E2E_ADMIN = { username: 'admin', password: 'E2E-Admin-Pass-2026' }
+
+async function signIn(window: Page): Promise<void> {
+  const setup = window.getByRole('heading', { name: 'Create the administrator account' })
+  const login = window.getByRole('heading', { name: 'Sign in' })
+  await expect(setup.or(login)).toBeVisible({ timeout: 10000 })
+  await window.getByLabel('Username').fill(E2E_ADMIN.username)
+  await window.getByLabel('Password', { exact: true }).fill(E2E_ADMIN.password)
+  if (await setup.isVisible()) {
+    await window.getByLabel('Confirm password').fill(E2E_ADMIN.password)
+    await window.getByRole('button', { name: 'Create administrator' }).click()
+  } else {
+    await window.getByRole('button', { name: /Login|Sign in/ }).click()
+  }
+}
 
 async function cleanTestDatabase(): Promise<void> {
   const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
@@ -29,9 +47,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
       const window = await app.firstWindow()
 
       await expect(window).toHaveTitle(/Pharmacy POS/)
-      await window.getByLabel('Username').fill('admin')
-      await window.getByLabel('Password').fill('admin')
-      await window.getByRole('button', { name: /Login|Sign in|تسجيل الدخول/ }).click()
+      await signIn(window)
       await expect(
         window.getByRole('heading', { name: 'Dashboard', level: 1 })
       ).toBeVisible({ timeout: 10000 })
@@ -44,8 +60,11 @@ test.describe.serial('Phase 2 - database and settings', () => {
         await window.evaluate(() => Object.keys((window as any).api).sort())
       ).toEqual([
         'auditList',
+        'authChangePassword',
         'authLogin',
         'authLogout',
+        'authSetup',
+        'authSetupRequired',
         'authState',
         'crmActivitiesCreate',
         'crmActivitiesList',
@@ -248,7 +267,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
     }
   })
 
-  test('keeps the application usable when MongoDB is unavailable', async () => {
+  test('fails closed at sign-in when MongoDB is unavailable', async () => {
     const app = await electron.launch({
       args: ['.'],
       env: {
@@ -262,25 +281,22 @@ test.describe.serial('Phase 2 - database and settings', () => {
       const window = await app.firstWindow()
 
       await expect(window).toHaveTitle(/Pharmacy POS/)
+      // No first-run setup without a database; the sign-in screen is shown.
+      await expect(window.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 10000 })
+      expect(await window.evaluate(() => (window as any).api.authSetupRequired())).toBe(false)
+
+      // The removed fallback: admin/admin must not open a session without the database.
       await window.getByLabel('Username').fill('admin')
-      await window.getByLabel('Password').fill('admin')
-      await window.getByRole('button', { name: /Login|Sign in|تسجيل الدخول/ }).click()
-      await expect(
-        window.getByRole('heading', { name: 'Dashboard', level: 1 })
-      ).toBeVisible({ timeout: 10000 })
-      await expect(window.getByText('Disconnected', { exact: true }).first()).toBeVisible()
-      await expect(window.locator('.db-panel .error')).toBeVisible()
+      await window.getByLabel('Password', { exact: true }).fill('admin')
+      await window.getByRole('button', { name: /Login|Sign in/ }).click()
+      await expect(window.getByRole('alert')).toHaveText(/Sign-in failed/)
+      await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toHaveCount(0)
+      expect(await window.evaluate(() => (window as any).api.authState())).toEqual({ authenticated: false })
+      await expect(window.evaluate(() => (window as any).api.usersList())).rejects.toThrow(/AUTH_REQUIRED/)
 
       const dir = join(process.cwd(), 'screenshots')
       mkdirSync(dir, { recursive: true })
-      await window.screenshot({ path: join(dir, 'phase2-db-unavailable.png') })
-
-      await window.getByRole('button', { name: 'Settings', exact: true }).click()
-      await expect(
-        window.getByRole('heading', { name: 'Settings', level: 1 })
-      ).toBeVisible()
-      await expect(window.getByText(/Could not load settings/)).toBeVisible()
-      await window.screenshot({ path: join(dir, 'phase2-settings-unavailable.png') })
+      await window.screenshot({ path: join(dir, 'gate1-db-unavailable-login-refused.png') })
     } finally {
       await app.close()
     }
@@ -299,9 +315,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
     try {
       const window = await app.firstWindow()
       await expect(window).toHaveTitle(/Pharmacy POS/)
-      await window.getByLabel('Username').fill('admin')
-      await window.getByLabel('Password').fill('admin')
-      await window.getByRole('button', { name: /Login|Sign in/ }).click()
+      await signIn(window)
       await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({
         timeout: 10000
       })
@@ -435,9 +449,7 @@ test('receives cartons and sells whole boxes in base units', async () => {
   try {
     const window = await app.firstWindow()
     await expect(window).toHaveTitle(/Pharmacy POS/)
-    await window.getByLabel('Username').fill('admin')
-    await window.getByLabel('Password').fill('admin')
-    await window.getByRole('button', { name: /Login|Sign in/ }).click()
+    await signIn(window)
     await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({
       timeout: 10000
     })
@@ -494,6 +506,75 @@ test('receives cartons and sells whole boxes in base units', async () => {
     expect(result.totalCents).toBe(3600)
   } finally {
     await app.close()
+  }
+})
+
+test('first-run setup and forced reset of a legacy admin/admin account (EN and AR)', async () => {
+  const dir = join(process.cwd(), 'screenshots')
+  mkdirSync(dir, { recursive: true })
+
+  // First run: setup screen in both languages, weak password refused in the UI.
+  await cleanTestDatabase()
+  let app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  try {
+    const window = await app.firstWindow()
+    await expect(window.getByRole('heading', { name: 'Create the administrator account' })).toBeVisible({ timeout: 10000 })
+    await window.getByLabel('Username').fill('owner')
+    await window.getByLabel('Password', { exact: true }).fill('short')
+    await window.getByLabel('Confirm password').fill('short')
+    await window.getByRole('button', { name: 'Create administrator' }).click()
+    await expect(window.getByRole('alert')).toHaveText('The password must be at least 12 characters.')
+    await window.screenshot({ path: join(dir, 'gate1-setup-en.png') })
+    await window.getByRole('button', { name: 'AR' }).click()
+    await expect(window.getByRole('heading', { name: 'إنشاء حساب المدير' })).toBeVisible()
+    await window.screenshot({ path: join(dir, 'gate1-setup-ar.png') })
+  } finally {
+    await app.close()
+  }
+
+  // An existing database with the old default account: admin/admin as a legacy SHA-256 hash.
+  await cleanTestDatabase()
+  const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
+  await client.connect()
+  const now = new Date().toISOString()
+  await client.db(TEST_DB).collection('users').insertOne({
+    username: 'admin',
+    passwordHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',
+    role: 'Administrator',
+    active: true,
+    createdAt: now,
+    updatedAt: now
+  })
+
+  app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  try {
+    const window = await app.firstWindow()
+    await expect(window.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 10000 })
+    await window.getByLabel('Username').fill('admin')
+    await window.getByLabel('Password', { exact: true }).fill('admin')
+    await window.getByRole('button', { name: /Login|Sign in/ }).click()
+    await expect(window.getByRole('heading', { name: 'Choose a new password' })).toBeVisible()
+    await window.screenshot({ path: join(dir, 'gate1-force-reset-en.png') })
+    // Until the password is changed, the session can do nothing else.
+    await expect(window.evaluate(() => (window as any).api.usersList())).rejects.toThrow(/PASSWORD_CHANGE_REQUIRED/)
+
+    await window.getByRole('button', { name: 'AR' }).click()
+    await expect(window.getByRole('heading', { name: 'اختر كلمة مرور جديدة' })).toBeVisible()
+    await window.screenshot({ path: join(dir, 'gate1-force-reset-ar.png') })
+    await window.getByRole('button', { name: 'EN' }).click()
+
+    await window.getByLabel('Current password').fill('admin')
+    await window.getByLabel('New password').fill('Changed-Admin-Pass-1')
+    await window.getByLabel('Confirm password').fill('Changed-Admin-Pass-1')
+    await window.getByRole('button', { name: 'Save new password' }).click()
+    await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+
+    const stored = await client.db(TEST_DB).collection('users').findOne({ username: 'admin' })
+    expect(stored?.passwordHash).toMatch(/^\$argon2id\$/)
+    expect(stored?.mustChangePassword).toBe(false)
+  } finally {
+    await app.close()
+    await client.close()
   }
 })
 

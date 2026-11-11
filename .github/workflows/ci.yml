@@ -10,14 +10,22 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      # Auth integration tests (tests/unit/auth.test.ts) need a real MongoDB. CI only; never shipped.
+      mongo:
+        image: mongo:9.0
+        ports:
+          - 27017:27017
     env:
       # The build and unit tests do not launch Electron.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      MONGODB_TEST_URI: mongodb://127.0.0.1:27017/?directConnection=true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Electron 45 runs Node 24.
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run typecheck
