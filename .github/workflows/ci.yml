@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # matches the mongod build used by the access-control tests
     services:
       # Auth integration tests (tests/unit/auth.test.ts) need a real MongoDB. CI only; never shipped.
       mongo:
@@ -43,10 +43,17 @@ jobs:
       - run: npm run build
       - name: Signing / issuance scan
         run: npm run scan:signing
-      - name: mongod binary for the access-control tests (from the mongo:9.0 service image)
+      - name: mongod 9.0.8 for the access-control tests (official build, SHA-256 verified)
+        env:
+          MONGOD_TGZ: mongodb-linux-x86_64-ubuntu2404-9.0.8.tgz
+          MONGOD_SHA256: 834da9b0eb7cd5dcd95f69a56f3a249505307e12026f7b0951d5e502dde4b26a
         run: |
-          docker cp "${{ job.services.mongo.id }}:/usr/bin/mongod" "$RUNNER_TEMP/mongod"
-          "$RUNNER_TEMP/mongod" --version | head -1
+          set -o pipefail
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o "$MONGOD_TGZ" "https://fastdl.mongodb.org/linux/$MONGOD_TGZ"
+          echo "$MONGOD_SHA256  $MONGOD_TGZ" | sha256sum -c -
+          tar -xzf "$MONGOD_TGZ" --strip-components=2 --wildcards '*/bin/mongod'
+          ./mongod --version | head -1
           echo "MONGOD_BIN=$RUNNER_TEMP/mongod" >> "$GITHUB_ENV"
       - run: npm run test:unit
       - name: Production dependency audit
