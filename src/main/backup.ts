@@ -6,9 +6,12 @@ import { getDb } from './db'
 import { getSettings } from './settings'
 import { getCurrentSession, logAudit } from './auth'
 import type { BackupResult } from '../shared/ipc'
+import { BACKUP_ERRORS, MIN_BACKUP_PASSPHRASE, decryptBackup, encryptBackup, isEncryptedBackup } from './backupCrypto'
 
 // v2 (Gate 1 S4): canonical EJSON keeps ObjectId/Date/Decimal types through a restore.
 // v1 files (plain JSON, ids as strings) can still be imported.
+// Every new export is wrapped in an encrypted envelope (backupCrypto.ts, file version 3); legacy
+// plaintext v1/v2 files still import so existing backups are not stranded.
 const BACKUP_VERSION = 2
 const READABLE_VERSIONS = new Set([1, 2])
 const PRESERVED = new Set(['audit'])
@@ -20,9 +23,11 @@ interface BackupFile {
   collections: Record<string, Document[]>
 }
 
-export async function exportBackup(win: BrowserWindow): Promise<BackupResult> {
+export async function exportBackup(win: BrowserWindow, input?: { passphrase?: unknown }): Promise<BackupResult> {
   const db = getDb()
   if (!db) throw new Error('Database unavailable')
+  const passphrase = input?.passphrase
+  if (typeof passphrase !== 'string' || passphrase.length < MIN_BACKUP_PASSPHRASE) throw new Error(BACKUP_ERRORS.passphrase)
 
   const fileName = `pharmacy-pos-backup-${new Date().toISOString().slice(0, 10)}.json`
   let defaultPath = fileName
@@ -54,12 +59,13 @@ export async function exportBackup(win: BrowserWindow): Promise<BackupResult> {
     collections
   }
 
-  await writeFile(result.filePath, BSON.EJSON.stringify(payload, undefined, 2, { relaxed: false }), 'utf8')
-  await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.export', resource: 'backup', details: { collections: Object.keys(collections).length } })
+  const encrypted = await encryptBackup(BSON.EJSON.stringify(payload, undefined, 0, { relaxed: false }), passphrase)
+  await writeFile(result.filePath, encrypted, 'utf8')
+  await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.export', resource: 'backup', details: { collections: Object.keys(collections).length, encrypted: true } })
   return { canceled: false, filePath: result.filePath }
 }
 
-export async function importBackup(win: BrowserWindow): Promise<BackupResult> {
+export async function importBackup(win: BrowserWindow, input?: { passphrase?: unknown }): Promise<BackupResult> {
   const db = getDb()
   if (!db) throw new Error('Database unavailable')
 
@@ -72,9 +78,24 @@ export async function importBackup(win: BrowserWindow): Promise<BackupResult> {
   if (result.canceled || result.filePaths.length === 0) return { canceled: true }
 
   const filePath = result.filePaths[0]
+  let text = await readFile(filePath, 'utf8')
+  let encrypted = false
+  try {
+    const outer = JSON.parse(text)
+    if (isEncryptedBackup(outer)) {
+      text = await decryptBackup(outer, input?.passphrase)
+      encrypted = true
+    }
+  } catch (error) {
+    if ((error as Error).message === BACKUP_ERRORS.decrypt || (error as Error).message === BACKUP_ERRORS.passphrase) {
+      await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.import_refused', resource: 'backup', details: { reason: (error as Error).message } })
+      throw error
+    }
+    throw new Error('Invalid backup file')
+  }
   let payload: Partial<BackupFile>
   try {
-    payload = BSON.EJSON.parse(await readFile(filePath, 'utf8'), { relaxed: true }) as Partial<BackupFile>
+    payload = BSON.EJSON.parse(text, { relaxed: true }) as Partial<BackupFile>
   } catch {
     throw new Error('Invalid backup file')
   }
@@ -123,6 +144,6 @@ export async function importBackup(win: BrowserWindow): Promise<BackupResult> {
   }
 
   // Appended to the live (preserved) log, so the chain records that a restore happened.
-  await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.import', resource: 'backup', details: { imported, collections: collections.length } })
+  await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.import', resource: 'backup', details: { imported, collections: collections.length, encrypted } })
   return { canceled: false, filePath, imported }
 }

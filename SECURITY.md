@@ -14,7 +14,7 @@ Report privately to the owner (repository admin). Do not open a public issue. In
 | Boundary | Trusted side | Rule |
 |---|---|---|
 | Renderer ↔ main (IPC) | main | Sender URL check, per-channel argument schema, no MongoDB operators/dotted keys, permission guard, stable error codes |
-| Main ↔ MongoDB | main | Bundled `mongod` binds `127.0.0.1` only, port 27028 |
+| Main ↔ MongoDB | main | Bundled `mongod` binds `127.0.0.1` only (port 27028), access control on (keyFile); the app uses a least-privilege user |
 | Customer device | none | A local administrator can patch the app or edit files; controls detect and limit, they do not prevent |
 | Repository / CI | owner | No private keys or signing code (scan in CI); full-history secret scan (gitleaks) in CI |
 | Licence authority | separate panel repo | The app verifies, never issues (`docs/licensing/ADR-001-licence-authority.md`) |
@@ -33,14 +33,17 @@ Report privately to the owner (repository admin). Do not open a public issue. In
 | IPC | Schema for every channel; operator/prototype/size guards; DB errors hidden | `tests/unit/ipcSchema.test.ts`, E2E "Gate 1 S3" |
 | Audit | Hash-chained, verified at startup; edits/deletions detected | `tests/unit/auditChain.test.ts`, `auth.test.ts` "audit chain" |
 | Logs | mongod log and audit fallback rotate at 10 MB (3 kept) | `tests/unit/logRotate.test.ts` |
-| Backup | EJSON v2 keeps id types; a restore never replaces the audit log; export/import audited | E2E "…restores a backup" (restore drill) |
+| Backup | Encrypted: Argon2id (64 MiB, t=3) + AES-256-GCM with an authenticated header; passphrase never stored; EJSON keeps id types; a restore never replaces the audit log; export/import/refusal audited | `tests/unit/backupCrypto.test.ts`; E2E "…restores a backup" (restore drill) |
+| MongoDB | Access control: admin + least-privilege app user (`readWrite` + `collMod` on the app DB only); credentials and keyFile encrypted with DPAPI; keyFile on disk only during startup; pre-Gate-1 data folders secured on first start | `tests/unit/mongoAuth.test.ts` (real mongod); `scripts/smoke-packaged.mjs` |
+| Logs | `mongod` runs `--quiet` with slow-op logging off (op logs carry query values); IPC failures log error name/code only | `src/main/localDb.ts`, `src/main/index.ts` |
 | Supply chain | Shipped deps pinned; `npm audit --omit=dev` high gate; SBOM incl. Electron + MongoDB; licence allowlist | CI steps; `scripts/sbom.mjs` |
 | Supply chain | MongoDB runtime pinned to 9.0.8 | `scripts/prepare-mongodb.ps1` |
 
 ## Known gaps (not yet controls)
 
-- MongoDB authentication / least-privilege user: not enabled (S4).
-- Backups are plaintext (EJSON) and include password hashes: encryption is not done yet (S4).
+- DPAPI binds the MongoDB credentials to the Windows user: any process running as that user can recover them. It protects against other users and casual access, not the same user.
+- Backups exported before Gate 1 S4 are plaintext; they still import. Re-export to get an encrypted copy, then destroy the old files.
+- Failed sign-ins record the typed username (it can contain a mistyped password). It is truncated to 64 characters.
 - BitLocker is a deployment requirement, not yet verified on a clean PC (S4).
 - No code-signing certificate; SmartScreen will warn (S6).
 - Licence verifier/lock (Gate 2) not built; `PHM1` activation still present.

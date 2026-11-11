@@ -100,7 +100,11 @@ function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...ar
       return await listener(event, ...args)
     } catch (error) {
       const safe = publicError(error)
-      if (safe.message !== (error as Error)?.message) console.error(`[ipc] ${channel} failed`, error)
+      // Gate 1 S4: no message text here. Driver messages can carry data (E11000 prints the duplicate value).
+      if (safe.message !== (error as Error)?.message) {
+        const e = error as { name?: string; code?: unknown; codeName?: string }
+        console.error(`[ipc] ${channel} failed`, { name: e?.name, code: e?.code, codeName: e?.codeName })
+      }
       throw safe
     }
   })
@@ -178,14 +182,14 @@ function registerIpc(): void {
     return saveSettings(input)
   })
 
-  handle(IPC.BackupExport, async (event) => {
+  handle(IPC.BackupExport, async (event, input: { passphrase?: unknown }) => {
     assertTrusted(event)
-    return exportBackup(senderWindow(event))
+    return exportBackup(senderWindow(event), input)
   })
 
-  handle(IPC.BackupImport, async (event) => {
+  handle(IPC.BackupImport, async (event, input: { passphrase?: unknown }) => {
     assertTrusted(event)
-    return importBackup(senderWindow(event))
+    return importBackup(senderWindow(event), input)
   })
 
   handle(IPC.AuthLogin, async (event, input: unknown) => {

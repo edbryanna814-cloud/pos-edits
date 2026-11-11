@@ -106,8 +106,9 @@ export interface PreloadApi {
   dbHealth(): Promise<DbHealth>
   getSettings(): Promise<StoredCompanySettings | null>
   saveSettings(input: CompanySettings): Promise<StoredCompanySettings>
-  exportBackup(): Promise<BackupResult>
-  importBackup(): Promise<BackupResult>
+  /** Gate 1 S4: the passphrase encrypts the backup; it is never stored. */
+  exportBackup(input: { passphrase: string }): Promise<BackupResult>
+  importBackup(input: { passphrase?: string }): Promise<BackupResult>
   authLogin(input: LoginInput): Promise<LoginResult>
   authLogout(token: string): Promise<{ success: boolean }>
   authState(token?: string): Promise<AuthState>

@@ -45,6 +45,14 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+// Stable backup codes from src/main/backupCrypto.ts, shown in the user's language.
+function backupErrorText(language: Language, error: unknown): string {
+  const message = errorMessage(error)
+  if (message.includes('BACKUP_PASSPHRASE_REQUIRED')) return t(language, 'errBackupPassphrase')
+  if (message.includes('BACKUP_DECRYPT_FAILED')) return t(language, 'errBackupDecrypt')
+  return message
+}
+
 export default function SettingsPage({
   settings,
   language,
@@ -56,6 +64,7 @@ export default function SettingsPage({
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [passphrase, setPassphrase] = useState('')
 
   useEffect(() => {
     setForm(toForm(settings))
@@ -117,14 +126,18 @@ export default function SettingsPage({
     setMessage('')
     setError('')
     try {
-      const result = await window.api.exportBackup()
+      if (passphrase.length < 12) {
+        setError(t(language, 'errBackupPassphrase'))
+        return
+      }
+      const result = await window.api.exportBackup({ passphrase })
       setMessage(
         result.canceled
           ? t(language, 'canceled')
           : `${t(language, 'backupExport')}: ${result.filePath}`
       )
     } catch (backupError) {
-      setError(`${t(language, 'backupError')}: ${errorMessage(backupError)}`)
+      setError(`${t(language, 'backupError')}: ${backupErrorText(language, backupError)}`)
     }
   }
 
@@ -132,7 +145,7 @@ export default function SettingsPage({
     setMessage('')
     setError('')
     try {
-      const result = await window.api.importBackup()
+      const result = await window.api.importBackup({ passphrase })
       if (result.canceled) {
         setMessage(t(language, 'canceled'))
         return
@@ -140,7 +153,7 @@ export default function SettingsPage({
       setMessage(`${t(language, 'importedDocs')}: ${result.imported ?? 0}`)
       onReload()
     } catch (backupError) {
-      setError(`${t(language, 'backupError')}: ${errorMessage(backupError)}`)
+      setError(`${t(language, 'backupError')}: ${backupErrorText(language, backupError)}`)
     }
   }
 
@@ -219,6 +232,16 @@ export default function SettingsPage({
           <input
             value={form.backupDirectory}
             onChange={(event) => update('backupDirectory', event.target.value)}
+          />
+        </label>
+
+        <label className="wide">
+          <span>{t(language, 'backupPassphrase')}</span>
+          <input
+            type="password"
+            autoComplete="new-password"
+            value={passphrase}
+            onChange={(event) => setPassphrase(event.target.value)}
           />
         </label>
 

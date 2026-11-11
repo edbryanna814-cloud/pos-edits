@@ -47,7 +47,10 @@ const translations = {
     backupExport: 'Export backup',
     backupImport: 'Import backup',
     backupNote:
-      'Backup exports all collections to a JSON file. Import replaces the current database after confirmation.',
+      'Backups are encrypted with the passphrase above. Keep the passphrase somewhere other than the backup; it is not stored and a backup cannot be restored without it. Import replaces the current database after confirmation (the audit log is kept).',
+    backupPassphrase: 'Backup passphrase',
+    errBackupPassphrase: 'Enter a backup passphrase of at least 12 characters.',
+    errBackupDecrypt: 'Wrong passphrase, or the backup file is damaged.',
     language: 'Language',
     english: 'English',
     arabic: 'Arabic',
@@ -160,7 +163,10 @@ const translations = {
     backupExport: 'تصدير نسخة احتياطية',
     backupImport: 'استيراد نسخة احتياطية',
     backupNote:
-      'يصدّر النسخ الاحتياطي جميع المجموعات إلى ملف JSON. الاستيراد يستبدل قاعدة البيانات الحالية بعد التأكيد.',
+      'النسخ الاحتياطية مشفّرة بكلمة المرور أعلاه. احفظ كلمة المرور في مكان غير مكان النسخة؛ لا يتم حفظها ولا يمكن استعادة النسخة بدونها. الاستيراد يستبدل قاعدة البيانات الحالية بعد التأكيد (مع الإبقاء على سجل التدقيق).',
+    backupPassphrase: 'كلمة مرور النسخة الاحتياطية',
+    errBackupPassphrase: 'أدخل كلمة مرور للنسخة الاحتياطية لا تقل عن 12 حرفًا.',
+    errBackupDecrypt: 'كلمة المرور غير صحيحة، أو ملف النسخة تالف.',
     language: 'اللغة',
     english: 'الإنجليزية',
     arabic: 'العربية',

@@ -43,6 +43,11 @@ jobs:
       - run: npm run build
       - name: Signing / issuance scan
         run: npm run scan:signing
+      - name: mongod binary for the access-control tests (from the mongo:9.0 service image)
+        run: |
+          docker cp "${{ job.services.mongo.id }}:/usr/bin/mongod" "$RUNNER_TEMP/mongod"
+          "$RUNNER_TEMP/mongod" --version | head -1
+          echo "MONGOD_BIN=$RUNNER_TEMP/mongod" >> "$GITHUB_ENV"
       - run: npm run test:unit
       - name: Production dependency audit
         run: npm audit --omit=dev --audit-level=high

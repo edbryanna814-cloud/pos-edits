@@ -24,14 +24,16 @@ them to a customer.
 
 ## Backup
 
-1. Settings → Export backup → choose a location **off the PC** (encrypted USB drive).
-2. **The backup is plaintext JSON and contains password hashes.** Store it encrypted and access-controlled
-   until encrypted backups land (S4).
-3. Export and import are recorded in the audit log.
+1. Settings → enter a **backup passphrase** (at least 12 characters) → Export backup → choose a location
+   **off the PC**.
+2. The file is encrypted (Argon2id + AES-256-GCM). **Without the passphrase it cannot be restored.** Keep the
+   passphrase separately from the backup (for example in the owner's password manager); the app never stores it.
+3. Export, import and refused imports (wrong passphrase) are recorded in the audit log.
+4. Backups exported before this version are plaintext. Re-export, then destroy the old files.
 
 ## Restore
 
-1. Settings → Import backup → choose the file → confirm "Replace database".
+1. Settings → enter the backup's passphrase → Import backup → choose the file → confirm "Replace database".
 2. Check totals on the Reports page and open one recent sale.
 3. Backups are EJSON (format v2): record ids and dates keep their types through a restore. Older v1
    files still import, but their ids come back as text. Re-export after upgrading.
@@ -56,3 +58,15 @@ them to a customer.
 3. Check the audit chain status and failed-login entries.
 4. Rotate: reset every user password; if a licence key is involved, follow `KEY-CUSTODY.md` "Compromise".
 5. Record what happened, when, who was involved, and what was changed.
+
+## Database access (MongoDB)
+
+- The bundled MongoDB requires authentication. The app creates its users on first start (also on an
+  existing data folder from an older version) and keeps the credentials in `mongodb-auth.bin`, encrypted
+  with the Windows user's DPAPI key.
+- **Do not delete `mongodb-auth.bin`.** Without it the app cannot open its database. Recovery is a support
+  task: stop the app, start `mongod` on the data folder without `--keyFile`, drop `pharmacy_admin` and
+  `pharmacy_app` from `admin.system.users`, stop it, delete `mongodb-auth.bin`, and start the app (it
+  re-creates both users). Record it as an incident.
+- Moving the data folder to another Windows user or PC needs the same recovery, because DPAPI keys do not
+  move. Use an encrypted backup and restore instead.

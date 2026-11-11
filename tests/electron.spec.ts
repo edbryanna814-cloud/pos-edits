@@ -5,11 +5,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const TEST_DB = 'pharmacy_pos_test'
+// Own Electron profile: isolates localStorage/userData from a real install and from its single-instance lock.
+const E2E_PROFILE = mkdtempSync(join(tmpdir(), 'pharmacy-pos-e2e-'))
 const MONGO_URI = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
 
 // Gate 1: there is no default account. A clean database shows the first-run setup screen;
 // later launches show the sign-in screen. Test-only credentials, local test database only.
 const E2E_ADMIN = { username: 'admin', password: 'E2E-Admin-Pass-2026' }
+const BACKUP_PASSPHRASE = 'E2E-backup-passphrase-2026' // gitleaks:allow test-only
 
 async function signIn(window: Page): Promise<void> {
   const setup = window.getByRole('heading', { name: 'Create the administrator account' })
@@ -39,7 +42,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
     const backupDir = mkdtempSync(join(tmpdir(), 'pharmacy-pos-backup-'))
     const backupPath = join(backupDir, 'phase2-backup.json')
     const app = await electron.launch({
-      args: ['.'],
+      args: ['.', `--user-data-dir=${E2E_PROFILE}`],
       env: { ...process.env, MONGODB_DB: TEST_DB }
     })
 
@@ -206,15 +209,21 @@ test.describe.serial('Phase 2 - database and settings', () => {
         ;(dialog as any).showSaveDialog = async () => ({ canceled: false, filePath })
       }, backupPath)
 
+      // Gate 1 S4: no passphrase, no export.
+      await window.getByRole('button', { name: 'Export backup' }).click()
+      await expect(window.getByRole('alert')).toContainText('at least 12 characters')
+      expect(existsSync(backupPath)).toBe(false)
+
+      await window.getByLabel('Backup passphrase').fill(BACKUP_PASSPHRASE)
       await window.getByRole('button', { name: 'Export backup' }).click()
       await expect(window.locator('.success')).toContainText(backupPath)
       expect(existsSync(backupPath)).toBe(true)
 
-      const backup = JSON.parse(readFileSync(backupPath, 'utf8')) as {
-        collections: { settings: Array<{ companyName: string }> }
-      }
-      expect(backup.collections.settings).toHaveLength(1)
-      expect(backup.collections.settings[0].companyName).toBe('Test Pharmacy')
+      // The file is an encrypted envelope: none of the business data is readable.
+      const fileText = readFileSync(backupPath, 'utf8')
+      expect(fileText).not.toContain('Test Pharmacy')
+      expect(fileText).not.toContain('passwordHash')
+      expect(JSON.parse(fileText)).toMatchObject({ format: 'pharmacy-pos-backup', version: 3, cipher: { alg: 'aes-256-gcm' } })
 
       await window.getByLabel('Company name').fill('Changed Pharmacy')
       await window.getByRole('button', { name: 'Save settings' }).click()
@@ -228,6 +237,13 @@ test.describe.serial('Phase 2 - database and settings', () => {
         ;(dialog as any).showMessageBox = async () => ({ response: 1 })
       }, backupPath)
 
+      // Wrong passphrase: refused, nothing replaced.
+      await window.getByLabel('Backup passphrase').fill('a-wrong-passphrase')
+      await window.getByRole('button', { name: 'Import backup' }).click()
+      await expect(window.getByRole('alert')).toContainText('Wrong passphrase')
+      expect((await window.evaluate(() => (window as any).api.getSettings())).companyName).toBe('Changed Pharmacy')
+
+      await window.getByLabel('Backup passphrase').fill(BACKUP_PASSPHRASE)
       await window.getByRole('button', { name: 'Import backup' }).click()
       await expect(window.locator('.success')).toContainText('Imported documents')
       await expect(window.getByLabel('Company name')).toHaveValue('Test Pharmacy')
@@ -245,7 +261,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         const updated = await window.evaluate((id) => (window as any).api.usersUpdate(id, { active: true }), String(adminDoc?._id))
         expect(updated.username).toBe(E2E_ADMIN.username)
         const actions = (await client.db(TEST_DB).collection('audit').find({}).toArray()).map((e) => e.action)
-        expect(actions).toEqual(expect.arrayContaining(['backup.export', 'backup.import']))
+        expect(actions).toEqual(expect.arrayContaining(['backup.export', 'backup.import_refused', 'backup.import']))
       } finally {
         await client.close()
       }
@@ -255,7 +271,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
     }
 
     const relaunched = await electron.launch({
-      args: ['.'],
+      args: ['.', `--user-data-dir=${E2E_PROFILE}`],
       env: { ...process.env, MONGODB_DB: TEST_DB }
     })
 
@@ -284,7 +300,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
 
   test('fails closed at sign-in when MongoDB is unavailable', async () => {
     const app = await electron.launch({
-      args: ['.'],
+      args: ['.', `--user-data-dir=${E2E_PROFILE}`],
       env: {
         ...process.env,
         MONGODB_DB: TEST_DB,
@@ -323,7 +339,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
     await cleanTestDatabase()
 
     const app = await electron.launch({
-      args: ['.'],
+      args: ['.', `--user-data-dir=${E2E_PROFILE}`],
       env: { ...process.env, MONGODB_DB: TEST_DB }
     })
 
@@ -457,7 +473,7 @@ test('receives cartons and sells whole boxes in base units', async () => {
   await cleanTestDatabase()
 
   const app = await electron.launch({
-    args: ['.'],
+    args: ['.', `--user-data-dir=${E2E_PROFILE}`],
     env: { ...process.env, MONGODB_DB: TEST_DB }
   })
 
@@ -530,7 +546,7 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
 
   // First run: setup screen in both languages, weak password refused in the UI.
   await cleanTestDatabase()
-  let app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  let app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
   try {
     const window = await app.firstWindow()
     await expect(window.getByRole('heading', { name: 'Create the administrator account' })).toBeVisible({ timeout: 10000 })
@@ -561,7 +577,7 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
     updatedAt: now
   })
 
-  app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
   try {
     const window = await app.firstWindow()
     await expect(window.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 10000 })
@@ -594,7 +610,7 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
 })
 
 test('Gate 1 S2: CSP, window, navigation and permission guards hold in the built app', async () => {
-  const app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  const app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
   try {
     const window = await app.firstWindow()
     const cspErrors: string[] = []
@@ -650,7 +666,7 @@ test('Gate 1 S2: CSP, window, navigation and permission guards hold in the built
 })
 
 test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', async () => {
-  const app = await electron.launch({ args: ['.'], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  const app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
   try {
     const window = await app.firstWindow()
     await expect(window.getByRole('heading', { name: /^(Sign in|Create the administrator account|Dashboard)$/, level: 1 })).toBeVisible({ timeout: 10000 })
@@ -672,5 +688,6 @@ test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', a
 })
 
 test.afterAll(async () => {
+  rmSync(E2E_PROFILE, { recursive: true, force: true })
   await cleanTestDatabase()
 })
