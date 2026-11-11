@@ -77,15 +77,16 @@ Checked 2026-11-10:
 - `npx playwright test --list`: exit 0, 4 tests in 1 file (`electron.spec.ts`).
 - `npm run test:unit`: 16 pass (scanSigning 8, licenseApplyGuard 7, smoke 1).
 
-## Gate 1 (security baseline), 
-Commits (each CI green on its own SHA unless noted):
--  auth fixes (fallback removed, no default admin, Argon2id, lockout, hashed sessions, audit), CI 42932666717
--  S1 (gitleaks in CI, SBOM + licence check, pinned deps), CI 42933341929
--  S2 (CSP, webContents guards, permissions, DevTools)
--  S3 (IPC schema, NoSQL guard, safe errors)
--  S5 (audit hash chain, startup verify, log rotation), CI 42934504857
--  S6/S7/S8 (MongoDB 9.0.8 pin, packaged smoke, threat model, security docs)
-- the next commit: S4 restore drill (EJSON v2 backups, audit preserved on restore) plus this file
+## Gate 1 (security baseline), `gate1/security-baseline`
+
+Commits (CI run listed where it was watched; each push ran CI):
+- `14f9f64` auth fixes (fallback removed, no default admin, Argon2id, lockout, hashed sessions, audit), CI 42932666717
+- `b85d686` S1 (gitleaks in CI, SBOM + licence check, pinned deps), CI 42933341929
+- `c13ce3c` S2 (CSP, webContents guards, permissions, DevTools)
+- `7680d1e` S3 (IPC schema, NoSQL guard, safe errors)
+- `e519462` S5 (audit hash chain, startup verify, log rotation), CI 42934504857
+- `03f36aa` S6/S7/S8 (MongoDB 9.0.8 pin, packaged smoke, threat model, security docs)
+- `adcdf34` S4 restore drill (EJSON v2 backups, audit preserved on restore), CI 42936172900
 
 Still open in Gate 1:
 - S4: MongoDB auth with a least-privilege user; encrypted backups (passphrase not stored beside the backup); BitLocker check on PC2; log PII review.
@@ -93,7 +94,7 @@ Still open in Gate 1:
 - S6: SmartScreen/AV test; clean-VM install (needs a clean Windows VM / PC2).
 - S8: D-LIC-17 written confirmation (owner/admins); old PHM1 key search (owner).
 
-Installer built locally (not distributed, SSPL hold): , SHA-256 .
+Installer built locally from `03f36aa` (not distributed, SSPL hold): `release/Pharmacy-POS-Setup-0.2.0.exe`, SHA-256 `f43337141f2d27c17152f809cc198c0479e14e6cfef52cf67f61c73a3aabbe93`.
 
 ## Next
 
@@ -101,4 +102,4 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 
 ## Last completed step
 
-2026-11-11: Gate 1 auth plus S1, S2, S3, S5, S6 (scripts and packaged smoke), S7 and S8 docs, and the S4 restore drill committed on . Stopped to report to the TD.
+2026-11-11: Gate 1 auth plus S1, S2, S3, S5, S6 (scripts and packaged smoke), S7 and S8 docs, and the S4 restore drill committed on `gate1/security-baseline` (head `adcdf34`, CI 42936172900 green). Stopped to report to the TD.
