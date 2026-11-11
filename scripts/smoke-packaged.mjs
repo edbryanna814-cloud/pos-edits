@@ -37,14 +37,16 @@ try {
     return !wc.isDevToolsOpened()
   })
   // Gate 1 S4: the app reaches its database as the least-privilege user; anonymous access is refused.
-  results.appDb = (await window.evaluate(() => window.api.dbHealth())).status
+  const health = await window.evaluate(() => window.api.dbHealth())
+  results.appDb = health.status
   results.credentialStore = existsSync(join(profile, 'mongodb-auth.bin')) && !readFileSync(join(profile, 'mongodb-auth.bin')).includes('pharmacy_app')
   results.keyFileLeftOnDisk = existsSync(join(profile, 'mongodb-keyfile'))
   const client = new MongoClient('mongodb://127.0.0.1:27028/?directConnection=true', { serverSelectionTimeoutMS: 5000 })
   await client.connect()
-  const info = await client.db('admin').command({ buildInfo: 1 })
   const hello = await client.db('admin').command({ hello: 1 })
-  results.bundledMongo = { port: 27028, version: info.version, setName: hello.setName }
+  // buildInfo needs authentication now; the version comes from the app's own (authenticated) health check.
+  results.bundledMongo = { port: 27028, version: health.serverVersion, topology: health.topology, setName: hello.setName }
+  results.anonymousBuildInfo = await client.db('admin').command({ buildInfo: 1 }).then(() => 'allowed', (e) => e.codeName)
   results.anonymousRead = await client.db('pharmacy_pos').collection('users').findOne({}).then(() => 'allowed', (e) => e.codeName)
   await client.close()
   results.devService27017 = { before: devServiceBefore, during: await portOpen(27017) }
@@ -59,7 +61,7 @@ const ok =
   results.firstScreen && results.devToolsDisabled && results.bundledMongo.version === '9.0.8' &&
   results.bundledMongo.setName === 'rs0' && results.devService27017.before === results.devService27017.during &&
   results.sourceMapsInAsar === 0 && results.appDb === 'connected' && results.credentialStore === true &&
-  results.keyFileLeftOnDisk === false && results.anonymousRead === 'Unauthorized'
+  results.keyFileLeftOnDisk === false && results.anonymousRead === 'Unauthorized' && results.anonymousBuildInfo === 'Unauthorized'
 if (!ok) {
   console.error('packaged smoke FAILED')
   process.exit(1)

@@ -87,14 +87,20 @@ Commits (CI run listed where it was watched; each push ran CI):
 - `e519462` S5 (audit hash chain, startup verify, log rotation), CI 42934504857
 - `03f36aa` S6/S7/S8 (MongoDB 9.0.8 pin, packaged smoke, threat model, security docs)
 - `adcdf34` S4 restore drill (EJSON v2 backups, audit preserved on restore), CI 42936172900
+- `c617b29` S4 MongoDB access control, encrypted backups, log PII limits (CI failed: test timeout and a non-runnable mongod copy, fixed below)
+- `8f3d11a` test timeout raised (CI still failed: container mongod needs glibc 2.42 / OpenSSL 3.4)
+- `e7d56c5` CI uses the official MongoDB 9.0.8 Ubuntu 24.04 build, SHA-256 pinned, CI 42938533976 green
+- the next commit: packaged smoke reads the version as the app user (anonymous buildInfo is now refused)
+
+Packaged smoke on the S4 build (installer SHA-256 `25606fe34b487bd59ef9032d04a263cae61f072dc1456109e0c6ac0c7fc1178b`): app DB connected as the app user, encrypted credential store, no keyFile left on disk, anonymous read and buildInfo refused, 9.0.8 on rs0 at 27028, dev 27017 untouched, 0 maps. The user's installed (pre-auth) copy was closed with the user's OK to free port 27028.
 
 Still open in Gate 1:
-- S4: MongoDB auth with a least-privilege user; encrypted backups (passphrase not stored beside the backup); BitLocker check on PC2; log PII review.
+- S4: BitLocker check on PC2.
 - S5: support bundle (overlaps B5/L5).
 - S6: SmartScreen/AV test; clean-VM install (needs a clean Windows VM / PC2).
 - S8: D-LIC-17 written confirmation (owner/admins); old PHM1 key search (owner).
 
-Installer built locally from `03f36aa` (not distributed, SSPL hold): `release/Pharmacy-POS-Setup-0.2.0.exe`, SHA-256 `f43337141f2d27c17152f809cc198c0479e14e6cfef52cf67f61c73a3aabbe93`.
+Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Pharmacy-POS-Setup-0.2.0.exe`, SHA-256 `25606fe34b487bd59ef9032d04a263cae61f072dc1456109e0c6ac0c7fc1178b`. An older build of it (pre-auth) is installed on the builder PC; installing the new one secures that data folder on first start.
 
 ## Next
 
@@ -102,4 +108,4 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 
 ## Last completed step
 
-2026-11-11: Gate 1 auth plus S1, S2, S3, S5, S6 (scripts and packaged smoke), S7 and S8 docs, and the S4 restore drill committed on `gate1/security-baseline` (head `adcdf34`, CI 42936172900 green). Stopped to report to the TD.
+2026-11-11: S4 done on `gate1/security-baseline`: MongoDB access control with a least-privilege app user, encrypted backups, and the log PII review. Real-mongod tests pass locally and in CI, and the packaged smoke passes. Stopped to report to the TD.
