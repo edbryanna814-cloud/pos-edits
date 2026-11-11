@@ -33,13 +33,14 @@ Report privately to the owner (repository admin). Do not open a public issue. In
 | IPC | Schema for every channel; operator/prototype/size guards; DB errors hidden | `tests/unit/ipcSchema.test.ts`, E2E "Gate 1 S3" |
 | Audit | Hash-chained, verified at startup; edits/deletions detected | `tests/unit/auditChain.test.ts`, `auth.test.ts` "audit chain" |
 | Logs | mongod log and audit fallback rotate at 10 MB (3 kept) | `tests/unit/logRotate.test.ts` |
+| Backup | EJSON v2 keeps id types; a restore never replaces the audit log; export/import audited | E2E "…restores a backup" (restore drill) |
 | Supply chain | Shipped deps pinned; `npm audit --omit=dev` high gate; SBOM incl. Electron + MongoDB; licence allowlist | CI steps; `scripts/sbom.mjs` |
 | Supply chain | MongoDB runtime pinned to 9.0.8 | `scripts/prepare-mongodb.ps1` |
 
 ## Known gaps (not yet controls)
 
 - MongoDB authentication / least-privilege user: not enabled (S4).
-- Backups are plaintext JSON and include password hashes; restore converts ObjectIds to strings (S4).
+- Backups are plaintext (EJSON) and include password hashes: encryption is not done yet (S4).
 - BitLocker is a deployment requirement, not yet verified on a clean PC (S4).
 - No code-signing certificate; SmartScreen will warn (S6).
 - Licence verifier/lock (Gate 2) not built; `PHM1` activation still present.

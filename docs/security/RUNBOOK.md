@@ -33,8 +33,9 @@ them to a customer.
 
 1. Settings → Import backup → choose the file → confirm "Replace database".
 2. Check totals on the Reports page and open one recent sale.
-3. Known issue (S4, open): the JSON format stores record ids as text. Some operations that look a
-   record up by id may fail after a restore. Rehearse restores on a test PC first.
+3. Backups are EJSON (format v2): record ids and dates keep their types through a restore. Older v1
+   files still import, but their ids come back as text. Re-export after upgrading.
+4. The audit log is never replaced by a restore. The restore is appended to it as `backup.import`.
 
 ## Audit log
 

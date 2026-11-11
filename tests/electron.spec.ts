@@ -234,6 +234,21 @@ test.describe.serial('Phase 2 - database and settings', () => {
 
       const restored = await window.evaluate(() => (window as any).api.getSettings())
       expect(restored.companyName).toBe('Test Pharmacy')
+
+      // Gate 1 S4 restore drill: record ids keep their type through export/import, so id-based
+      // operations still work after a restore, and the restore itself is in the audit chain.
+      const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
+      await client.connect()
+      try {
+        const adminDoc = await client.db(TEST_DB).collection('users').findOne({ username: E2E_ADMIN.username })
+        expect(adminDoc?._id?.constructor?.name).toBe('ObjectId')
+        const updated = await window.evaluate((id) => (window as any).api.usersUpdate(id, { active: true }), String(adminDoc?._id))
+        expect(updated.username).toBe(E2E_ADMIN.username)
+        const actions = (await client.db(TEST_DB).collection('audit').find({}).toArray()).map((e) => e.action)
+        expect(actions).toEqual(expect.arrayContaining(['backup.export', 'backup.import']))
+      } finally {
+        await client.close()
+      }
     } finally {
       await app.close()
       rmSync(backupDir, { recursive: true, force: true })

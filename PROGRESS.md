@@ -4,7 +4,8 @@ Resume from here after any interruption.
 
 - **Baseline:** `3f70318` (single squashed import commit; its message "Remove in-app subscription and license management" does not match the code — D-LIC-15).
 - **Plan:** `docs/licensing/` — rulings in `TD-RULINGS-001.md` win over older docs.
-- **Branch:** `chore/licence-containment` → `main`. Never work on `main`, never force-push.
+- **Branch:** Gate 1 on `gate1/security-baseline` (from `main` at `7c6b87e`). PR #1 (`chore/licence-containment`) merged at `7c6b87e`. Never work on `main`, never force-push.
+- **Repo identity:** this is `edbryanna814-cloud/Pharmacy-POS-and-management-`. Factory ERP is a different repo (`Talaat-hub/Factory-ERP`); never mix them in a report.
 - **Rule:** no private key or issuance code in this repo, ever. The old `PHM1` key is treated as exposed.
 
 ## Slice order (TD-RULINGS-001 §4)
@@ -12,7 +13,8 @@ Resume from here after any interruption.
 | Slice | Repo | Status |
 |---|---|---|
 | C0 containment + CI + docs correction | app | **done** — `a457994`, CI run 42836474294 green |
-| C0.1 Gate 0 fixes (G0-1…G0-5) | app | **done, awaiting review** — fixes `4c8250f`, CI run 42928915572 green; head = the `docs(progress)` commit after it (SHA and run in the PR #1 report) |
+| C0.1 Gate 0 fixes (G0-1…G0-5) | app | **done, merged** — PR #1 head `cb1d53b` (CI 42929253555), merged at `7c6b87e` |
+| Gate 1 security baseline (CLOSURE-PLAN §4) | app | **in progress** on `gate1/security-baseline` — see "Gate 1" below |
 | A1 panel skeleton, auth, audit | panel | not started — contract v3 in `Anubis-hub/anubis-switcher` (`df66cf8`) |
 | A2 customers, plans, licences | panel | — |
 | A3 reverse enrolment + PHM2 signing | panel | — (stop point) |
@@ -75,15 +77,28 @@ Checked 2026-11-10:
 - `npx playwright test --list`: exit 0, 4 tests in 1 file (`electron.spec.ts`).
 - `npm run test:unit`: 16 pass (scanSigning 8, licenseApplyGuard 7, smoke 1).
 
+## Gate 1 (security baseline), 
+Commits (each CI green on its own SHA unless noted):
+-  auth fixes (fallback removed, no default admin, Argon2id, lockout, hashed sessions, audit), CI 42932666717
+-  S1 (gitleaks in CI, SBOM + licence check, pinned deps), CI 42933341929
+-  S2 (CSP, webContents guards, permissions, DevTools)
+-  S3 (IPC schema, NoSQL guard, safe errors)
+-  S5 (audit hash chain, startup verify, log rotation), CI 42934504857
+-  S6/S7/S8 (MongoDB 9.0.8 pin, packaged smoke, threat model, security docs)
+- the next commit: S4 restore drill (EJSON v2 backups, audit preserved on restore) plus this file
+
+Still open in Gate 1:
+- S4: MongoDB auth with a least-privilege user; encrypted backups (passphrase not stored beside the backup); BitLocker check on PC2; log PII review.
+- S5: support bundle (overlaps B5/L5).
+- S6: SmartScreen/AV test; clean-VM install (needs a clean Windows VM / PC2).
+- S8: D-LIC-17 written confirmation (owner/admins); old PHM1 key search (owner).
+
+Installer built locally (not distributed, SSPL hold): , SHA-256 .
+
 ## Next
 
-**Gate 1, security baseline (`docs/security/CLOSURE-PLAN.md` §4)**, on its own branch after PR #1 merges. Status assessed 2026-11-11, no code yet. Open HIGH findings:
-- `auth.ts:131-146`: hard-coded `admin`/`admin` login when the DB is unavailable;
-- `auth.ts:79-91`: default `admin`/`admin` account on first run;
-- `auth.ts:36-38`: unsalted SHA-256 password hashes.
-
-Do not start B1 until panel A3 signing is verified. Do not start Gate 2 or sell before TD confirmation.
+Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-11 — C0.1 Gate 0 fixes committed (`4c8250f`, CI green); dev MongoDB switched to `rs0` and E2E green; Gate 1 status assessed. Stopped for TD review.
+2026-11-11: Gate 1 auth plus S1, S2, S3, S5, S6 (scripts and packaged smoke), S7 and S8 docs, and the S4 restore drill committed on . Stopped to report to the TD.
