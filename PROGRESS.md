@@ -11,8 +11,9 @@ Resume from here after any interruption.
 
 | Slice | Repo | Status |
 |---|---|---|
-| C0 containment + CI + docs correction | app | **done, awaiting review** — `a457994`, CI run 42836474294 green |
-| A1 panel skeleton, auth, audit | panel | not started — waits for C0 review |
+| C0 containment + CI + docs correction | app | **done** — `a457994`, CI run 42836474294 green |
+| C0.1 Gate 0 fixes (G0-1…G0-5) | app | **done, awaiting review** — fixes `4c8250f`, CI run 42928915572 green; head = the `docs(progress)` commit after it (SHA and run in the PR #1 report) |
+| A1 panel skeleton, auth, audit | panel | not started — contract v3 in `Anubis-hub/anubis-switcher` (`df66cf8`) |
 | A2 customers, plans, licences | panel | — |
 | A3 reverse enrolment + PHM2 signing | panel | — (stop point) |
 | B1 verifier, key set, remove price/MAC from status | app | — |
@@ -47,7 +48,7 @@ D-LIC-01…18 (`docs/licensing/TD-RULINGS-001.md`). Key ones: reverse enrolment 
 - `a457994` chore(licence): C0 containment — CI green: https://github.com/edbryanna814-cloud/Pharmacy-POS-and-management-/actions/runs/42836474294 (npm ci, typecheck, build, signing scan, test:unit).
 - Tests: `tests/unit/smoke.test.ts` (1), `tests/unit/licenseApplyGuard.test.ts` (7), `tests/unit/scanSigning.test.ts` (6) — 14 pass.
 - Scan run against the baseline's two scripts: 4 failures, exit 1 (as intended).
-- Closed: NFR-LIC-012, ADR E1. Partly: M1 (rotation record pending, A1/A3), FR-LIC-020 (entry still exists, guarded; removed in B3).
+- Closed: NFR-LIC-012. ADR E1 and MIGRATION K8 closed only at C0.1 (`4c8250f`), when the scan rules and the docs were made to match. Partly: M1 (rotation record pending, A1/A3), FR-LIC-020 (entry still exists, guarded; removed in B3).
 - Deferred: Playwright E2E not in CI (needs Electron + MongoDB on Windows); apply rate limit is in-memory (resets on restart); guard messages English only (ActivationPage unchanged by ruling, removed in B3).
 
 ## Development environment (builder machine)
@@ -60,14 +61,29 @@ Checked 2026-11-10:
 - Log: `...\Server\9.0\log\mongod.log`.
 - `mongosh` is not installed.
 - `npm run db:start|stop|status|init` (`scripts/mongodb.ps1`) controls this same service.
-- **The server runs standalone, with no replica set.** The `hello` command reports no `setName`, and `mongod.cfg` has no `replication` section. The app's default URI (`src/main/db.ts:4`) and the E2E tests (`tests/electron.spec.ts:8`) expect `?replicaSet=rs0`. Until the service runs as `rs0`, a dev run and the E2E tests cannot use it.
-  - The fix is a machine change, not a repo change: add `replication: { replSetName: rs0 }` to `mongod.cfg`, restart the service from an elevated shell, then run `npm run db:init`. It has not been done; it needs the owner's OK.
+- 2026-11-10: the server was standalone (no `setName`), but the app (`src/main/db.ts:4`) and the E2E tests (`tests/electron.spec.ts:8`) expect `?replicaSet=rs0`.
+- **2026-11-11, fixed (TD-approved, machine-only, not committed):**
+  - added `replication: { replSetName: rs0 }` to `mongod.cfg` (backup `mongod.cfg.bak-before-rs0`);
+  - restarted the service from an elevated shell;
+  - `npm run db:init` → `PRIMARY rs0`; `hello` → `{"setName":"rs0","isWritablePrimary":true}`;
+  - `npm test` (Playwright): 4 passed.
 - The installer bundles its own MongoDB (`vendor/mongodb` → `localDb.ts`). This service is used for development only.
+
+## C0.1 result (Gate 0)
+
+- `4c8250f` fix(licence): G0-1 Playwright `testMatch`; G0-2 R-04 "absent from the tip"; G0-3 R-02 header + base64 body; G0-4 scan adds signing calls, and E1/K8 restated to the implemented rules; G0-5 "Implement:" lines under the panel banners reworded.
+- `npx playwright test --list`: exit 0, 4 tests in 1 file (`electron.spec.ts`).
+- `npm run test:unit`: 16 pass (scanSigning 8, licenseApplyGuard 7, smoke 1).
 
 ## Next
 
-A1 panel skeleton, auth, audit — in the owner's account (`Talaat-hub`), **not started**; waits for C0 review.
+**Gate 1, security baseline (`docs/security/CLOSURE-PLAN.md` §4)**, on its own branch after PR #1 merges. Status assessed 2026-11-11, no code yet. Open HIGH findings:
+- `auth.ts:131-146`: hard-coded `admin`/`admin` login when the DB is unavailable;
+- `auth.ts:79-91`: default `admin`/`admin` account on first run;
+- `auth.ts:36-38`: unsalted SHA-256 password hashes.
+
+Do not start B1 until panel A3 signing is verified. Do not start Gate 2 or sell before TD confirmation.
 
 ## Last completed step
 
-2026-11-10 — C0 committed and CI green on `a457994`; stopped for review.
+2026-11-11 — C0.1 Gate 0 fixes committed (`4c8250f`, CI green); dev MongoDB switched to `rs0` and E2E green; Gate 1 status assessed. Stopped for TD review.
