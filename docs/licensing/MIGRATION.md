@@ -42,7 +42,7 @@ tooling is in the repo. Treat it as **exposed**.
 | K5 | Stop using `PHM1` for any new sale; issue only `PHM2` | Panel audit |
 | K6 | Destroy the old private key once the new key is live and the rotation record is written. If `D-LIC-17` is reversed, destroy it after the last `PHM1` expires, or archive it offline under owner control | Destruction record |
 | K7 | Remove `scripts/license-keygen.mjs` and `scripts/license-generator.mjs` from this repo and from build machines | Commit + CI scan |
-| K8 | Add CI checks: no `BEGIN PRIVATE KEY`, no `generateKeyPair`, no signing call in app paths | CI config |
+| K8 | Add CI checks with exactly the rules in ADR-001 E1: a private-key PEM block with a base64 body; key generation, private-key loading and signing calls in code files (`generateKeyPair`, `createPrivateKey`, `createSign`, `privateEncrypt`, `crypto.sign(` / `subtle.sign(`, `sign` from `crypto`); any `scripts/license-*.mjs` | CI config (`.github/workflows/ci.yml`, step "Signing / issuance scan") + `tests/unit/scanSigning.test.ts` |
 
 If K1 finds the key only on one developer machine and no licences were sold
 yet, rotation is cheap and mandatory anyway. If licences were sold, note the

@@ -7,6 +7,15 @@ import { readFileSync } from 'node:fs'
 // A key block needs a base64 body (real line break or an escaped \n in source); a bare header in prose is allowed.
 const KEY_BLOCK = new RegExp('-----BEGIN [A-Z0-9 ]*' + 'PRIVATE KEY-----[ \\t]*(?:\\r?\\n|\\\\n)[ \\t]*[A-Za-z0-9+/=]{40,}')
 const ISSUANCE_CALL = new RegExp('\\b(?:generate' + 'KeyPair(?:Sync)?|create' + 'PrivateKey)\\b')
+// Signing APIs: create-Sign, private-Encrypt, crypto/subtle .sign(), or `sign` imported/required from crypto.
+const SIGNING_CALL = new RegExp(
+  [
+    '\\b(?:create' + 'Sign|private' + 'Encrypt)\\b',
+    '\\b(?:crypto|subtle)\\.' + 'sign\\s*\\(',
+    'import\\s*\\{[^}]*\\b' + 'sign\\b[^}]*\\}\\s*from\\s*[\'"](?:node:)?crypto[\'"]',
+    '\\{[^}]*\\b' + 'sign\\b[^}]*\\}\\s*=\\s*require\\(\\s*[\'"](?:node:)?crypto[\'"]'
+  ].join('|')
+)
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/i
 const ISSUANCE_SCRIPT = /^scripts\/license-[^/]*\.mjs$/
 
@@ -27,6 +36,7 @@ for (const file of files) {
   }
   if (KEY_BLOCK.test(text)) problems.push(`${path}: private key block with key material`)
   if (CODE_FILE.test(path) && ISSUANCE_CALL.test(text)) problems.push(`${path}: key generation / private key loading in code`)
+  if (CODE_FILE.test(path) && SIGNING_CALL.test(text)) problems.push(`${path}: signing call in code`)
 }
 
 if (problems.length) {

@@ -123,7 +123,7 @@ achieves the same binding without physical logistics.
 
 | # | Rule | How it is checked |
 |---|---|---|
-| E1 | This repo contains no key-generation, signing, or issuance code | CI grep + bundle scan fail on `PRIVATE KEY`, `generateKeyPair`, `sign(` in licensing paths; `scripts/license-*.mjs` absent |
+| E1 | This repo contains no key-generation, signing, or issuance code | `npm run scan:signing` in CI, over every tracked file, fails on: a private-key PEM block with a base64 body; in code files, `generateKeyPair(Sync)`, `createPrivateKey`, `createSign`, `privateEncrypt`, `crypto.sign(` / `subtle.sign(`, or `sign` imported or required from `crypto`; any `scripts/license-*.mjs`. Tested by `tests/unit/scanSigning.test.ts`. Not covered: the built bundle (`out/`, asar) is not scanned. |
 | E2 | The app has no licence input control | UI test asserts no input with licence semantics exists on any route, pre- or post-login |
 | E3 | No role or permission mentions licences | `Permission` union and `BUILTIN_ROLES` contain no licence entry; test asserts it |
 | E4 | Only the main process talks to the panel; renderer gets status only | Preload surface review + IPC test |

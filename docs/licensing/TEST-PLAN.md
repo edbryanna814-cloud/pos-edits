@@ -219,14 +219,18 @@ These prove the containment itself, before any verifier exists.
 | ID | Case | Expected |
 |---|---|---|
 | R-01 | CI workflow on a pull request and on `main` | typecheck, build, secret/signing scan, Vitest all run |
-| R-02 | Plant `-----BEGIN PRIVATE KEY-----` in a source file | scan job fails; remove the plant afterwards |
+| R-02 | Plant a private-key PEM block **with a base64 body** (header line, then at least one line of 40+ base64 characters) in a source file. A bare header alone passes by design (R-09). | scan job fails; remove the plant afterwards |
 | R-03 | Plant a `scripts/license-*.mjs` file | scan job fails |
-| R-04 | `scripts/license-keygen.mjs` and `scripts/license-generator.mjs` | absent from the tree and from history after C0 |
+| R-04 | `scripts/license-keygen.mjs` and `scripts/license-generator.mjs` | absent from the tip of every branch after C0. They remain in history at baseline `3f70318`, by design: history is not rewritten (D-LIC-15), and the old key is treated as exposed anyway. |
 | R-05 | `license:apply` while the current state is `valid` | refused before writing `license.json` |
 | R-06 | `license:apply` with an earlier `exp` than the installed licence | refused; installed licence unchanged |
 | R-07 | More than 5 `license:apply` attempts in an hour | refused with a rate-limit error; each attempt audited |
 | R-08 | Vitest smoke test via `npm run test:unit` | runs and passes locally and in CI; `npm test` stays Playwright |
 | R-09 | Prose in `docs/licensing/` mentions a private-key header with no key body | scan passes; the directory is scanned, not excluded |
 
-R-04 is checked with `git log --all -- scripts/license-*.mjs` (no output) and a
-tree scan. The scan must not rely on `.gitignore`.
+R-04 is checked at the tip with `git ls-tree -r --name-only HEAD -- scripts/`
+(no `license-*.mjs` listed) and with `npm run scan:signing`, which fails on any
+tracked `scripts/license-*.mjs`. The scan must not rely on `.gitignore`.
+`git log --all -- 'scripts/license-*.mjs'` is expected to print the baseline
+add and the C0 delete. It proves when the files were removed, not that they
+are absent from history.

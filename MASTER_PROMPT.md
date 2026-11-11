@@ -285,7 +285,7 @@ This subscription is the fee paid by the company to use this software.
 
 It is NOT a subscription sold to the company's CRM customers.
 
-Implement:
+Panel scope (licence panel repo, not app work):
 
 - Subscription plans.
 - Configurable prices.

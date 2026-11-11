@@ -205,7 +205,7 @@ Test report totals against source records.
 
 Important: this is the subscription paid by the company to use the application.
 
-Implement:
+Panel scope (licence panel repo, not app work):
 
 - Plans.
 - Prices.
@@ -241,7 +241,7 @@ Automated recurring billing requires a trusted backend and verified payment prov
 
 Read DEVICE_LICENSING.md.
 
-Implement:
+Panel scope (licence panel repo, not app work):
 
 ### Hardware Fingerprint
 
@@ -297,7 +297,7 @@ Implement:
 
 ### Offline Licensing
 
-Implement only the policy approved by the owner.
+The panel applies only the policy approved by the owner (POL-* in `docs/licensing/REQUIREMENTS.md` §7).
 
 Do not invent an offline grace duration.
 

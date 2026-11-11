@@ -41,6 +41,27 @@ describe('signing scan', () => {
     expect(scan(plant('load.mjs', `create${'PrivateKey'}(pem)\n`)).status).toBe(1)
   })
 
+  it('fails on signing calls in code', () => {
+    const cases = [
+      `const s = create${'Sign'}('sha256')\n`,
+      `private${'Encrypt'}(key, buf)\n`,
+      `crypto.${'sign'}(null, data, key)\n`,
+      `await subtle.${'sign'}('Ed25519', key, data)\n`,
+      `import { randomUUID, ${'sign'} } from 'node:crypto'\n`,
+      `const { ${'sign'} } = require('crypto')\n`
+    ]
+    cases.forEach((src, i) => {
+      const r = scan(plant(`signer${i}.ts`, src))
+      expect(r.status, src).toBe(1)
+      expect(r.stderr).toMatch(/signing call/)
+    })
+  })
+
+  it('allows verify-only crypto use', () => {
+    const src = `import { createPublicKey, verify as verifySignature } from 'node:crypto'\n`
+    expect(scan(plant('verifier.ts', src)).status).toBe(0)
+  })
+
   it('fails on any scripts/license-*.mjs path', () => {
     const r = scan('scripts/license-generator.mjs')
     expect(r.status).toBe(1)
