@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { Document } from 'mongodb'
 import { getDb } from './db'
 import { getSettings } from './settings'
+import { getCurrentSession, logAudit } from './auth'
 import type { BackupResult } from '../shared/ipc'
 
 const BACKUP_VERSION = 1
@@ -50,6 +51,7 @@ export async function exportBackup(win: BrowserWindow): Promise<BackupResult> {
   }
 
   await writeFile(result.filePath, JSON.stringify(payload, null, 2), 'utf8')
+  await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.export', resource: 'backup', details: { collections: Object.keys(collections).length } })
   return { canceled: false, filePath: result.filePath }
 }
 
@@ -109,5 +111,7 @@ export async function importBackup(win: BrowserWindow): Promise<BackupResult> {
     if (!backupNames.has(info.name)) await db.collection(info.name).drop()
   }
 
+  // Written into the restored log, so the chain records that a restore happened.
+  await logAudit({ actorUsername: getCurrentSession()?.username, action: 'backup.import', resource: 'backup', details: { imported, collections: collections.length } })
   return { canceled: false, filePath, imported }
 }

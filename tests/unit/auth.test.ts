@@ -164,3 +164,25 @@ describe('with MongoDB', () => {
     expect((await auth.login({ username: 'cashier1', password: 'Temp-Reset-Pass-1' })).mustChangePassword).toBe(true)
   })
 })
+
+describe('audit chain in MongoDB (Gate 1 S5)', () => {
+  it('every audit entry written above is chained and the chain verifies', async () => {
+    const report = await auth.verifyAuditLog()
+    expect(report.ok).toBe(true)
+    expect(report.checked).toBeGreaterThan(10)
+    expect(report.unchained).toBe(0)
+  })
+
+  it('concurrent writes do not fork the chain', async () => {
+    await Promise.all(Array.from({ length: 20 }, (_, i) => auth.logAudit({ action: `concurrent.${i}`, resource: 'test' })))
+    expect((await auth.verifyAuditLog()).ok).toBe(true)
+  })
+
+  it('detects an edited, then a deleted, audit entry', async () => {
+    const col = raw.db(DB_NAME).collection('audit')
+    await col.updateOne({ seq: 3 }, { $set: { actorUsername: 'someone-else' } })
+    expect(await auth.verifyAuditLog()).toMatchObject({ ok: false, brokenAtSeq: 3 })
+    await col.deleteOne({ seq: 3 })
+    expect(await auth.verifyAuditLog()).toMatchObject({ ok: false, brokenAtSeq: 3, reason: 'missing or duplicate entry' })
+  })
+})

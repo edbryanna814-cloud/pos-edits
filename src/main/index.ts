@@ -8,13 +8,14 @@ import { closeDb, connectDb, dbHealth } from './db'
 import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser } from './auth'
+import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
 import { publicError, validateIpcArgs } from './ipcSchema'
+import { rotateIfLarge } from './logRotate'
 
 const rendererUrl = process.env['ELECTRON_RENDERER_URL']
 const isDev = Boolean(rendererUrl)
@@ -346,7 +347,9 @@ if (!app.requestSingleInstanceLock()) {
     const allowedPermissions = new Set(['clipboard-sanitized-write'])
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowedPermissions.has(permission)))
     session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowedPermissions.has(permission))
-    setAuditFallbackFile(join(app.getPath('userData'), 'audit-fallback.jsonl'))
+    const auditFallback = join(app.getPath('userData'), 'audit-fallback.jsonl')
+    await rotateIfLarge(auditFallback).catch(() => undefined)
+    setAuditFallbackFile(auditFallback)
     try {
       await startBundledMongo()
     } catch (error) {
@@ -360,6 +363,12 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       await ensureAuthSchema()
+      // Gate 1 S5: verify the audit hash chain on every start; a break is itself audited.
+      const chain = await verifyAuditLog()
+      if (!chain.ok) {
+        console.error('[audit] chain verification failed', chain)
+        await logAudit({ action: 'audit.chain_broken', resource: 'audit', details: { brokenAtSeq: chain.brokenAtSeq, reason: chain.reason } })
+      }
     } catch (error) {
       console.error('[main] auth schema setup failed', error)
     }

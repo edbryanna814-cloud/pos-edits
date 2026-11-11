@@ -3,6 +3,7 @@ import { appendFile } from 'node:fs/promises'
 import { ObjectId, type Db } from 'mongodb'
 import { getDb } from './db'
 import { hashPassword, hashToken, newPasswordError, verifyPassword } from './password'
+import { chainEntry, verifyChain, type ChainReport } from './auditChain'
 import type { AuditEvent, LoginInput, LoginResult, Permission, Session, User } from '../shared/auth'
 import { BUILTIN_ROLES, DEFAULT_SESSION_TTL_MS } from '../shared/auth'
 
@@ -83,14 +84,45 @@ export async function ensureAuthSchema(): Promise<void> {
   await sessions.deleteMany({ token: { $exists: true } })
   if ((await sessions.indexes()).some((index) => index.name === 'token_1')) await sessions.dropIndex('token_1')
   await sessions.createIndex({ tokenHash: 1 }, { unique: true })
+  // One entry per chain position: stops two writers forking the audit chain.
+  await db.collection(AUDIT_COL).createIndex({ seq: 1 }, { unique: true, partialFilterExpression: { seq: { $exists: true } } })
+}
+
+// Audit writes are serialised so each entry links to the previous one (see auditChain.ts).
+let auditQueue: Promise<unknown> = Promise.resolve()
+
+async function appendChained(db: Db, record: AuditEvent): Promise<void> {
+  const audit = db.collection<AuditEvent & { seq?: number; hash?: string }>(AUDIT_COL)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // Read the tail on every write (indexed): stays correct after a backup import replaces the log.
+    const last = await audit.find({ seq: { $exists: true } }).sort({ seq: -1 }).limit(1).next()
+    const entry = chainEntry({ ...record } as Record<string, unknown>, last ? { seq: last.seq as number, hash: last.hash as string } : null)
+    try {
+      await audit.insertOne(entry as any)
+      return
+    } catch (error) {
+      // Another writer took this seq (unique index): re-read the tail once and retry.
+      if ((error as { code?: number })?.code !== 11000 || attempt > 0) throw error
+    }
+  }
+}
+
+/** Verifies the whole audit hash chain (Gate 1 S5). */
+export async function verifyAuditLog(): Promise<ChainReport> {
+  const db = requireDb()
+  // shortcut: loads every entry; fine for a single pharmacy, paginate if the log reaches millions of rows.
+  return verifyChain(await db.collection(AUDIT_COL).find({}).toArray())
 }
 
 /** Writes to the audit collection; if MongoDB is unavailable, appends a JSON line to the fallback file. */
 export async function logAudit(event: Omit<AuditEvent, 'createdAt'> & { createdAt?: string }): Promise<void> {
   const record = { ...event, createdAt: event.createdAt ?? new Date().toISOString() } as AuditEvent
+  if (record.details === undefined) delete record.details
   const db = getDb()
   if (db) {
-    await db.collection<AuditEvent>(AUDIT_COL).insertOne(record)
+    const write = auditQueue.then(() => appendChained(db, record))
+    auditQueue = write.catch(() => undefined)
+    await write
     return
   }
   if (!auditFallbackFile) {

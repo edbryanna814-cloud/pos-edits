@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { MongoClient } from 'mongodb'
+import { rotateIfLarge } from './logRotate'
 
 const PORT = 27028
 const REPLICA_SET = 'rs0'
@@ -72,6 +73,7 @@ export async function startBundledMongo(): Promise<void> {
   const dataDir = join(app.getPath('userData'), 'mongodb-data')
   const logFile = join(app.getPath('userData'), 'mongodb.log')
   await mkdir(dataDir, { recursive: true })
+  await rotateIfLarge(logFile) // mongod opens it with --logappend; keep it bounded
 
   const executable = join(process.resourcesPath, 'mongodb', 'mongod.exe')
   child = spawn(
