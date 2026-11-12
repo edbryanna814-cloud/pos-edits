@@ -7,3 +7,6 @@
 14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:103
 14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:118
 14f9f64d4d7ccdf6adaddc84eac475eff9bcf3e2:tests/unit/auth.test.ts:generic-api-key:122
+# 76cd797: tests/fixtures/anb2-panel-leases.json holds panel test leases signed with a throwaway scratch key (public key + leases only). Test data, not credentials.
+76cd79739b788ffb500d5ba02764ae242ca521c8:tests/fixtures/anb2-panel-leases.json:jwt:18
+76cd79739b788ffb500d5ba02764ae242ca521c8:tests/fixtures/anb2-panel-leases.json:jwt:55
