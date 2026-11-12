@@ -1,11 +1,11 @@
-# Pharmacy POS 0.2.0: installation manual (field test)
+# Pharmacy POS 0.2.1: installation manual (field test)
 
 Arabic version: `INSTALL.ar.md`.
 
 | | |
 |---|---|
-| Package | `Pharmacy-POS-Setup-0.2.0.exe` (Windows 64-bit installer, about 158 MB) |
-| Built from | branch `field-test/0.2.0`, app code at commit `12dcfc7` (Gate 1 security baseline) |
+| Package | `Pharmacy-POS-Setup-0.2.1.exe` (Windows 64-bit installer, about 158 MB) |
+| Built from | branch `field-test/0.2.0`, tag `field-test-0.2.1` |
 | SHA-256 | see `SHA256SUMS.txt` in this folder |
 | Status | **Field test build.** Not a sales release. No code-signing certificate yet. |
 
@@ -56,7 +56,7 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 
 1. **Check the file is genuine.** In PowerShell, in the folder that holds the installer:
    ```powershell
-   Get-FileHash .\Pharmacy-POS-Setup-0.2.0.exe -Algorithm SHA256
+   Get-FileHash .\Pharmacy-POS-Setup-0.2.1.exe -Algorithm SHA256
    ```
    The result must equal the value in `SHA256SUMS.txt`. If it does not, **do not install**.
 2. **Close any running copy** of Pharmacy POS (an older test copy also uses port 27028).
@@ -66,7 +66,7 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 
 ## 3. Install
 
-1. Double-click `Pharmacy-POS-Setup-0.2.0.exe`.
+1. Double-click `Pharmacy-POS-Setup-0.2.1.exe`.
 2. **Windows SmartScreen** may say "Windows protected your PC" because the installer is not code-signed yet.
    Click **More info → Run anyway**, but only if the SHA-256 check in §2 matched.
 3. Antivirus software may scan or question the installer and `mongod.exe` (the database). Allow them.
@@ -77,11 +77,10 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 
 ## 4. First start
 
-> ⚠ **Licence activation (known blocker for this build).** A packaged build opens on **"Activate this device"**
-> and needs a `PHM1` licence code for this device's ID. The old code generator was removed from the
-> project for security (Gate 0), and the new licence panel is not built yet (Gate 2). **Unless you already
-> have a valid code for this PC, the program cannot go past this screen.** Send the **Device ID** shown on the
-> screen to the supplier. Do not try to work around it.
+> ⚠ **Licence activation.** A packaged build opens on **"Activate this device"**. Send the **Device code**
+> shown on that screen to the seller; you will receive a licence code for this exact PC. Paste it and press
+> **Activate**. The test licence lasts 30 days. No internet connection is needed for activation. Keep the
+> code: you need it again if the app data folder is reset or the PC is replaced.
 
 After activation:
 
@@ -151,9 +150,10 @@ nothing is changed.
 
 ## 8. Known limits of this field-test build
 
-- Licence activation needs a `PHM1` code (see §4). The new licence system is Gate 2.
+- Licence activation needs a code tied to this PC (see §4). Field-test codes last 30 days; a later build with
+  a different signing key needs a new code.
 - No code-signing certificate: SmartScreen warns.
-- Not yet tested on a clean PC (the clean-VM install test is still open).
+- Not yet tested on a clean PC by the seller; this release is the clean-PC test.
 - **MongoDB Server is licensed under SSPL.** The owner's legal position is pending. This build is for
   the owner's own field testing, not for sale or distribution to customers.
 - Business-data changes made directly in the database files are not detected (the audit log is).

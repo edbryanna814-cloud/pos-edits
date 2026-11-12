@@ -11,8 +11,11 @@ import { expiryRefusal, preApplyRefusal } from './licenseApplyGuard'
 
 const execFileAsync = promisify(execFile)
 
+// Field-test key (reference phm-fieldtest-2026-01), rotated 2026-11-12 because the old private
+// key was not on the build PC and no code could be issued. The private half is not in this repo.
+// Replace with the panel's public key when panel A3 issues licences; codes from this key then stop.
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA61OdJ1imcoCzYW6DImq2veDwk0fFfe9YdXeevRMyK98=
+MCowBQYDK2VwAyEAtZhdtfTqM+yx+1xvJcIQqrpJusZmn7PsJqmNGEU7TdA=
 -----END PUBLIC KEY-----`
 
 const LICENSE_FILE = () => join(app.getPath('userData'), 'license.json')

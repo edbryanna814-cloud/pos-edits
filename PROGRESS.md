@@ -122,10 +122,28 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Unused `lines?` removed from the preload return type.
 - Verification: typecheck clean, 11 unit files / 59 tests pass, 7 Playwright tests pass.
 
+## Field-test 0.2.1 (2026-11-12)
+
+- Version 0.2.1: same app code as `27f075c`, plus the field-test verification key and the updated
+  installation docs. Built from branch `field-test/0.2.0`, tag `field-test-0.2.1`.
+- Signing key rotated to reference `phm-fieldtest-2026-01` because the original PHM1 private key was not
+  on the build PC and no code could be issued. The private half stays outside the repo at
+  `%USERPROFILE%\.pharmacy-pos-license\private.pem`; only the public half is in `src/main/license.ts`.
+  Codes issued with this key stop working when the panel (A3) takes over issuance.
+- Packaged build verified on the builder PC: activation screen shows the device code, a 30-day code is
+  accepted, `licenseStatus` becomes `valid`, `dbHealth` reports `connected` on MongoDB 9.0.8
+  (`replicaSet:rs0`, transactions supported), and `authSetupRequired` is `true`.
+- Installer: `release/Pharmacy-POS-Setup-0.2.1.exe`, SHA-256
+  `3eb2253e6f6cc7286f7b84ce063ea8eb6206173aa36b97800c7cc7815630fea2`.
+- Zip: `release/Pharmacy-POS-0.2.1-field-test.zip`, SHA-256
+  `aed460a128705d2fe135e38af2d86a5437951e9ab66b0236d1a8815844774e69`.
+- The installer is not stored in Git for this version; the pre-release assets are the distribution copy.
+- Owner-only test build: no sale, no customer distribution (SSPL hold).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-11: S4 done on `gate1/security-baseline`: MongoDB access control with a least-privilege app user, encrypted backups, and the log PII review. Real-mongod tests pass locally and in CI, and the packaged smoke passes. Stopped to report to the TD.
+2026-11-12: field-test 0.2.1 packaged build verified end to end (activation, database connection) and released as a private pre-release with checksums, SBOM and installation notes.

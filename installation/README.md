@@ -1,22 +1,21 @@
-# Pharmacy POS 0.2.0: field-test installation folder
+# Pharmacy POS 0.2.1: field-test installation folder
 
-Everything needed to install and run Pharmacy POS on a Windows PC, kept together as a backup.
+Everything needed to install and run Pharmacy POS on a Windows PC, kept together with the release.
 
 | File | What it is |
 |---|---|
-| `Pharmacy-POS-Setup-0.2.0.exe` | Windows 64-bit installer (stored with Git LFS in this branch) |
-| `INSTALL.md` | Installation manual: PC requirements, required/included programs, install, first start, backup, troubleshooting |
+| `WHAT-TO-INSTALL.md` | Short answer to "what must be installed alongside the app" (EN + AR) |
+| `INSTALL.md` | Installation manual: PC requirements, install, first start, backup, troubleshooting |
 | `INSTALL.ar.md` | The same manual in Arabic |
 | `SHA256SUMS.txt` | SHA-256 checksums: verify the installer before running it |
 | `sbom.cdx.json` | Software bill of materials (CycloneDX 1.5): every bundled component and its licence |
 
-**Download:** the whole folder as one zip, plus the installer alone, is attached to the GitHub pre-release
-`field-test-0.2.0` of this repository (Releases page). With Git: `git lfs install`, then clone and check out
-branch `field-test/0.2.0`, or run `git lfs pull` in an existing clone.
+**Download:** `Pharmacy-POS-Setup-0.2.1.exe`, the whole folder as one zip, and the checksums are attached
+to the GitHub pre-release `field-test-0.2.1` of this repository (Releases page). The installer is not
+stored in Git for this version; the release assets are the distribution copy.
 
-**Start with `INSTALL.md` (English) or `INSTALL.ar.md` (Arabic).** Read §4 "First start" before going on site:
-this build stops at licence activation unless the PC has a valid `PHM1` code.
+**Start with `WHAT-TO-INSTALL.md` or `INSTALL.md` §4 "First start".** The app needs a licence code tied
+to the PC: install it, copy the **Device code** from the activation screen, and send it to the seller.
 
-Built from branch `field-test/0.2.0`; app code identical to `gate1/security-baseline` at `12dcfc7`
-(PR edbryanna814-cloud/Pharmacy-POS-and-management-#2). Field test only: not for sale or distribution
-(MongoDB SSPL position pending).
+Built from branch `field-test/0.2.0`, tag `field-test-0.2.1`. Field test only: not for sale or
+distribution (MongoDB SSPL position pending).
