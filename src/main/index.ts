@@ -14,6 +14,7 @@ import { createCategory, createPO, createProduct, createSupplier, createUnit, en
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
+import { licenseRequired } from './licenseGate'
 import { publicError, validateIpcArgs } from './ipcSchema'
 import { rotateIfLarge } from './logRotate'
 
@@ -97,6 +98,11 @@ function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...ar
       const guard = channelGuards[channel]
       if (guard === 'authenticated') requireSession()
       else if (guard) requirePermission(...guard)
+      // Gate 2: re-check the licence on every call, not only at sign-in, so an expiry mid-session
+      // locks the business screens instead of letting them run to the next restart.
+      if (licenseRequired(channel) && !(await hasValidLicense().catch(() => false))) {
+        throw new Error('License required or expired')
+      }
       return await listener(event, ...args)
     } catch (error) {
       const safe = publicError(error)

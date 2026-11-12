@@ -151,7 +151,7 @@ export interface PreloadApi {
   invPOReceive(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt>
   posCheckout(input: any): Promise<Sale>
   posSalesList(): Promise<Sale[]>
-  posReturn(input: { saleId: string; reason: string; lines?: any[] }): Promise<Return>
+  posReturn(input: { saleId: string; reason: string }): Promise<Return>
   posCashIn(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashOut(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashboxList(): Promise<CashboxMovement[]>

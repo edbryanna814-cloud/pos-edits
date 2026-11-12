@@ -128,7 +128,14 @@ async function createSale(db: Db, input: any): Promise<Sale> {
   const discountCents = requestedDiscount > 0 ? requestedDiscount : lineDiscounts
   if (discountCents > subtotalCents) throw new Error('Discount exceeds subtotal')
 
-  const taxCents = toCents(input?.taxCents ?? 0, 'Tax')
+  // Gate 2: tax is recomputed here from saved settings. The renderer's taxCents is ignored so a
+  // stale screen (or a tampered call) cannot post a wrong tax figure to sales or reports.
+  const settingsDoc = await db.collection('settings').findOne({ _id: 'company' } as any)
+  const taxRateBasisPoints = Math.min(
+    10000,
+    Math.max(0, Math.trunc(Number((settingsDoc as any)?.taxRateBasisPoints) || 0))
+  )
+  const taxCents = Math.round(((subtotalCents - discountCents) * taxRateBasisPoints) / 10000)
   const totalCents = subtotalCents - discountCents + taxCents
 
   const paymentMethod = String(input?.paymentMethod ?? 'cash')
@@ -199,10 +206,14 @@ async function createSale(db: Db, input: any): Promise<Sale> {
     { saleId, amountCents: paidCents, method: sale.paymentMethod, createdAt: now },
     { session: input.session }
   )
-  await db.collection(CASHBOX).insertOne(
-    { type: 'sale', amountCents: totalCents, reason: `Sale ${sale.invoiceNo}`, reference: saleId, createdAt: now },
-    { session: input.session }
-  )
+  // The cashbox is the physical drawer: only cash sales add to it. Card and other payments live in
+  // the payments collection so the drawer balance still matches the notes and coins in the till.
+  if (paymentMethod === 'cash') {
+    await db.collection(CASHBOX).insertOne(
+      { type: 'sale', amountCents: totalCents, reason: `Sale ${sale.invoiceNo}`, reference: saleId, createdAt: now },
+      { session: input.session }
+    )
+  }
 
   return { ...sale, _id: saleId }
 }
@@ -298,16 +309,19 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
         ...(username ? { createdBy: username } : {})
       }
       const inserted = await db.collection(RETURNS).insertOne(ret as any, { session })
-      await db.collection(CASHBOX).insertOne(
-        {
-          type: 'refund',
-          amountCents: -sale.totalCents,
-          reason: `Return ${sale.invoiceNo}`,
-          reference: input.saleId,
-          createdAt: now
-        },
-        { session }
-      )
+      // Mirror the original payment: only cash refunds come out of the drawer.
+      if (sale.paymentMethod === 'cash') {
+        await db.collection(CASHBOX).insertOne(
+          {
+            type: 'refund',
+            amountCents: -sale.totalCents,
+            reason: `Return ${sale.invoiceNo}`,
+            reference: input.saleId,
+            createdAt: now
+          },
+          { session }
+        )
+      }
       return { ...ret, _id: inserted.insertedId.toString() }
     })
     if (!returned) throw new Error('Return failed')

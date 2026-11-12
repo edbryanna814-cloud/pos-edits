@@ -418,7 +418,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
           discountCents: 0,
           taxCents: 0,
           paymentMethod: 'cash',
-          paidCents: 2000
+          paidCents: 2200
         }
         const first = await api.posCheckout(input)
         const second = await api.posCheckout(input)
@@ -449,7 +449,8 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
 
       expect(idempotency.sameSale).toBe(true)
       expect(idempotency.before - idempotency.after).toBe(2)
-      expect(idempotency.serverPriceTotal).toBe(2000)
+      // Server tax (10% from saved settings) is added on top of the server-priced lines.
+      expect(idempotency.serverPriceTotal).toBe(2200)
       expect(idempotency.rejectedLowPayment).toBe(true)
 
       const report = await window.evaluate(() => (window as any).api.reportsSales())
@@ -458,7 +459,27 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       expect(report.grossProfitCents).toBe(1000)
       expect(report.returnsCount).toBe(1)
       expect(report.byProduct[0].quantity).toBe(2)
-      expect(report.byCashier.admin).toEqual({ count: 1, totalCents: 2000 })
+      expect(report.byCashier.admin).toEqual({ count: 1, totalCents: 2200 })
+
+      // Cashbox is the physical drawer: the two cash sales and one cash refund net to 2200,
+      // and a card sale must not add anything.
+      const cashbox = await window.evaluate(async () => {
+        const api = (window as any).api
+        const balance = (await api.reportsCashbox()).balanceCents
+        const before = (await api.posCashboxList()).length
+        const product = (await api.invProductsList())[0]
+        const sale = await api.posCheckout({
+          clientRequestId: 'e2e-card-1',
+          lines: [{ productId: product._id, quantity: 1 }],
+          discountCents: 0,
+          paymentMethod: 'card'
+        })
+        const after = (await api.posCashboxList()).length
+        return { balance, before, after, method: sale.paymentMethod }
+      })
+      expect(cashbox.balance).toBe(2200)
+      expect(cashbox.method).toBe('card')
+      expect(cashbox.after).toBe(cashbox.before)
 
       const dir = join(process.cwd(), 'screenshots')
       mkdirSync(dir, { recursive: true })

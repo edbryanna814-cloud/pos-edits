@@ -71,7 +71,8 @@ export default function DashboardPage({ language, currency, products, sales, cas
     .filter((product) => {
       if (product.active === false) return false
       const remaining = daysLeft(product.expiryDate)
-      return product.stockQuantity <= 6 || (remaining !== null && remaining <= 30)
+      const minStock = Math.max(0, Math.trunc(Number(product.minStock) || 0))
+      return product.stockQuantity <= minStock || (remaining !== null && remaining <= 30)
     })
     .sort((a, b) => {
       const ae = daysLeft(a.expiryDate)

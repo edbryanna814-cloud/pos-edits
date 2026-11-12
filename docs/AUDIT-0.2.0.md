@@ -41,6 +41,8 @@ the current source; items marked *documented* come from the Gate 1 closure plan 
 
 ### P1 — should be fixed before selling
 
+> Status: items 1–4 are fixed later in this branch; see section 7.
+
 1. **Licence is checked only at sign-in and first-run setup.** A session that is already open keeps
    working after the licence expires, and nothing re-checks during the session. *Verified in code*
    (`src/main/index.ts` guards `AuthLogin`/`AuthSetup`; no periodic or per-call check).
@@ -112,3 +114,21 @@ old signed codes (they are ignored, not displayed; removing them would break exi
 Fix P1 items 1–4 before selling. They affect money and licence control, which is exactly what a buyer
 tests first. P2 items can follow in 0.2.x, except 9 and 11 which touch data integrity and are cheap to
 fix now.
+
+## 7. Fixes applied on this branch
+
+1. **Licence re-checked on every call.** `src/main/licenseGate.ts` lists the few channels that stay open
+   (activation, session state, sign-out, password change, health/version). Every other channel asks
+   `hasValidLicense()` first, so an expiry mid-session cannot sell. The renderer also polls the licence
+   every minute and on window focus, and locks to the activation screen. Covered by
+   `tests/unit/licenseGate.test.ts`.
+2. **Tax computed on the server.** `createSale` reads the saved tax rate and recomputes tax from the
+   server-priced subtotal minus discount. The renderer's `taxCents` is ignored.
+3. **Cashbox follows the payment method.** Only cash sales add to the drawer and only cash sales create
+   a cash refund; card and other payments stay in the payments collection. Covered in the business-flow
+   test (cash net 2200, card sale leaves the drawer untouched).
+4. **Low stock uses each product's minimum.** Dashboard and inventory report both compare
+   `stockQuantity <= minStock`.
+
+Also removed the unused `lines?` field from the return API, since returns are full-invoice only.
+

@@ -297,6 +297,25 @@ export default function App() {
     void loadAuth()
   }, [])
 
+  // Poll the licence so an expiry during a shift locks the screens without waiting for a restart.
+  // The main process enforces the same rule on every call; this only keeps the UI honest.
+  useEffect(() => {
+    if (!window.api) return
+
+    const check = (): void => {
+      window.api
+        .licenseStatus()
+        .then((state) => setLicense(state))
+        .catch(() => setLicense({ status: 'invalid', deviceId: '' }))
+    }
+    const timer = setInterval(check, 60_000)
+    window.addEventListener('focus', check)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
+  }, [])
+
   useEffect(() => {
     if (!authUser) return
     if (active === 'users') {

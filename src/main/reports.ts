@@ -134,7 +134,7 @@ export async function inventoryReport(): Promise<InventoryReport> {
         expiring = days <= 30
       }
     }
-    if (qty <= 6 || expiring) lowStock++
+    if (qty <= Math.max(0, Math.trunc(Number(p.minStock) || 0)) || expiring) lowStock++
     totalValueCents += qty * (Number(p.purchaseCostCents) || 0)
   }
   return { totalProducts: products.length, lowStock, totalValueCents }

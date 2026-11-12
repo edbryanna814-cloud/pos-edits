@@ -110,6 +110,18 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Installer SHA-256 `b6fe9a4394df30094b5f629b7fe670a02a8bc1b90ae4557d72a5c78aba9c2217`.
 - Blocker for on-site use: the packaged app stops at PHM1 activation (no code can be issued: generator removed, panel not built).
 
+## Audit and pre-sale fixes (2026-11-12)
+
+- `b8695f5` user-facing cleanup: no MAC address, no internal licence fields, plain labels and errors,
+  sessions excluded from backups.
+- `dc33934` `docs/AUDIT-0.2.0.md`: features, security controls, findings.
+- Licence re-checked on every IPC call (`src/main/licenseGate.ts`) plus a one-minute renderer poll.
+- Tax recomputed on the server from saved settings; the renderer value is ignored.
+- Cashbox only tracks cash sales and cash refunds; card/other payments stay in `pos_payments`.
+- Low stock uses each product's `minStock` in the dashboard and the inventory report.
+- Unused `lines?` removed from the preload return type.
+- Verification: typecheck clean, 11 unit files / 59 tests pass, 7 Playwright tests pass.
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
