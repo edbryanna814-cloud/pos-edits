@@ -9,7 +9,6 @@ import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
-import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
@@ -48,19 +47,6 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.UsersUpdate]: ['users.manage'],
   [IPC.RolesList]: ['users.read'],
   [IPC.AuditList]: ['audit.view'],
-  [IPC.CrmCustomersCreate]: ['crm.manage'],
-  [IPC.CrmCustomersUpdate]: ['crm.manage'],
-  [IPC.CrmContactsCreate]: ['crm.manage'],
-  [IPC.CrmLeadsCreate]: ['crm.manage'],
-  [IPC.CrmDealsCreate]: ['crm.manage'],
-  [IPC.CrmActivitiesCreate]: ['crm.manage'],
-  [IPC.CrmNotesCreate]: ['crm.manage'],
-  [IPC.CrmCustomersList]: 'authenticated',
-  [IPC.CrmContactsList]: 'authenticated',
-  [IPC.CrmLeadsList]: 'authenticated',
-  [IPC.CrmDealsList]: 'authenticated',
-  [IPC.CrmActivitiesList]: 'authenticated',
-  [IPC.CrmNotesList]: 'authenticated',
   [IPC.InvCategoriesCreate]: ['inventory.manage'],
   [IPC.InvUnitsCreate]: ['inventory.manage'],
   [IPC.InvProductsCreate]: ['inventory.manage'],
@@ -250,59 +236,6 @@ function registerIpc(): void {
     return listAudit(limit)
   })
 
-  handle(IPC.CrmCustomersList, async (event) => {
-    assertTrusted(event)
-    return listCustomers()
-  })
-  handle(IPC.CrmCustomersCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createCustomer(input)
-  })
-  handle(IPC.CrmCustomersUpdate, async (event, id: string, input: any) => {
-    assertTrusted(event)
-    return updateCustomer(id, input)
-  })
-  handle(IPC.CrmContactsList, async (event, customerId?: string) => {
-    assertTrusted(event)
-    return listContacts(customerId)
-  })
-  handle(IPC.CrmContactsCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createContact(input)
-  })
-  handle(IPC.CrmLeadsList, async (event) => {
-    assertTrusted(event)
-    return listLeads()
-  })
-  handle(IPC.CrmLeadsCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createLead(input)
-  })
-  handle(IPC.CrmDealsList, async (event) => {
-    assertTrusted(event)
-    return listDeals()
-  })
-  handle(IPC.CrmDealsCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createDeal(input)
-  })
-  handle(IPC.CrmActivitiesList, async (event, customerId?: string) => {
-    assertTrusted(event)
-    return listActivities(customerId)
-  })
-  handle(IPC.CrmActivitiesCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createActivity(input)
-  })
-  handle(IPC.CrmNotesList, async (event, customerId: string) => {
-    assertTrusted(event)
-    return listNotes(customerId)
-  })
-  handle(IPC.CrmNotesCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createNote(input)
-  })
-
   handle(IPC.InvCategoriesList, async (event) => { assertTrusted(event); return listCategories() })
   handle(IPC.InvCategoriesCreate, async (event, input: any) => { assertTrusted(event); return createCategory(input) })
   handle(IPC.InvUnitsList, async (event) => { assertTrusted(event); return listUnits() })
@@ -381,11 +314,6 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch (error) {
       console.error('[main] auth schema setup failed', error)
-    }
-    try {
-      await ensureCrmSchema()
-    } catch (error) {
-      console.error('[main] crm schema setup failed', error)
     }
     try {
       await ensureInventorySchema()

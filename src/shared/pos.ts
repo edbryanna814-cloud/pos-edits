@@ -17,7 +17,6 @@ export type Sale = {
   _id?: string
   invoiceNo: string
   clientRequestId?: string
-  customerId?: string
   lines: SaleLine[]
   subtotalCents: number
   discountCents: number

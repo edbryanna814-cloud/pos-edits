@@ -81,7 +81,6 @@ const ALL_PERMISSIONS: Permission[] = [
   'permissions.manage',
   'pos.use',
   'inventory.manage',
-  'crm.manage',
   'reports.view',
   'cashbox.manage',
   'settings.manage',
@@ -275,7 +274,7 @@ export default function UsersPage({ language }: Props) {
       </div>
 
       <input
-        className="crm-search"
+        className="user-search"
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
@@ -290,7 +289,7 @@ export default function UsersPage({ language }: Props) {
           {filteredUsers.map((user) => (
             <article key={user._id ?? user.username} className={`user-card ${user.active === false ? 'inactive' : ''}`}>
               <div className="user-card-head">
-                <span className="crm-avatar">{(user.username || '?').slice(0, 1).toUpperCase()}</span>
+                <span className="user-avatar">{(user.username || '?').slice(0, 1).toUpperCase()}</span>
                 <div>
                   <strong>{user.username}</strong>
                   <small className="block-muted">{user.role}</small>

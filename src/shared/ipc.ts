@@ -1,6 +1,5 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
 import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
-import type { Activity, Contact, Customer, Deal, Lead, Note } from './crm'
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
 import type { CashboxMovement, CashierShift, Payment, Return, Sale } from './pos'
 
@@ -23,19 +22,6 @@ export const IPC = {
   UsersUpdate: 'users:update',
   RolesList: 'roles:list',
   AuditList: 'audit:list',
-  CrmCustomersList: 'crm:customers:list',
-  CrmCustomersCreate: 'crm:customers:create',
-  CrmCustomersUpdate: 'crm:customers:update',
-  CrmContactsList: 'crm:contacts:list',
-  CrmContactsCreate: 'crm:contacts:create',
-  CrmLeadsList: 'crm:leads:list',
-  CrmLeadsCreate: 'crm:leads:create',
-  CrmDealsList: 'crm:deals:list',
-  CrmDealsCreate: 'crm:deals:create',
-  CrmActivitiesList: 'crm:activities:list',
-  CrmActivitiesCreate: 'crm:activities:create',
-  CrmNotesList: 'crm:notes:list',
-  CrmNotesCreate: 'crm:notes:create',
   InvCategoriesList: 'inv:categories:list',
   InvCategoriesCreate: 'inv:categories:create',
   InvUnitsList: 'inv:units:list',
@@ -114,19 +100,6 @@ export interface PreloadApi {
   usersUpdate(id: string, input: Partial<User>): Promise<User>
   rolesList(): Promise<{ name: string; permissions: Permission[] }[]>
   auditList(limit?: number): Promise<import('./auth').AuditEvent[]>
-  crmCustomersList(): Promise<Customer[]>
-  crmCustomersCreate(input: Partial<Customer>): Promise<Customer>
-  crmCustomersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
-  crmContactsList(customerId?: string): Promise<Contact[]>
-  crmContactsCreate(input: Partial<Contact>): Promise<Contact>
-  crmLeadsList(): Promise<Lead[]>
-  crmLeadsCreate(input: Partial<Lead>): Promise<Lead>
-  crmDealsList(): Promise<Deal[]>
-  crmDealsCreate(input: Partial<Deal>): Promise<Deal>
-  crmActivitiesList(customerId?: string): Promise<Activity[]>
-  crmActivitiesCreate(input: Partial<Activity>): Promise<Activity>
-  crmNotesList(customerId: string): Promise<Note[]>
-  crmNotesCreate(input: Partial<Note>): Promise<Note>
   invCategoriesList(): Promise<Category[]>
   invCategoriesCreate(input: Partial<Category>): Promise<Category>
   invUnitsList(): Promise<Unit[]>

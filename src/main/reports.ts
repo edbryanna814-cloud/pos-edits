@@ -1,4 +1,4 @@
-import { ObjectId, type Db } from 'mongodb'
+import type { Db } from 'mongodb'
 import { getDb } from './db'
 import type { CashboxReport, InventoryReport, SalesReport } from '../shared/reports'
 
@@ -20,7 +20,6 @@ export async function salesReport(): Promise<SalesReport> {
   let cogsCents = 0
   const byPaymentMethod: Record<string, { count: number; totalCents: number }> = {}
   const byCashier: Record<string, { count: number; totalCents: number }> = {}
-  const byCustomer = new Map<string, { count: number; totalCents: number }>()
   const products = new Map<string, SalesReport['byProduct'][number]>()
 
   for (const s of completed) {
@@ -39,13 +38,6 @@ export async function salesReport(): Promise<SalesReport> {
     byCashier[cashier] ??= { count: 0, totalCents: 0 }
     byCashier[cashier].count++
     byCashier[cashier].totalCents += total
-
-    if (s.customerId) {
-      const entry = byCustomer.get(s.customerId) ?? { count: 0, totalCents: 0 }
-      entry.count++
-      entry.totalCents += total
-      byCustomer.set(s.customerId, entry)
-    }
 
     for (const line of Array.isArray(s.lines) ? s.lines : []) {
       const quantity = Number(line.baseQuantity ?? line.quantity) || 0
@@ -70,23 +62,6 @@ export async function salesReport(): Promise<SalesReport> {
 
   const returnsCents = returns.reduce((sum, r) => sum + (Number(r.refundCents) || 0), 0)
 
-  const customerIds = [...byCustomer.keys()].filter((id) => ObjectId.isValid(id))
-  const customers =
-    customerIds.length > 0
-      ? ((await db
-          .collection('crm_customers')
-          .find({ _id: { $in: customerIds.map((id) => new ObjectId(id)) } })
-          .toArray()) as any[])
-      : []
-  const customerNames = new Map(customers.map((c) => [String(c._id), String(c.name ?? '')]))
-  const byCustomerList = [...byCustomer.entries()]
-    .map(([customerId, value]) => ({
-      customerId,
-      name: customerNames.get(customerId) ?? customerId,
-      ...value
-    }))
-    .sort((a, b) => b.totalCents - a.totalCents)
-
   return {
     totalSalesCents,
     totalCount: completed.length,
@@ -99,7 +74,6 @@ export async function salesReport(): Promise<SalesReport> {
     grossProfitCents: grossCents - discountCents - cogsCents,
     byPaymentMethod,
     byCashier,
-    byCustomer: byCustomerList,
     byProduct: [...products.values()].sort((a, b) => b.revenueCents - a.revenueCents)
   }
 }

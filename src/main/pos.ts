@@ -157,21 +157,11 @@ async function createSale(db: Db, input: any): Promise<Sale> {
   }
 
   const clientRequestId = typeof input?.clientRequestId === 'string' ? input.clientRequestId.trim() : ''
-  const customerId = typeof input?.customerId === 'string' ? input.customerId.trim() : ''
-  if (customerId) {
-    if (!ObjectId.isValid(customerId)) throw new Error('Invalid customer')
-    const customer = await db.collection('crm_customers').findOne(
-      { _id: new ObjectId(customerId) },
-      { session: input.session }
-    )
-    if (!customer) throw new Error('Customer not found')
-  }
   const cashierUsername =
     typeof input?.cashierUsername === 'string' ? input.cashierUsername.trim() : ''
   const sale: Omit<Sale, '_id'> = {
     invoiceNo: genInvoice(),
     ...(clientRequestId ? { clientRequestId } : {}),
-    ...(customerId ? { customerId } : {}),
     ...(cashierUsername ? { cashierUsername } : {}),
     lines,
     subtotalCents,

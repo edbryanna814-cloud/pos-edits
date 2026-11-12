@@ -5,7 +5,6 @@ export type Permission =
   | 'permissions.manage'
   | 'pos.use'
   | 'inventory.manage'
-  | 'crm.manage'
   | 'reports.view'
   | 'cashbox.manage'
   | 'settings.manage'
@@ -17,12 +16,11 @@ export type Role = {
 }
 
 export const BUILTIN_ROLES: Role[] = [
-  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'crm.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view'] },
-  { name: 'Manager', permissions: ['users.read', 'pos.use', 'inventory.manage', 'crm.manage', 'reports.view', 'cashbox.manage'] },
+  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view'] },
+  { name: 'Manager', permissions: ['users.read', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage'] },
   { name: 'Cashier', permissions: ['pos.use', 'reports.view'] },
   { name: 'Inventory Manager', permissions: ['inventory.manage', 'reports.view'] },
-  { name: 'Accountant', permissions: ['cashbox.manage', 'reports.view'] },
-  { name: 'CRM Employee', permissions: ['crm.manage'] }
+  { name: 'Accountant', permissions: ['cashbox.manage', 'reports.view'] }
 ]
 
 export type User = {

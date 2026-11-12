@@ -18,10 +18,9 @@ import PosPage from './pos/PosPage'
 import ShiftPanel from './pos/ShiftPanel'
 import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
-import CrmPage from './crm/CrmPage'
 import UsersPage from './users/UsersPage'
 
-type SectionId = 'dashboard' | 'pos' | 'inventory' | 'crm' | 'reports' | 'settings' | 'users' | 'audit'
+type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit'
 
 interface Section {
   id: SectionId
@@ -51,13 +50,6 @@ const sections: Section[] = [
     titleKey: 'inventoryTitle',
     descriptionKey: 'inventoryDesc',
     permission: 'inventory.manage'
-  },
-  {
-    id: 'crm',
-    labelKey: 'crm',
-    titleKey: 'crmTitle',
-    descriptionKey: 'crmDesc',
-    permission: 'crm.manage'
   },
   {
     id: 'reports',
@@ -570,8 +562,7 @@ export default function App() {
               </tbody>
             </table>
           </section>
-        ) : active === 'crm' ? (
-          <CrmPage language={language} currency={currency} />        ) : active === 'inventory' ? (
+        ) : active === 'inventory' ? (
           <>
             <InventoryPage
               products={products}
