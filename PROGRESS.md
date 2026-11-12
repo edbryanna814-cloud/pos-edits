@@ -140,10 +140,29 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - The installer is not stored in Git for this version; the pre-release assets are the distribution copy.
 - Owner-only test build: no sale, no customer distribution (SSPL hold).
 
+## Field-test 0.2.2 (2026-11-12): CRM removed, panel licences
+
+- `ba8efbb` CRM removed (page, services, IPC, role, permission); POS walk-in only; version 0.2.2.
+- `76cd797` app accepts panel licences (ANB2 token or `.anbc` file; `src/main/anb2.ts`, 9 tests on
+  panel-issued leases). `4effeee` gitleaks triage of the test-lease fixture. CI green on `4effeee`.
+- `8988896` trusts the live panel key `phm-2026-01` (owner created it 2026-11-12T17:22:05Z; SHA-256 of the
+  raw public key `45bedf7e…bddd`). Scratch test leases are proven not to activate a real install.
+- Panel (`Anubis-hub/anubis-switcher`, branch `feat/a3-issue-licence`): `508a867` A3 issuance (Licences page,
+  1-hour test length by default, `.anbc` export, standalone `scripts/verify-lease.mjs`), `824adc6` a new
+  licence is allowed once the previous subscription has ended. Deployed on the laptop panel (restarted with
+  the owner's OK). Scratch-DB verification only; the live DB holds the owner's key and no licences.
+- Packaged 0.2.2: smoke ok (MongoDB 9.0.8 rs0 with access control), activation screen shows the licence-file
+  button, a lease from another key is refused, no CRM API. Installer SHA-256
+  `beb754bbf6815cb211040e4cfff870e984965cd1fe4417c41431bb3f2216e773`; zip
+  `2fab12cc31cf49cb90945b41bf4cbfce7d0de38848c1d456d9f0a1b43d9db44b`. Not stored in Git; release assets.
+- Not done: renewal before expiry, transfer, revoke, support leases (panel A4); sequence high-water mark and
+  clock-rollback store in the app (Gate 2 L1/L4). After the field test, set the panel's `DEFAULT_LENGTH`
+  back to `'product'` (30 days).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-12: field-test 0.2.1 packaged build verified end to end (activation, database connection) and released as a private pre-release with checksums, SBOM and installation notes.
+2026-11-12: field-test 0.2.2 (CRM removed, panel licences with the live key) built, smoke-tested and released as pre-release `field-test-0.2.2`; panel A3 issuance live on the laptop.

@@ -1,11 +1,11 @@
-# Pharmacy POS 0.2.1: installation manual (field test)
+# Pharmacy POS 0.2.2: installation manual (field test)
 
 Arabic version: `INSTALL.ar.md`.
 
 | | |
 |---|---|
-| Package | `Pharmacy-POS-Setup-0.2.1.exe` (Windows 64-bit installer, about 158 MB) |
-| Built from | branch `field-test/0.2.0`, tag `field-test-0.2.1` |
+| Package | `Pharmacy-POS-Setup-0.2.2.exe` (Windows 64-bit installer, about 158 MB) |
+| Built from | branch `field-test/0.2.0`, tag `field-test-0.2.2` |
 | SHA-256 | see `SHA256SUMS.txt` in this folder |
 | Status | **Field test build.** Not a sales release. No code-signing certificate yet. |
 
@@ -56,7 +56,7 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 
 1. **Check the file is genuine.** In PowerShell, in the folder that holds the installer:
    ```powershell
-   Get-FileHash .\Pharmacy-POS-Setup-0.2.1.exe -Algorithm SHA256
+   Get-FileHash .\Pharmacy-POS-Setup-0.2.2.exe -Algorithm SHA256
    ```
    The result must equal the value in `SHA256SUMS.txt`. If it does not, **do not install**.
 2. **Close any running copy** of Pharmacy POS (an older test copy also uses port 27028).
@@ -66,7 +66,7 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 
 ## 3. Install
 
-1. Double-click `Pharmacy-POS-Setup-0.2.1.exe`.
+1. Double-click `Pharmacy-POS-Setup-0.2.2.exe`.
 2. **Windows SmartScreen** may say "Windows protected your PC" because the installer is not code-signed yet.
    Click **More info → Run anyway**, but only if the SHA-256 check in §2 matched.
 3. Antivirus software may scan or question the installer and `mongod.exe` (the database). Allow them.
@@ -78,9 +78,13 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 ## 4. First start
 
 > ⚠ **Licence activation.** A packaged build opens on **"Activate this device"**. Send the **Device code**
-> shown on that screen to the seller; you will receive a licence code for this exact PC. Paste it and press
-> **Activate**. The test licence lasts 30 days. No internet connection is needed for activation. Keep the
-> code: you need it again if the app data folder is reset or the PC is replaced.
+> shown on that screen to the seller (press **Copy code**). You receive a **licence file** (`.anbc`) or a
+> licence code for this exact PC. Press **"Or choose the licence file (.anbc)"** and pick the file (or paste
+> the code), then press **Activate**. No internet connection is needed. Keep the file: you need it again if
+> the app data folder is reset.
+>
+> **Field test:** test licences from the licence panel may last only **1 hour**. When one ends, the app
+> returns to this screen within about a minute; your data stays. Load a new licence file to continue.
 
 After activation:
 
@@ -88,9 +92,9 @@ After activation:
    **at least 12 characters**. Write the password down somewhere safe; there is no password-recovery email.
 2. Open **Settings**, fill in the company name, currency, decimal places, tax rate, and default language
    (Arabic or English), and save.
-3. Open **Users** and create an account for each person (Cashier, Manager, Inventory Manager, Accountant,
-   CRM Employee). Passwords: at least 12 characters. A password set by the administrator is temporary; the
-   user must choose their own at first sign-in.
+3. Open **Users** and create an account for each person (Cashier, Manager, Inventory Manager, Accountant).
+   Passwords: at least 12 characters. A password set by the administrator is temporary; the user must
+   choose their own at first sign-in.
 4. Make a first backup (§6).
 
 Sign-in rules: 5 wrong passwords lock the account for 15 minutes.
@@ -150,8 +154,10 @@ nothing is changed.
 
 ## 8. Known limits of this field-test build
 
-- Licence activation needs a code tied to this PC (see §4). Field-test codes last 30 days; a later build with
-  a different signing key needs a new code.
+- Licence activation needs a licence tied to this PC (see §4). Field-test licences from the panel last
+  1 hour (normal subscriptions: 30 days). Older `PHM1` field-test codes still work.
+- Not yet built: renewing a licence before it ends, moving a licence to another PC, and protection against
+  setting the Windows clock back. Those come with the next licensing steps.
 - No code-signing certificate: SmartScreen warns.
 - Not yet tested on a clean PC by the seller; this release is the clean-PC test.
 - **MongoDB Server is licensed under SSPL.** The owner's legal position is pending. This build is for
