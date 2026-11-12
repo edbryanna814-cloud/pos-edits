@@ -159,10 +159,21 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
   clock-rollback store in the app (Gate 2 L1/L4). After the field test, set the panel's `DEFAULT_LENGTH`
   back to `'product'` (30 days).
 
+## Field-test 0.2.3 (2026-11-13): shared database, UI fixes
+
+- `356cb1f` dashboard reloads after activation; the receipt prints only the receipt and says "Paid amount";
+  "Expires soon" only within 8 months (`src/shared/expiry.ts`, used by dashboard, inventory, report).
+- `360bb7c` shared live database: Settings → Database location (this computer, or one MongoDB server such as
+  Atlas for several tills; TLS + login + replica set required; string stored DPAPI-encrypted). Shifts are per
+  cashier; audit chain retries under contention. E2E: two tills on one server share users.
+- Panel (`Anubis-hub/anubis-switcher`): `2c4d9e3` Cancel license, "license" spelling, min app 0.2.2.
+- `installation/` now holds only `WHAT-TO-INSTALL.txt`. Installer 0.2.3 SHA-256
+  `a7bcf2eb885ca73e05c75059742fc7844eda9ed74b91db08db0669c41c2b8a9e` (release asset, tag `field-test-0.2.3`).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-12: field-test 0.2.2 (CRM removed, panel licences with the live key) built, smoke-tested and released as pre-release `field-test-0.2.2`; panel A3 issuance live on the laptop.
+2026-11-13: field-test 0.2.3 (shared live database, receipt/expiry/dashboard fixes) built, smoke-tested and released as pre-release `field-test-0.2.3` with only the installer and a short txt.
