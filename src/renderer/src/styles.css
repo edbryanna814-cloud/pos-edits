@@ -1553,7 +1553,11 @@ h3 {
   .pos-products,
   .pos-cart,
   .pos-bottom,
-  .receipt-panel-header .row-actions {
+  .receipt-panel-header .row-actions,
+  /* Only the receipt prints: nothing below the Change line (shift panel, cart, forms). */
+  .shift-panel,
+  .pos-page > :not(.receipt-panel),
+  .receipt-panel ~ * {
     display: none !important;
   }
 

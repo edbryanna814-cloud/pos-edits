@@ -289,6 +289,12 @@ export default function App() {
     void loadAuth()
   }, [])
 
+  // Settings are refused while unlicensed; reload them once the license becomes valid (after activation),
+  // otherwise the dashboard keeps showing "Could not load settings: License required".
+  useEffect(() => {
+    if (license?.status === 'valid') void load()
+  }, [license?.status])
+
   // Poll the license so an expiry during a shift locks the screens without waiting for a restart.
   // The main process enforces the same rule on every call; this only keeps the UI honest.
   useEffect(() => {

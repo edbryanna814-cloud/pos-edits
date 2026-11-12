@@ -1,5 +1,6 @@
 import type { Db } from 'mongodb'
 import { getDb } from './db'
+import { expiryState } from '../shared/expiry'
 import type { CashboxReport, InventoryReport, SalesReport } from '../shared/reports'
 
 function requireDb(): Db {
@@ -96,18 +97,10 @@ export async function inventoryReport(): Promise<InventoryReport> {
   const products = await db.collection('inv_products').find({}).toArray() as any[]
   let lowStock = 0
   let totalValueCents = 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
   for (const p of products) {
     const qty = Number(p.stockQuantity) || 0
-    let expiring = false
-    if (p.expiryDate) {
-      const target = new Date(`${String(p.expiryDate).slice(0, 10)}T00:00:00`)
-      if (!Number.isNaN(target.getTime())) {
-        const days = Math.round((target.getTime() - today.getTime()) / 86400000)
-        expiring = days <= 30
-      }
-    }
+    const state = expiryState(p.expiryDate ? String(p.expiryDate) : undefined)
+    const expiring = state === 'expired' || state === 'soon'
     if (qty <= Math.max(0, Math.trunc(Number(p.minStock) || 0)) || expiring) lowStock++
     totalValueCents += qty * (Number(p.purchaseCostCents) || 0)
   }

@@ -44,6 +44,7 @@ const copy = {
     card: 'Card',
     other: 'Other',
     paid: 'Paid amount (leave empty for exact)',
+    paidReceipt: 'Paid amount',
     change: 'Change',
     checkout: 'Complete sale',
     processing: 'Completing...',
@@ -112,6 +113,7 @@ const copy = {
     card: 'بطاقة',
     other: 'أخرى',
     paid: 'المبلغ المدفوع (اتركه فارغًا للمبلغ بالضبط)',
+    paidReceipt: 'المبلغ المدفوع',
     change: 'الباقي',
     checkout: 'إتمام البيع',
     processing: 'جارٍ إتمام البيع...',
@@ -538,7 +540,7 @@ export default function PosPage({
               <dd>{formatMoney(receipt.totalCents, currency)}</dd>
             </div>
             <div>
-              <dt>{text.paid}</dt>
+              <dt>{text.paidReceipt}</dt>
               <dd>{formatMoney(receipt.paidCents, currency)}</dd>
             </div>
             <div>
