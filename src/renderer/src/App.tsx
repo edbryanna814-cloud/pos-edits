@@ -289,7 +289,7 @@ export default function App() {
     void loadAuth()
   }, [])
 
-  // Poll the licence so an expiry during a shift locks the screens without waiting for a restart.
+  // Poll the license so an expiry during a shift locks the screens without waiting for a restart.
   // The main process enforces the same rule on every call; this only keeps the UI honest.
   useEffect(() => {
     if (!window.api) return

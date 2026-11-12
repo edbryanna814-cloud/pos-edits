@@ -27,8 +27,8 @@
 
 1. **SmartScreen warning.** The test build is not code-signed. Verify the SHA-256 in `SHA256SUMS.txt`,
    then choose **More info → Run anyway**.
-2. **Licence step.** On first start the app shows a **Device code**. Send that 32-character code to the
-   seller, paste the licence code you get back, and press **Activate**. The test licence lasts 30 days.
+2. **License step.** On first start the app shows a **Device code**. Send that 32-character code to the
+   seller, paste the license code you get back, and press **Activate**. Field-test licenses can last 1 hour; normal subscriptions last 30 days.
    No internet is needed for this step.
 
 Never delete `%APPDATA%\pharmacy-pos-management\mongodb-auth.bin`. It is the key to the local database.

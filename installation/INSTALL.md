@@ -77,14 +77,14 @@ You do **not** need Node.js, MongoDB, Visual Studio, Python, or an internet conn
 
 ## 4. First start
 
-> ⚠ **Licence activation.** A packaged build opens on **"Activate this device"**. Send the **Device code**
-> shown on that screen to the seller (press **Copy code**). You receive a **licence file** (`.anbc`) or a
-> licence code for this exact PC. Press **"Or choose the licence file (.anbc)"** and pick the file (or paste
+> ⚠ **License activation.** A packaged build opens on **"Activate this device"**. Send the **Device code**
+> shown on that screen to the seller (press **Copy code**). You receive a **license file** (`.anbc`) or a
+> license code for this exact PC. Press **"Or choose the license file (.anbc)"** and pick the file (or paste
 > the code), then press **Activate**. No internet connection is needed. Keep the file: you need it again if
 > the app data folder is reset.
 >
-> **Field test:** test licences from the licence panel may last only **1 hour**. When one ends, the app
-> returns to this screen within about a minute; your data stays. Load a new licence file to continue.
+> **Field test:** test licenses from the license panel may last only **1 hour**. When one ends, the app
+> returns to this screen within about a minute; your data stays. Load a new license file to continue.
 
 After activation:
 
@@ -154,9 +154,9 @@ nothing is changed.
 
 ## 8. Known limits of this field-test build
 
-- Licence activation needs a licence tied to this PC (see §4). Field-test licences from the panel last
+- License activation needs a license tied to this PC (see §4). Field-test licenses from the panel last
   1 hour (normal subscriptions: 30 days). Older `PHM1` field-test codes still work.
-- Not yet built: renewing a licence before it ends, moving a licence to another PC, and protection against
+- Not yet built: renewing a license before it ends, moving a license to another PC, and protection against
   setting the Windows clock back. Those come with the next licensing steps.
 - No code-signing certificate: SmartScreen warns.
 - Not yet tested on a clean PC by the seller; this release is the clean-PC test.

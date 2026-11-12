@@ -30,10 +30,10 @@ const strings = {
     errExpiredCode: 'This code has already expired.',
     errShorterCode: 'This code would shorten the current license. Contact your supplier.',
     errInvalidCode: 'The code could not be verified. Check it and try again.',
-    loadFile: 'Or choose the licence file (.anbc)',
-    errWrongProduct: 'This licence is for a different product.',
-    errAppTooOld: 'This licence needs a newer version of the app. Contact your supplier.',
-    errNotYetValid: 'This licence is not valid yet. Check the date and time on this PC.'
+    loadFile: 'Or choose the license file (.anbc)',
+    errWrongProduct: 'This license is for a different product.',
+    errAppTooOld: 'This license needs a newer version of the app. Contact your supplier.',
+    errNotYetValid: 'This license is not valid yet. Check the date and time on this PC.'
   },
   ar: {
     title: 'تفعيل هذا الجهاز',
@@ -83,7 +83,7 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
     return text.errInvalidCode
   }
 
-  // A .anbc licence file from the supplier: its text goes into the code box; main extracts the token.
+  // A .anbc license file from the supplier: its text goes into the code box; main extracts the token.
   async function loadFile(file: File | undefined): Promise<void> {
     if (!file) return
     setError('')
