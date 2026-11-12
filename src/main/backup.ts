@@ -14,7 +14,11 @@ import { BACKUP_ERRORS, MIN_BACKUP_PASSPHRASE, decryptBackup, encryptBackup, isE
 // plaintext v1/v2 files still import so existing backups are not stranded.
 const BACKUP_VERSION = 2
 const READABLE_VERSIONS = new Set([1, 2])
+// The audit log is append-only: a restore never replaces or rewinds it (Gate 1 S4/S5).
 const PRESERVED = new Set(['audit'])
+// Sessions are local machine state: a backup must not carry them, and a restore must not
+// replace (or drop) the sessions of the machine doing the restore.
+const SKIPPED = new Set(['sessions'])
 
 interface BackupFile {
   version: number
@@ -48,7 +52,7 @@ export async function exportBackup(win: BrowserWindow, input?: { passphrase?: un
 
   const collections: Record<string, Document[]> = {}
   for (const info of await db.listCollections().toArray()) {
-    if (info.name.startsWith('system.')) continue
+    if (info.name.startsWith('system.') || SKIPPED.has(info.name)) continue
     collections[info.name] = await db.collection(info.name).find({}).toArray()
   }
 
@@ -128,7 +132,7 @@ export async function importBackup(win: BrowserWindow, input?: { passphrase?: un
   let imported = 0
   for (const [name, docs] of collections) {
     // The audit log is append-only: a restore never replaces or rewinds it (Gate 1 S4/S5).
-    if (PRESERVED.has(name)) continue
+    if (PRESERVED.has(name) || SKIPPED.has(name)) continue
     const collection = db.collection(name)
     await collection.deleteMany({})
     if (docs.length > 0) {
@@ -139,7 +143,7 @@ export async function importBackup(win: BrowserWindow, input?: { passphrase?: un
 
   const backupNames = new Set(collections.map(([name]) => name))
   for (const info of await db.listCollections().toArray()) {
-    if (info.name.startsWith('system.') || PRESERVED.has(info.name)) continue
+    if (info.name.startsWith('system.') || PRESERVED.has(info.name) || SKIPPED.has(info.name)) continue
     if (!backupNames.has(info.name)) await db.collection(info.name).drop()
   }
 

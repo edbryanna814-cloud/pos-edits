@@ -18,7 +18,6 @@ MCowBQYDK2VwAyEA61OdJ1imcoCzYW6DImq2veDwk0fFfe9YdXeevRMyK98=
 const LICENSE_FILE = () => join(app.getPath('userData'), 'license.json')
 
 interface HardwareInfo {
-  mac: string
   deviceId: string
 }
 
@@ -26,11 +25,6 @@ interface LicensePayload {
   v: number
   lid: string
   dev: string
-  price: string
-  cur: string
-  per: 'day' | 'month' | 'year'
-  cnt: number
-  iat: number
   exp: number
 }
 
@@ -91,10 +85,7 @@ async function readHardwareIds(): Promise<{ mac?: string; disk?: string; board?:
 
 export function getHardwareInfo(): Promise<HardwareInfo> {
   if (!cached) {
-    cached = readHardwareIds().then((ids) => ({
-      mac: (ids.mac || '').toUpperCase(),
-      deviceId: computeDeviceId(ids)
-    }))
+    cached = readHardwareIds().then((ids) => ({ deviceId: computeDeviceId(ids) }))
   }
   return cached
 }
@@ -133,14 +124,9 @@ async function readStoredCode(): Promise<string | null> {
 function validState(info: HardwareInfo, payload: LicensePayload): LicenseState {
   return {
     status: 'valid',
-    mac: info.mac,
     deviceId: info.deviceId,
     licenseId: payload.lid,
-    expiresAt: new Date(payload.exp).toISOString(),
-    price: payload.price,
-    currency: payload.cur,
-    period: payload.per,
-    count: payload.cnt
+    expiresAt: new Date(payload.exp).toISOString()
   }
 }
 
@@ -152,22 +138,17 @@ function expiredState(info: HardwareInfo, payload: LicensePayload): LicenseState
 }
 
 export async function getLicenseState(): Promise<LicenseState> {
-  if (devBypass()) return { status: 'valid', mac: 'DEV', deviceId: 'dev' }
+  if (devBypass()) return { status: 'valid', deviceId: 'dev' }
 
   const info = await getHardwareInfo()
   const code = await readStoredCode()
-  if (!code) return { status: 'missing', mac: info.mac, deviceId: info.deviceId }
+  if (!code) return { status: 'missing', deviceId: info.deviceId }
 
   try {
     const payload = verifyCode(code, info.deviceId)
     return payload.exp > Date.now() ? validState(info, payload) : expiredState(info, payload)
-  } catch (error) {
-    return {
-      status: 'invalid',
-      mac: info.mac,
-      deviceId: info.deviceId,
-      reason: error instanceof Error ? error.message : String(error)
-    }
+  } catch {
+    return { status: 'invalid', deviceId: info.deviceId }
   }
 }
 

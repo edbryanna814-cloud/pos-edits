@@ -144,7 +144,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
       expect(health.supportsTransactions).toBe(true)
 
       await expect(window.getByText('Connected', { exact: true }).first()).toBeVisible()
-      await expect(window.getByText('Supported', { exact: true })).toBeVisible()
+      await expect(window.getByText('Response time', { exact: true })).toBeVisible()
 
       const dir = join(process.cwd(), 'screenshots')
       mkdirSync(dir, { recursive: true })
@@ -156,7 +156,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
       ).toBeVisible()
 
       await window.getByLabel('Company name').fill('Test Pharmacy')
-      await window.getByLabel('Currency code (ISO 4217)').fill('USD')
+      await window.getByLabel('Currency code (three letters)').fill('USD')
       await window.getByLabel('Currency decimal places').fill('2')
       await window.getByLabel('Tax rate (%)').fill('10')
       await window.getByLabel('Default language').selectOption('en')
@@ -286,7 +286,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
 
       await window.getByRole('button', { name: 'Settings', exact: true }).click()
       await expect(window.getByLabel('Company name')).toHaveValue('Test Pharmacy')
-      await expect(window.getByLabel('Currency code (ISO 4217)')).toHaveValue('USD')
+      await expect(window.getByLabel('Currency code (three letters)')).toHaveValue('USD')
       await expect(window.getByLabel('Tax rate (%)')).toHaveValue('10.00')
       await expect(window.getByLabel('Default language')).toHaveValue('en')
 
@@ -353,7 +353,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
 
       await window.getByRole('button', { name: 'Settings', exact: true }).click()
       await window.getByLabel('Company name').fill('E2E Pharmacy')
-      await window.getByLabel('Currency code (ISO 4217)').fill('USD')
+      await window.getByLabel('Currency code (three letters)').fill('USD')
       await window.getByLabel('Currency decimal places').fill('2')
       await window.getByLabel('Tax rate (%)').fill('10')
       await window.getByLabel('Default language').selectOption('en')

@@ -115,6 +115,11 @@ describe.skipIf(!MONGOD)('bundled MongoDB access control (Gate 1 S4)', () => {
       }
     })).toBe('ok')
 
+    // dbHealth (src/main/db.ts) reads the version and topology as the app user, so both
+    // commands must be allowed without clusterMonitor/admin roles.
+    expect(await outcome(app, (c) => c.db('admin').command({ buildInfo: 1 }))).toBe('ok')
+    expect(await outcome(app, (c) => c.db('admin').command({ hello: 1 }))).toBe('ok')
+
     // App user: nothing outside its database, no user/role admin, no dropDatabase, no shutdown.
     expect(await outcome(app, (c) => c.db('other').collection('x').findOne({}))).toBe('Unauthorized')
     expect(await outcome(app, (c) => c.db('admin').collection('system.users').findOne({}))).toBe('Unauthorized')

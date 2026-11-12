@@ -11,37 +11,47 @@ interface Props {
 const strings = {
   en: {
     title: 'Activate this device',
-    subtitle: 'Send the device details below to the supplier, then paste the license code you receive.',
-    mac: 'MAC address',
-    deviceId: 'Device ID',
-    copy: 'Copy',
+    subtitle: 'Send the device code below to your supplier, then paste the license code you receive.',
+    deviceCode: 'Device code',
+    copy: 'Copy code',
     copied: 'Copied',
     copyFailed: 'Copy failed, select the text manually.',
     missing: 'No license code is active on this device.',
     expired: 'The license expired. Enter a new code to continue.',
     invalid: 'The saved license is not valid.',
     code: 'License code',
-    placeholder: 'PHM1...',
+    placeholder: 'Paste the code you received',
     activate: 'Activate',
     activating: 'Activating...',
-    help: 'License codes are issued per device and expire at the end of the purchased period.'
+    help: 'License codes are issued per device and expire at the end of the purchased period.',
+    errWrongDevice: 'This code was issued for a different device.',
+    errAlreadyActive: 'This device is already activated.',
+    errTooMany: 'Too many attempts. Try again in an hour.',
+    errExpiredCode: 'This code has already expired.',
+    errShorterCode: 'This code would shorten the current license. Contact your supplier.',
+    errInvalidCode: 'The code could not be verified. Check it and try again.'
   },
   ar: {
     title: 'تفعيل هذا الجهاز',
-    subtitle: 'ابعت بيانات الجهاز دي للمورد، وبعدها الصق كود الترخيص اللي هيوصلك.',
-    mac: 'عنوان MAC',
-    deviceId: 'معرّف الجهاز',
-    copy: 'نسخ',
+    subtitle: 'ابعت كود الجهاز التالي للمورد، وبعدها الصق كود الترخيص اللي هيوصلك.',
+    deviceCode: 'كود الجهاز',
+    copy: 'نسخ الكود',
     copied: 'تم النسخ',
     copyFailed: 'تعذر النسخ، حدد النص يدويًا.',
     missing: 'لا يوجد كود ترخيص مفعّل على هذا الجهاز.',
     expired: 'انتهت صلاحية الترخيص. أدخل كودًا جديدًا للمتابعة.',
     invalid: 'الترخيص المحفوظ غير صالح.',
     code: 'كود الترخيص',
-    placeholder: 'PHM1...',
+    placeholder: 'الصق الكود اللي وصلك',
     activate: 'تفعيل',
     activating: 'جارٍ التفعيل...',
-    help: 'أكواد الترخيص تُصدر لكل جهاز على حدة وتنتهي بانتهاء المدة المشتراة.'
+    help: 'أكواد الترخيص تُصدر لكل جهاز على حدة وتنتهي بانتهاء المدة المشتراة.',
+    errWrongDevice: 'هذا الكود صادر لجهاز آخر.',
+    errAlreadyActive: 'هذا الجهاز مفعّل بالفعل.',
+    errTooMany: 'محاولات كثيرة. حاول مرة أخرى بعد ساعة.',
+    errExpiredCode: 'هذا الكود انتهت صلاحيته بالفعل.',
+    errShorterCode: 'هذا الكود أقصر من الترخيص الحالي. تواصل مع المورد.',
+    errInvalidCode: 'تعذر التحقق من الكود. راجعه وحاول مرة أخرى.'
   }
 } as const
 
@@ -50,13 +60,23 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState('')
+  const [copied, setCopied] = useState(false)
 
-  async function copy(label: string, value: string): Promise<void> {
+  function applyErrorText(err: unknown): string {
+    const message = err instanceof Error ? err.message : String(err)
+    if (/different device/i.test(message)) return text.errWrongDevice
+    if (/already installed/i.test(message)) return text.errAlreadyActive
+    if (/too many license attempts/i.test(message)) return text.errTooMany
+    if (/already expired/i.test(message)) return text.errExpiredCode
+    if (/expires earlier/i.test(message)) return text.errShorterCode
+    return text.errInvalidCode
+  }
+
+  async function copyDeviceCode(): Promise<void> {
     try {
-      await navigator.clipboard.writeText(value)
-      setCopied(label)
-      setTimeout(() => setCopied(''), 1500)
+      await navigator.clipboard.writeText(state.deviceId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
     } catch {
       setError(text.copyFailed)
     }
@@ -70,7 +90,7 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
       const result = await window.api.licenseApply(code)
       onActivated(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(applyErrorText(err))
     } finally {
       setLoading(false)
     }
@@ -80,7 +100,7 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
     state.status === 'expired'
       ? `${text.expired}${state.expiresAt ? ` (${new Date(state.expiresAt).toLocaleDateString()})` : ''}`
       : state.status === 'invalid'
-        ? `${text.invalid}${state.reason ? ` ${state.reason}` : ''}`
+        ? text.invalid
         : text.missing
 
   return (
@@ -100,21 +120,14 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
 
         <dl className="license-info">
           <div>
-            <dt>{text.mac}</dt>
-            <dd dir="ltr">{state.mac || '-'}</dd>
-          </div>
-          <div>
-            <dt>{text.deviceId}</dt>
+            <dt>{text.deviceCode}</dt>
             <dd dir="ltr">{state.deviceId || '-'}</dd>
           </div>
         </dl>
 
         <div className="license-copy-actions">
-          <button type="button" onClick={() => void copy('mac', state.mac)}>
-            {copied === 'mac' ? text.copied : `${text.copy} MAC`}
-          </button>
-          <button type="button" onClick={() => void copy('id', state.deviceId)}>
-            {copied === 'id' ? text.copied : `${text.copy} ID`}
+          <button type="button" onClick={() => void copyDeviceCode()}>
+            {copied ? text.copied : text.copy}
           </button>
         </div>
 

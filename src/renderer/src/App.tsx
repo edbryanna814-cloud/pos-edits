@@ -156,24 +156,8 @@ function DatabasePanel({
       {db ? (
         <dl className="status-grid">
           <div>
-            <dt>{t(language, 'database')}</dt>
-            <dd>{db.database}</dd>
-          </div>
-          <div>
             <dt>{t(language, 'serverVersion')}</dt>
             <dd>{db.serverVersion ?? '-'}</dd>
-          </div>
-          <div>
-            <dt>{t(language, 'topology')}</dt>
-            <dd>{db.topology ?? '-'}</dd>
-          </div>
-          <div>
-            <dt>{t(language, 'transactions')}</dt>
-            <dd>
-              {db.supportsTransactions
-                ? t(language, 'supported')
-                : t(language, 'unsupported')}
-            </dd>
           </div>
           <div>
             <dt>{t(language, 'latency')}</dt>
@@ -182,7 +166,7 @@ function DatabasePanel({
         </dl>
       ) : null}
 
-      {db?.error ? <p className="error">{db.error}</p> : null}
+      {db?.error ? <p className="error">{t(language, 'databaseUnavailable')}</p> : null}
 
       <button type="button" onClick={onRetry}>
         {t(language, 'retry')}
@@ -305,7 +289,7 @@ export default function App() {
       .licenseStatus()
       .then((state) => setLicense(state))
       .catch(() =>
-        setLicense({ status: 'invalid', mac: '', deviceId: '', reason: 'License check failed' })
+        setLicense({ status: 'invalid', deviceId: '' })
       )
       .finally(() => setLicenseLoaded(true))
 

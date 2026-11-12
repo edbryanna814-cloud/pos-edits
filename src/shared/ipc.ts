@@ -89,15 +89,9 @@ export type LicenseStateStatus = 'valid' | 'missing' | 'expired' | 'invalid'
 
 export interface LicenseState {
   status: LicenseStateStatus
-  mac: string
   deviceId: string
   licenseId?: string
   expiresAt?: string
-  price?: string
-  currency?: string
-  period?: string
-  count?: number
-  reason?: string
 }
 
 export interface PreloadApi {
