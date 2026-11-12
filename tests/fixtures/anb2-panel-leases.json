@@ -1,0 +1,81 @@
+{
+  "note": "Signed by anubis-switcher (feat/a3-issue-licence) with a throwaway scratch-database key. Public key and leases only; the private key never left the scratch panel. Test data, not a real licence.",
+  "key": {
+    "kid": "phm-2026-01",
+    "publicKey": "pVpqkaKE/2ScAL4jmA5f2yqKp4gwMX+7pfLTSF4iq50="
+  },
+  "subscription": {
+    "lease": {
+      "format": "anubis-lease-v1",
+      "product": "PHM",
+      "customer": "Field Test Pharmacy",
+      "licenceId": "6af5ea756ee55954e1eecf9a",
+      "deviceHash": "abababababababababababababababab",
+      "issuedAt": "2026-11-12T16:33:57.778Z",
+      "expiresAt": "2026-11-12T17:33:57.000Z",
+      "kind": "standard",
+      "note": "test",
+      "token": "ANB2.eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoicGhtLTIwMjYtMDEiLCJ0eXAiOiJBTkItRU5UIn0.eyJ2IjoyLCJwcm9kIjoiUEhNIiwibGlkIjoiNmFmNWVhNzU2ZWU1NTk1NGUxZWVjZjlhIiwiY2lkIjoiNmFmNWVhNzU2ZWU1NTk1NGUxZWVjZjk5IiwiZGV2IjoiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJmcHYiOjEsInNlYXRzIjoxLCJwbGFuIjoiUEhNLVNURCIsImZlYXQiOlsicG9zIiwiaW52ZW50b3J5IiwicmVwb3J0cyJdLCJpYXQiOjE3OTQ1MDEyMzcsIm5iZiI6MTc5NDUwMTIzNywiZXhwIjoxNzk0NTA0ODM3LCJ0ZXJtIjowLjA0MTcsImdyYWNlIjowLCJtaW5BcHAiOiIwLjIuMiIsInNlcSI6MSwia2luZCI6InN0YW5kYXJkIn0.jUNSdCwnwIk4ZYYD6wJxc3Jst3eGTSjZYSGGc2NIg4hiUMPh_Zjg6qj3jBgEgXit6VS67kTADUKA0dvsN6JwDQ"
+    },
+    "payload": {
+      "v": 2,
+      "prod": "PHM",
+      "lid": "6af5ea756ee55954e1eecf9a",
+      "cid": "6af5ea756ee55954e1eecf99",
+      "dev": "abababababababababababababababab",
+      "fpv": 1,
+      "seats": 1,
+      "plan": "PHM-STD",
+      "feat": [
+        "pos",
+        "inventory",
+        "reports"
+      ],
+      "iat": 1794501237,
+      "nbf": 1794501237,
+      "exp": 1794504837,
+      "term": 0.0417,
+      "grace": 0,
+      "minApp": "0.2.2",
+      "seq": 1,
+      "kind": "standard"
+    }
+  },
+  "perpetual": {
+    "lease": {
+      "format": "anubis-lease-v1",
+      "product": "PHM",
+      "customer": "Field Test Pharmacy",
+      "licenceId": "6af5ea756ee55954e1eecf9e",
+      "deviceHash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "issuedAt": "2026-11-12T16:33:57.938Z",
+      "expiresAt": null,
+      "kind": "perpetual",
+      "note": "test",
+      "token": "ANB2.eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoicGhtLTIwMjYtMDEiLCJ0eXAiOiJBTkItRU5UIn0.eyJ2IjoyLCJwcm9kIjoiUEhNIiwibGlkIjoiNmFmNWVhNzU2ZWU1NTk1NGUxZWVjZjllIiwiY2lkIjoiNmFmNWVhNzU2ZWU1NTk1NGUxZWVjZjk5IiwiZGV2IjoiY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2RjZGNkY2QiLCJmcHYiOjEsInNlYXRzIjoxLCJwbGFuIjoiUEhNLVBFUlAiLCJmZWF0IjpbInBvcyIsImludmVudG9yeSIsInJlcG9ydHMiXSwiaWF0IjoxNzk0NTAxMjM3LCJuYmYiOjE3OTQ1MDEyMzcsImV4cCI6bnVsbCwidGVybSI6bnVsbCwiZ3JhY2UiOjAsIm1pbkFwcCI6IjAuMi4yIiwic2VxIjoxLCJraW5kIjoicGVycGV0dWFsIn0.w_L2Ci1vV-pjaAbbOgh7uzHQdd50Dxu4x5I59EgRVAbS1GVo2tUpPKGnmnI9rtqjJfxgGdiICks-xD8LUZTpCg"
+    },
+    "payload": {
+      "v": 2,
+      "prod": "PHM",
+      "lid": "6af5ea756ee55954e1eecf9e",
+      "cid": "6af5ea756ee55954e1eecf99",
+      "dev": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "fpv": 1,
+      "seats": 1,
+      "plan": "PHM-PERP",
+      "feat": [
+        "pos",
+        "inventory",
+        "reports"
+      ],
+      "iat": 1794501237,
+      "nbf": 1794501237,
+      "exp": null,
+      "term": null,
+      "grace": 0,
+      "minApp": "0.2.2",
+      "seq": 1,
+      "kind": "perpetual"
+    }
+  }
+}

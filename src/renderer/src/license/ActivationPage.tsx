@@ -29,7 +29,11 @@ const strings = {
     errTooMany: 'Too many attempts. Try again in an hour.',
     errExpiredCode: 'This code has already expired.',
     errShorterCode: 'This code would shorten the current license. Contact your supplier.',
-    errInvalidCode: 'The code could not be verified. Check it and try again.'
+    errInvalidCode: 'The code could not be verified. Check it and try again.',
+    loadFile: 'Or choose the licence file (.anbc)',
+    errWrongProduct: 'This licence is for a different product.',
+    errAppTooOld: 'This licence needs a newer version of the app. Contact your supplier.',
+    errNotYetValid: 'This licence is not valid yet. Check the date and time on this PC.'
   },
   ar: {
     title: 'تفعيل هذا الجهاز',
@@ -51,7 +55,11 @@ const strings = {
     errTooMany: 'محاولات كثيرة. حاول مرة أخرى بعد ساعة.',
     errExpiredCode: 'هذا الكود انتهت صلاحيته بالفعل.',
     errShorterCode: 'هذا الكود أقصر من الترخيص الحالي. تواصل مع المورد.',
-    errInvalidCode: 'تعذر التحقق من الكود. راجعه وحاول مرة أخرى.'
+    errInvalidCode: 'تعذر التحقق من الكود. راجعه وحاول مرة أخرى.',
+    loadFile: 'أو اختر ملف الترخيص (.anbc)',
+    errWrongProduct: 'هذا الترخيص لمنتج آخر.',
+    errAppTooOld: 'هذا الترخيص يحتاج إصدارًا أحدث من البرنامج. تواصل مع المورد.',
+    errNotYetValid: 'هذا الترخيص غير صالح بعد. راجع التاريخ والوقت على هذا الجهاز.'
   }
 } as const
 
@@ -69,7 +77,21 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
     if (/too many license attempts/i.test(message)) return text.errTooMany
     if (/already expired/i.test(message)) return text.errExpiredCode
     if (/expires earlier/i.test(message)) return text.errShorterCode
+    if (/different product/i.test(message)) return text.errWrongProduct
+    if (/newer app version/i.test(message)) return text.errAppTooOld
+    if (/not valid yet/i.test(message)) return text.errNotYetValid
     return text.errInvalidCode
+  }
+
+  // A .anbc licence file from the supplier: its text goes into the code box; main extracts the token.
+  async function loadFile(file: File | undefined): Promise<void> {
+    if (!file) return
+    setError('')
+    if (file.size > 8192) {
+      setError(text.errInvalidCode)
+      return
+    }
+    setCode((await file.text()).trim())
   }
 
   async function copyDeviceCode(): Promise<void> {
@@ -143,6 +165,10 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
               onChange={(e) => setCode(e.target.value)}
               required
             />
+          </label>
+          <label className="license-file">
+            <span>{text.loadFile}</span>
+            <input type="file" accept=".anbc,.json,.txt" onChange={(e) => void loadFile(e.target.files?.[0])} />
           </label>
           {error ? <p className="login-error" role="alert">{error}</p> : null}
           <button type="submit" disabled={loading}>
