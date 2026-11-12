@@ -74,3 +74,21 @@ describe('panel licences (ANB2)', () => {
     expect(() => verifyAnb2('ANB2.' + 'A'.repeat(9000), { ...at(0), deviceId: 'x' })).toThrow('format')
   })
 })
+
+describe('production panel key set', () => {
+  it('holds the live panel public key (32 bytes, fingerprint recorded in panelKeys.ts)', async () => {
+    const { PANEL_KEYS } = await import('../../src/main/panelKeys')
+    const { createHash } = await import('node:crypto')
+    expect(PANEL_KEYS.map((k) => k.kid)).toEqual(['phm-2026-01'])
+    const raw = Buffer.from(PANEL_KEYS[0].publicKey, 'base64')
+    expect(raw).toHaveLength(32)
+    expect(createHash('sha256').update(raw).digest('hex')).toBe('45bedf7e4fb0fa9857e03fccf6154c09c226dc1b7d7a959f27ccfbf3ebe9bddd')
+  })
+
+  it('never accepts the scratch test leases (same kid, different key)', async () => {
+    const { PANEL_KEYS } = await import('../../src/main/panelKeys')
+    expect(() =>
+      verifyAnb2(sub.lease.token, { keys: PANEL_KEYS, appVersion: '0.2.2', nowSeconds: sub.payload.nbf + 60, deviceId: sub.payload.dev })
+    ).toThrow('signature')
+  })
+})
