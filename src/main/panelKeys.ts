@@ -6,5 +6,5 @@ import type { PanelKey } from './anb2'
 export const PANEL_KEYS: PanelKey[] = [
   // Created in the panel 2026-11-12T17:22:05Z by the owner (audit seq 5).
   // SHA-256 of the raw key: 45bedf7e4fb0fa9857e03fccf6154c09c226dc1b7d7a959f27ccfbf3ebe9bddd
-  { kid: 'phm-2026-01', publicKey: 'JDWgK4Sydp0Pu0iVG0xeVb8Or7ePnRgGVICsDQf/U5k=' }
+  { kid: 'phm-2026-01', publicKey: 'JDWgK4Sydp0Pu0iVG0xeVb8Or7ePnRgGVICsDQf/U5k=' } // gitleaks:allow public verification key, not a secret
 ]

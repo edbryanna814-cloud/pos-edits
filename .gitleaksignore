@@ -10,3 +10,5 @@
 # 76cd797: tests/fixtures/anb2-panel-leases.json holds panel test leases signed with a throwaway scratch key (public key + leases only). Test data, not credentials.
 76cd79739b788ffb500d5ba02764ae242ca521c8:tests/fixtures/anb2-panel-leases.json:jwt:18
 76cd79739b788ffb500d5ba02764ae242ca521c8:tests/fixtures/anb2-panel-leases.json:jwt:55
+# 8988896: src/main/panelKeys.ts is the licence panel's PUBLIC verification key (Ed25519, cannot sign). Not a secret.
+89888960415280fba95241740111fd15fb51d15d:src/main/panelKeys.ts:generic-api-key:8
