@@ -69,6 +69,9 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'authSetup',
         'authSetupRequired',
         'authState',
+        'dbConnectionGet',
+        'dbConnectionSave',
+        'dbConnectionTest',
         'dbHealth',
         'exportBackup',
         'getSettings',
@@ -564,7 +567,7 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
     await window.getByRole('button', { name: 'Create administrator' }).click()
     await expect(window.getByRole('alert')).toHaveText('The password must be at least 12 characters.')
     await window.screenshot({ path: join(dir, 'gate1-setup-en.png') })
-    await window.getByRole('button', { name: 'AR' }).click()
+    await window.getByRole('button', { name: 'AR', exact: true }).click()
     await expect(window.getByRole('heading', { name: 'إنشاء حساب المدير' })).toBeVisible()
     await window.screenshot({ path: join(dir, 'gate1-setup-ar.png') })
   } finally {
@@ -597,10 +600,10 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
     // Until the password is changed, the session can do nothing else.
     await expect(window.evaluate(() => (window as any).api.usersList())).rejects.toThrow(/PASSWORD_CHANGE_REQUIRED/)
 
-    await window.getByRole('button', { name: 'AR' }).click()
+    await window.getByRole('button', { name: 'AR', exact: true }).click()
     await expect(window.getByRole('heading', { name: 'اختر كلمة مرور جديدة' })).toBeVisible()
     await window.screenshot({ path: join(dir, 'gate1-force-reset-ar.png') })
-    await window.getByRole('button', { name: 'EN' }).click()
+    await window.getByRole('button', { name: 'EN', exact: true }).click()
 
     await window.getByLabel('Current password').fill('admin')
     await window.getByLabel('New password').fill('Changed-Admin-Pass-1')
@@ -673,6 +676,102 @@ test('Gate 1 S2: CSP, window, navigation and permission guards hold in the built
   }
 })
 
+test('shared database: settings panel tests a connection; sign-in offers it while the database is down', async () => {
+  const app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  try {
+    const window = await app.firstWindow()
+    await expect(window.getByRole('heading', { name: /^(Sign in|Create the administrator account|Dashboard)$/, level: 1 })).toBeVisible({ timeout: 10000 })
+    if (!(await window.getByRole('heading', { name: 'Dashboard', level: 1 }).isVisible())) await signIn(window)
+    await window.getByRole('button', { name: 'Settings', exact: true }).click()
+    await expect(window.getByRole('heading', { name: 'Database location' })).toBeVisible()
+    await expect(window.getByText('Now: This computer only')).toBeVisible()
+    await window.getByLabel('Shared server (several devices)').check()
+    const field = window.getByLabel('Connection string')
+    await field.fill('mongodb://pos:secret@db.example.com:27017/')
+    await window.getByRole('button', { name: 'Test connection' }).click()
+    await expect(window.getByRole('alert').filter({ hasText: 'encrypted connection' })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'Save and restart' })).toBeDisabled()
+    await field.fill('mongodb://127.0.0.1:27017/?replicaSet=rs0')
+    await window.getByRole('button', { name: 'Test connection' }).click()
+    await expect(window.getByRole('status').filter({ hasText: 'Connected: 127.0.0.1' })).toBeVisible({ timeout: 15000 })
+    await expect(window.getByRole('button', { name: 'Save and restart' })).toBeEnabled()
+    await window.screenshot({ path: join(process.cwd(), 'screenshots', 'shared-db-settings.png') })
+    // Not saved: saving restarts the app onto the chosen server.
+  } finally {
+    await app.close()
+  }
+
+  const down = await electron.launch({
+    args: ['.', `--user-data-dir=${E2E_PROFILE}-down`],
+    env: { ...process.env, MONGODB_DB: TEST_DB, MONGODB_URI: 'mongodb://127.0.0.1:27099/?directConnection=true' }
+  })
+  try {
+    const window = await down.firstWindow()
+    await expect(window.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 15000 })
+    await window.getByRole('button', { name: /Database location/ }).click()
+    await expect(window.getByRole('heading', { name: 'Database location' })).toBeVisible()
+  } finally {
+    await down.close()
+  }
+})
+
+test('shared database: two tills on one server share users (A creates the admin, B signs in)', async () => {
+  await cleanTestDatabase()
+  const shared = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
+  // Each till's own default database points at a dead port: connecting at all proves the saved
+  // shared setting is what the app uses.
+  const env = { ...process.env, MONGODB_DB: TEST_DB, MONGODB_URI: 'mongodb://127.0.0.1:27099/?directConnection=true' }
+  const tills = [`${E2E_PROFILE}-till-a`, `${E2E_PROFILE}-till-b`]
+  try {
+    for (const profile of tills) {
+      const setup = await electron.launch({ args: ['.', `--user-data-dir=${profile}`], env })
+      // What "Save and restart" stores: the shared connection, encrypted with the Windows user key.
+      await setup.evaluate(({ app, safeStorage }, uri) => {
+        const { join } = process.mainModule!.require('node:path')
+        const { writeFileSync } = process.mainModule!.require('node:fs')
+        writeFileSync(join(app.getPath('userData'), 'db-connection.bin'), safeStorage.encryptString(JSON.stringify({ mode: 'shared', uri })))
+      }, shared)
+      await setup.close()
+    }
+
+    const a = await electron.launch({ args: ['.', `--user-data-dir=${tills[0]}`], env })
+    const b = await electron.launch({ args: ['.', `--user-data-dir=${tills[1]}`], env })
+    try {
+      const wa = await a.firstWindow()
+      const wb = await b.firstWindow()
+      for (const w of [wa, wb]) {
+        await expect(w.getByRole('heading', { name: /^(Sign in|Create the administrator account)$/, level: 1 })).toBeVisible({ timeout: 15000 })
+        expect(await w.evaluate(() => (window as any).api.dbConnectionGet())).toEqual({ mode: 'shared', hosts: '127.0.0.1' })
+        expect((await w.evaluate(() => (window as any).api.dbHealth())).status).toBe('connected')
+      }
+      // Till A: first run on the shared server creates the administrator.
+      await signIn(wa)
+      await expect(wa.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+      // Till B: the same account now exists for it; no setup, sign in directly.
+      await wb.reload()
+      expect(await wb.evaluate(() => (window as any).api.authSetupRequired())).toBe(false)
+      await signIn(wb)
+      await expect(wb.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+      // Both tills write to one audit chain, which still verifies (seq is unique across devices).
+      const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
+      await client.connect()
+      try {
+        const logins = await client.db(TEST_DB).collection('audit').countDocuments({ action: 'login.success' })
+        expect(logins).toBeGreaterThanOrEqual(1)
+        const seqs = (await client.db(TEST_DB).collection('audit').find({ seq: { $exists: true } }).toArray()).map((e) => e.seq).sort((x, y) => x - y)
+        expect(seqs).toEqual(seqs.map((_, i) => i + 1))
+      } finally {
+        await client.close()
+      }
+    } finally {
+      await a.close()
+      await b.close()
+    }
+  } finally {
+    for (const profile of tills) rmSync(profile, { recursive: true, force: true })
+  }
+})
+
 test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', async () => {
   const app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
   try {
@@ -697,5 +796,6 @@ test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', a
 
 test.afterAll(async () => {
   rmSync(E2E_PROFILE, { recursive: true, force: true })
+  rmSync(`${E2E_PROFILE}-down`, { recursive: true, force: true })
   await cleanTestDatabase()
 })

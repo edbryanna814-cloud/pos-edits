@@ -200,7 +200,7 @@ async function createSale(db: Db, input: any): Promise<Sale> {
   // the payments collection so the drawer balance still matches the notes and coins in the till.
   if (paymentMethod === 'cash') {
     await db.collection(CASHBOX).insertOne(
-      { type: 'sale', amountCents: totalCents, reason: `Sale ${sale.invoiceNo}`, reference: saleId, createdAt: now },
+      { type: 'sale', amountCents: totalCents, reason: `Sale ${sale.invoiceNo}`, reference: saleId, ...(cashierUsername ? { cashierUsername } : {}), createdAt: now },
       { session: input.session }
     )
   }
@@ -273,6 +273,7 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
             quantity: baseQuantity,
             reason: `Return ${sale.invoiceNo}`,
             reference: input.saleId,
+            ...(username ? { cashierUsername: username } : {}),
             createdAt: now
           },
           { session }
@@ -324,15 +325,15 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
   }
 }
 
-export async function cashIn(amountCents: number, reason: string): Promise<CashboxMovement> {
-  return cashMove('in', amountCents, reason)
+export async function cashIn(amountCents: number, reason: string, cashierUsername?: string): Promise<CashboxMovement> {
+  return cashMove('in', amountCents, reason, cashierUsername)
 }
 
-export async function cashOut(amountCents: number, reason: string): Promise<CashboxMovement> {
-  return cashMove('out', amountCents, reason)
+export async function cashOut(amountCents: number, reason: string, cashierUsername?: string): Promise<CashboxMovement> {
+  return cashMove('out', amountCents, reason, cashierUsername)
 }
 
-async function cashMove(type: 'in' | 'out', amountCents: number, reason: string): Promise<CashboxMovement> {
+async function cashMove(type: 'in' | 'out', amountCents: number, reason: string, cashierUsername?: string): Promise<CashboxMovement> {
   const db = requireDb()
   const amount = toInteger(amountCents, 'Amount', 1)
   const note = String(reason ?? '').trim()
@@ -342,6 +343,7 @@ async function cashMove(type: 'in' | 'out', amountCents: number, reason: string)
     type,
     amountCents: type === 'in' ? amount : -amount,
     reason: note,
+    ...(cashierUsername ? { cashierUsername } : {}),
     createdAt: now
   }
   const inserted = await db.collection(CASHBOX).insertOne(movement as any)
@@ -355,7 +357,8 @@ export async function listCashbox(): Promise<CashboxMovement[]> {
 
 export async function openShift(cashierUsername: string, openingBalanceCents: number): Promise<CashierShift> {
   const db = requireDb()
-  const open = await db.collection<CashierShift>(SHIFTS).findOne({ status: 'open' })
+  // One open shift per cashier (several tills can share one database).
+  const open = await db.collection<CashierShift>(SHIFTS).findOne({ status: 'open', cashierUsername })
   if (open) throw new Error('A shift is already open')
   const now = new Date().toISOString()
   const shift: Omit<CashierShift, '_id'> = {
@@ -369,14 +372,15 @@ export async function openShift(cashierUsername: string, openingBalanceCents: nu
   return { ...shift, _id: inserted.insertedId.toString() }
 }
 
-export async function closeShift(): Promise<CashierShift> {
+export async function closeShift(cashierUsername: string): Promise<CashierShift> {
   const db = requireDb()
   const now = new Date().toISOString()
-  const open = await db.collection<CashierShift>(SHIFTS).findOne({ status: 'open' }, { sort: { openedAt: -1 } })
+  const open = await db.collection<CashierShift>(SHIFTS).findOne({ status: 'open', cashierUsername }, { sort: { openedAt: -1 } })
   if (!open) throw new Error('No open shift')
+  // Only this cashier's cash (movements from before per-cashier tracking have no cashier and still count).
   const movements = await db
     .collection<CashboxMovement>(CASHBOX)
-    .find({ createdAt: { $gte: open.openedAt } })
+    .find({ createdAt: { $gte: open.openedAt }, $or: [{ cashierUsername }, { cashierUsername: { $exists: false } }] } as any)
     .toArray()
   const closingBalanceCents = open.openingBalanceCents + movements.reduce((sum, item) => sum + item.amountCents, 0)
   const result = await db.collection<CashierShift>(SHIFTS).findOneAndUpdate(

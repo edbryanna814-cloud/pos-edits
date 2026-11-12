@@ -4,11 +4,13 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC, type IpcChannel } from '../shared/ipc'
 import type { Permission } from '../shared/auth'
-import { closeDb, connectDb, dbHealth } from './db'
+import { closeDb, connectDb, dbHealth, getDb } from './db'
+import { describeDbMode, loadDbMode, saveDbMode } from './dbConfig'
+import { testSharedUri } from './dbConnection'
 import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
+import { changePassword, createUser, ensureAuthSchema, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
@@ -164,6 +166,50 @@ function registerIpc(): void {
     return applyLicenseCode(code)
   })
 
+  // Database location. Admins (settings.manage) may change it; before sign-in only on a fresh install
+  // (no users yet) or while the database is unreachable, so a new cashier PC can join the shared server.
+  async function mayChangeDatabase(): Promise<void> {
+    try {
+      requirePermission('settings.manage')
+      return
+    } catch {
+      if (!getDb() || (await isSetupRequired())) return
+      throw new Error('PERMISSION_DENIED')
+    }
+  }
+
+  handle(IPC.DbConnectionGet, async () => describeDbMode())
+
+  handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown }) => {
+    await mayChangeDatabase()
+    return testSharedUri(input?.uri)
+  })
+
+  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown }) => {
+    await mayChangeDatabase()
+    let hosts = ''
+    if (input?.mode === 'shared') {
+      hosts = (await testSharedUri(input.uri)).hosts
+      await saveDbMode({ mode: 'shared', uri: String(input.uri).trim() })
+    } else if (input?.mode === 'local') {
+      await saveDbMode({ mode: 'local' })
+    } else {
+      throw new Error('VALIDATION_FAILED')
+    }
+    await logAudit({
+      actorUsername: getCurrentSession()?.username ?? 'system:db-connection',
+      action: 'db.connection.change',
+      resource: 'settings',
+      details: { mode: input.mode, hosts }
+    }).catch(() => undefined)
+    // Restart so every module reconnects to the chosen database.
+    setTimeout(() => {
+      app.relaunch()
+      app.quit()
+    }, 500)
+    return { ok: true, restarting: true }
+  })
+
   handle(IPC.SettingsGet, async (event) => {
     assertTrusted(event)
     return getSettings()
@@ -255,11 +301,11 @@ function registerIpc(): void {
   handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input, requireSession().username) })
   handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
   handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input, requireSession().username) })
-  handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason) })
-  handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason) })
+  handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason, requireSession().username) })
+  handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason, requireSession().username) })
   handle(IPC.PosCashboxList, async (event) => { assertTrusted(event); return listCashbox() })
   handle(IPC.PosShiftOpen, async (event, openingBalanceCents: number) => { assertTrusted(event); return openShift(requireSession().username, openingBalanceCents) })
-  handle(IPC.PosShiftClose, async (event) => { assertTrusted(event); return closeShift() })
+  handle(IPC.PosShiftClose, async (event) => { assertTrusted(event); return closeShift(requireSession().username) })
   handle(IPC.PosShiftsList, async (event) => { assertTrusted(event); return listShifts() })
 
   handle(IPC.ReportsSales, async (event) => { assertTrusted(event); return salesReport() })
@@ -293,10 +339,23 @@ if (!app.requestSingleInstanceLock()) {
     const auditFallback = join(app.getPath('userData'), 'audit-fallback.jsonl')
     await rotateIfLarge(auditFallback).catch(() => undefined)
     setAuditFallbackFile(auditFallback)
+    // Shared live database (several PCs, one server) or this PC's bundled database.
+    let shared = false
     try {
-      await startBundledMongo()
+      const mode = await loadDbMode()
+      if (mode.mode === 'shared') {
+        process.env['MONGODB_URI'] = mode.uri
+        shared = true
+      }
     } catch (error) {
-      console.error('[main] bundled MongoDB failed to start', error)
+      console.error('[main] database setting unreadable; using this PC only', error instanceof Error ? error.message : error)
+    }
+    if (!shared) {
+      try {
+        await startBundledMongo()
+      } catch (error) {
+        console.error('[main] bundled MongoDB failed to start', error)
+      }
     }
     await connectDb()
     try {

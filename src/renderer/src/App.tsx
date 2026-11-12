@@ -460,7 +460,7 @@ export default function App() {
     return (
       <>
         {languageToggle}
-        <LoginPage language={language} onLogin={handleLogin} />
+        <LoginPage language={language} onLogin={handleLogin} dbUnavailable={db?.status === 'disconnected'} />
       </>
     )
   }

@@ -56,6 +56,8 @@ export type CashboxMovement = {
   amountCents: number
   reason: string
   reference?: string
+  /** Who moved the cash: shifts are per cashier, so several tills can share one database. */
+  cashierUsername?: string
   createdAt: string
 }
 

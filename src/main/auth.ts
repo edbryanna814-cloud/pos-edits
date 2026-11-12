@@ -93,7 +93,10 @@ let auditQueue: Promise<unknown> = Promise.resolve()
 
 async function appendChained(db: Db, record: AuditEvent): Promise<void> {
   const audit = db.collection<AuditEvent & { seq?: number; hash?: string }>(AUDIT_COL)
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Several PCs on one shared database can race for the same seq: retry with a short random wait.
+  const ATTEMPTS = 8
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 5 + Math.floor(Math.random() * 40) * attempt))
     // Read the tail on every write (indexed): stays correct after a backup import replaces the log.
     const last = await audit.find({ seq: { $exists: true } }).sort({ seq: -1 }).limit(1).next()
     const entry = chainEntry({ ...record } as Record<string, unknown>, last ? { seq: last.seq as number, hash: last.hash as string } : null)
@@ -101,8 +104,8 @@ async function appendChained(db: Db, record: AuditEvent): Promise<void> {
       await audit.insertOne(entry as any)
       return
     } catch (error) {
-      // Another writer took this seq (unique index): re-read the tail once and retry.
-      if ((error as { code?: number })?.code !== 11000 || attempt > 0) throw error
+      // Another writer took this seq (unique index): re-read the tail and retry.
+      if ((error as { code?: number })?.code !== 11000 || attempt === ATTEMPTS - 1) throw error
     }
   }
 }

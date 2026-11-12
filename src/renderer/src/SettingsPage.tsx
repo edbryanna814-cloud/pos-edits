@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { CompanySettings, Language, StoredCompanySettings } from '../../shared/settings'
 import { t } from './i18n'
+import DatabaseLocation from './DatabaseLocation'
 
 interface Props {
   settings: StoredCompanySettings | null
@@ -274,6 +275,7 @@ export default function SettingsPage({
           {error}
         </p>
       ) : null}
+      <DatabaseLocation language={language} />
     </section>
   )
 }

@@ -14,6 +14,9 @@ export const IPC = {
   AuthLogin: 'auth:login',
   AuthLogout: 'auth:logout',
   AuthState: 'auth:state',
+  DbConnectionGet: 'db:connection-get',
+  DbConnectionTest: 'db:connection-test',
+  DbConnectionSave: 'db:connection-save',
   AuthSetupRequired: 'auth:setup-required',
   AuthSetup: 'auth:setup',
   AuthChangePassword: 'auth:change-password',
@@ -92,6 +95,9 @@ export interface PreloadApi {
   authLogin(input: LoginInput): Promise<LoginResult>
   authLogout(token: string): Promise<{ success: boolean }>
   authState(token?: string): Promise<AuthState>
+  dbConnectionGet(): Promise<{ mode: 'local' | 'shared'; hosts?: string }>
+  dbConnectionTest(input: { uri: string }): Promise<{ ok: true; serverVersion: string; topology: string; hosts: string }>
+  dbConnectionSave(input: { mode: 'local' } | { mode: 'shared'; uri: string }): Promise<{ ok: true; restarting: true }>
   authSetupRequired(): Promise<boolean>
   authSetup(input: LoginInput): Promise<LoginResult>
   authChangePassword(input: ChangePasswordInput): Promise<{ success: true }>

@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import type { LoginResult } from '../../../shared/auth'
 import { t, type TranslationKey } from '../i18n'
 import type { Language } from '../../../shared/settings'
+import DatabaseLocation from '../DatabaseLocation'
 
 interface Props {
   language: Language
   onLogin: (token: string, user: { username: string; role: string; permissions: any[] }) => void
+  /** The database could not be reached: offer the database location (shared server) before sign-in. */
+  dbUnavailable?: boolean
 }
 
 type Mode = 'checking' | 'setup' | 'login' | 'change'
@@ -27,7 +30,8 @@ function errorText(language: Language, err: unknown): string {
   return match ? t(language, match[1]) : message
 }
 
-export default function LoginPage({ language, onLogin }: Props) {
+export default function LoginPage({ language, onLogin, dbUnavailable }: Props) {
+  const [showDb, setShowDb] = useState(false)
   const [mode, setMode] = useState<Mode>('checking')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -151,6 +155,12 @@ export default function LoginPage({ language, onLogin }: Props) {
             </button>
           </form>
         )}
+        {mode === 'setup' || dbUnavailable ? (
+          <button type="button" className="link-button" onClick={() => setShowDb(!showDb)}>
+            {t(language, 'databaseLocation')}
+          </button>
+        ) : null}
+        {showDb ? <DatabaseLocation language={language} /> : null}
       </section>
     </div>
   )

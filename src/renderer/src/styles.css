@@ -1834,3 +1834,74 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Database location (this computer or a shared server) */
+.db-location {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.db-location-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.db-location-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.db-location label.wide {
+  display: grid;
+  gap: 4px;
+}
+
+.login-panel .db-location {
+  text-align: start;
+}
+
+.db-location label.wide > span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.db-location input[type='password'] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.db-location input[type='password']:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(15 118 110 / 14%);
+}
+
+.db-location .form-actions button {
+  padding: 10px 15px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.db-location .form-actions button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.db-location .form-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
