@@ -1,0 +1,12 @@
+{
+  "note": "Signed by anubis-switcher src/lib/recovery.ts with a throwaway scratch-database key. Public key and a reset code only; the private key never left the scratch panel. Test data.",
+  "key": {
+    "kid": "phm-2026-01",
+    "publicKey": "1TEMsg7j5jFzzaFgtTL7YhHSbjPW+XXwAfvDsa3CI7w="
+  },
+  "deviceId": "abababababababababababababababab",
+  "requestCode": "ABCD-EFGH-JKMN",
+  "iat": 1794586683,
+  "exp": 1794590283,
+  "code": "RST1.eyJhbGciOiJFZDI1NTE5Iiwia2lkIjoicGhtLTIwMjYtMDEiLCJ0eXAiOiJBTkItUlNUIn0.eyJ2IjoxLCJwcm9kIjoiUEhNIiwiZGV2IjoiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJyZXEiOiJBQkNELUVGR0gtSktNTiIsImlhdCI6MTc5NDU4NjY4MywiZXhwIjoxNzk0NTkwMjgzfQ.ZcKQbxWcqhHZT3c9OrgiOdMPNwSTs9vMTm8OzYeqvH9Uuh94FGNBYfX8hVTVsHbeMa2Xo-6965D3kEXdcq35BA"
+}

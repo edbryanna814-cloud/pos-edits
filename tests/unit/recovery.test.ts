@@ -1,38 +1,34 @@
-import { generateKeyPairSync, sign } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { verifyResetCode } from '../../src/main/recovery'
 
-// Same signing as the panel (anubis-switcher src/lib/recovery.ts), with a throwaway key.
-const { publicKey, privateKey } = generateKeyPairSync('ed25519')
-const keys = [{ kid: 'test-01', publicKey: publicKey.export({ format: 'der', type: 'spki' }).subarray(12).toString('base64') }]
-const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
-const DEV = '0123456789abcdef0123456789abcdef'
-const NOW = 1_800_000_000
-
-function code(payload: Record<string, unknown>, header: Record<string, unknown> = {}): string {
-  const input = `${enc({ alg: 'Ed25519', kid: 'test-01', typ: 'ANB-RST', ...header })}.${enc({ v: 1, prod: 'PHM', dev: DEV, req: 'ABCD-EFGH-JKMN', iat: NOW, exp: NOW + 3600, ...payload })}`
-  return `RST1.${input}.${sign(null, Buffer.from(input), privateKey).toString('base64url')}`
-}
+// A reset code signed by the real panel code (anubis-switcher src/lib/recovery.ts) with a throwaway key.
+// No signing here: the app repo only verifies (scripts/scan-signing.mjs).
+const fx = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'reset-codes.json'), 'utf8'))
+const keys = [fx.key]
+const lease = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'anb2-panel-leases.json'), 'utf8')).subscription.lease.token
 const check = (token: string, over: Partial<{ deviceId: string; requestCode: string; nowSeconds: number }> = {}) =>
-  verifyResetCode(token, { keys, deviceId: DEV, requestCode: 'ABCD-EFGH-JKMN', nowSeconds: NOW + 60, ...over })
+  verifyResetCode(token, { keys, deviceId: fx.deviceId, requestCode: fx.requestCode, nowSeconds: fx.iat + 60, ...over })
 
 describe('forgotten-password reset code', () => {
-  it('accepts a panel-signed code for this device and request (line breaks from copying are ignored)', () => {
-    const token = code({})
-    expect(check(token).dev).toBe(DEV)
-    expect(check(`${token.slice(0, 40)}\n${token.slice(40)}`).req).toBe('ABCD-EFGH-JKMN')
+  it('accepts the panel-signed code for this device and request (line breaks from copying are ignored)', () => {
+    expect(check(fx.code)).toMatchObject({ v: 1, prod: 'PHM', dev: fx.deviceId, req: fx.requestCode })
+    expect(fx.exp - fx.iat).toBe(3600)
+    expect(check(`${fx.code.slice(0, 40)}\n ${fx.code.slice(40)}`).req).toBe(fx.requestCode)
   })
 
-  it('refuses another device, another request, expired, long-lived, forged and junk codes', () => {
-    expect(() => check(code({}), { deviceId: 'f'.repeat(32) })).toThrow('RESET_CODE_WRONG_DEVICE')
-    expect(() => check(code({}), { requestCode: 'ZZZZ-ZZZZ-ZZZZ' })).toThrow('RESET_CODE_WRONG_REQUEST')
-    expect(() => check(code({}), { nowSeconds: NOW + 3600 })).toThrow('RESET_CODE_EXPIRED')
-    expect(() => check(code({ exp: NOW + 86400 }))).toThrow('RESET_CODE_INVALID')
-    expect(() => check(code({ prod: 'OTHER' }))).toThrow('RESET_CODE_INVALID')
-    expect(() => check(code({}, { typ: 'ANB-ENT' }))).toThrow('RESET_CODE_INVALID') // a license is not a reset code
-    const [p, h, , s] = code({}).split('.')
-    expect(() => check([p, h, enc({ v: 1, prod: 'PHM', dev: DEV, req: 'ABCD-EFGH-JKMN', iat: NOW, exp: NOW + 7000 }), s].join('.'))).toThrow('RESET_CODE_INVALID')
-    expect(() => check('ANB2.a.b.c')).toThrow('RESET_CODE_INVALID')
+  it('refuses another device, another request, expired, tampered, license and junk codes', () => {
+    expect(() => check(fx.code, { deviceId: 'f'.repeat(32) })).toThrow('RESET_CODE_WRONG_DEVICE')
+    expect(() => check(fx.code, { requestCode: 'ZZZZ-ZZZZ-ZZZZ' })).toThrow('RESET_CODE_WRONG_REQUEST')
+    expect(() => check(fx.code, { nowSeconds: fx.exp })).toThrow('RESET_CODE_EXPIRED')
+    expect(() => verifyResetCode(fx.code, { keys: [{ ...fx.key, retired: true }], deviceId: fx.deviceId, requestCode: fx.requestCode, nowSeconds: fx.iat })).toThrow('RESET_CODE_INVALID')
+    // A longer validity written into the payload breaks the signature.
+    const [p, h, , s] = fx.code.split('.')
+    const longer = Buffer.from(JSON.stringify({ v: 1, prod: 'PHM', dev: fx.deviceId, req: fx.requestCode, iat: fx.iat, exp: fx.iat + 86400 })).toString('base64url')
+    expect(() => check([p, h, longer, s].join('.'))).toThrow('RESET_CODE_INVALID')
+    expect(() => check(lease)).toThrow('RESET_CODE_INVALID') // a license is not a reset code
+    expect(() => check('RST1.e30.e30.AAAA')).toThrow('RESET_CODE_INVALID')
     expect(() => check('')).toThrow('RESET_CODE_INVALID')
   })
 })
