@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CashboxMovement, Sale } from '../../../shared/pos'
 import type { Product } from '../../../shared/inventory'
-import type { Customer } from '../../../shared/crm'
 import type { Language } from '../../../shared/settings'
 import { formatDateTime, formatMoney, parseMoney } from '../money'
 
@@ -41,12 +40,11 @@ const copy = {
     tax: 'Tax',
     total: 'Total',
     paymentMethod: 'Payment method',
-    customer: 'Customer (optional)',
-    noCustomer: 'Walk-in customer',
     cash: 'Cash',
     card: 'Card',
     other: 'Other',
     paid: 'Paid amount (leave empty for exact)',
+    paidReceipt: 'Paid amount',
     change: 'Change',
     checkout: 'Complete sale',
     processing: 'Completing...',
@@ -111,12 +109,11 @@ const copy = {
     tax: 'الضريبة',
     total: 'الإجمالي',
     paymentMethod: 'طريقة الدفع',
-    customer: 'العميل (اختياري)',
-    noCustomer: 'عميل عابر',
     cash: 'نقدًا',
     card: 'بطاقة',
     other: 'أخرى',
     paid: 'المبلغ المدفوع (اتركه فارغًا للمبلغ بالضبط)',
+    paidReceipt: 'المبلغ المدفوع',
     change: 'الباقي',
     checkout: 'إتمام البيع',
     processing: 'جارٍ إتمام البيع...',
@@ -221,8 +218,6 @@ export default function PosPage({
   const [cashAmount, setCashAmount] = useState('')
   const [cashReason, setCashReason] = useState('')
   const [cashBusy, setCashBusy] = useState(false)
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [customerId, setCustomerId] = useState('')
   const requestIdRef = useRef<string | null>(null)
 
   const byId = useMemo(() => {
@@ -282,12 +277,6 @@ export default function PosPage({
   useEffect(() => {
     requestIdRef.current = null
   }, [cart, discountInput, paymentMethod])
-
-  useEffect(() => {
-    window.api?.crmCustomersList()
-      .then((list) => setCustomers(list.filter((customer: Customer) => customer.active !== false)))
-      .catch(() => undefined)
-  }, [])
 
   useEffect(() => {
     let buffer = ''
@@ -414,14 +403,12 @@ export default function PosPage({
         discountCents: safeDiscountCents,
         taxCents,
         paymentMethod,
-        paidCents,
-        customerId: customerId || undefined
+        paidCents
       })
       setReceipt(sale)
       setCart([])
       setDiscountInput('')
       setPaidInput('')
-      setCustomerId('')
       requestIdRef.current = null
       onChanged()
     } catch (checkoutError) {
@@ -513,14 +500,6 @@ export default function PosPage({
               <span>{text.cashierLabel}</span>
               <strong>{receipt.cashierUsername ?? cashier}</strong>
             </div>
-            {receipt.customerId ? (
-              <div>
-                <span>{text.customer}</span>
-                <strong>
-                  {customers.find((customer) => customer._id === receipt.customerId)?.name ?? '-'}
-                </strong>
-              </div>
-            ) : null}
           </div>
           <table className="data-table compact">
             <thead>
@@ -561,7 +540,7 @@ export default function PosPage({
               <dd>{formatMoney(receipt.totalCents, currency)}</dd>
             </div>
             <div>
-              <dt>{text.paid}</dt>
+              <dt>{text.paidReceipt}</dt>
               <dd>{formatMoney(receipt.paidCents, currency)}</dd>
             </div>
             <div>
@@ -753,18 +732,6 @@ export default function PosPage({
               <dd>{formatMoney(totalCents, currency)}</dd>
             </div>
           </dl>
-
-          <label className="cart-field">
-            <span>{text.customer}</span>
-            <select value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
-              <option value="">{text.noCustomer}</option>
-              {customers.map((customer) => (
-                <option key={customer._id} value={customer._id}>
-                  {customer.name}
-                </option>
-              ))}
-            </select>
-          </label>
 
           <div className="payment-row">
             <label>

@@ -88,7 +88,8 @@ export default function ShiftPanel({ language, currency, cashier, onChanged }: P
     void load()
   }, [])
 
-  const openShift = shifts.find((shift) => shift.status === 'open') ?? null
+  // This cashier's own open shift: other tills on a shared database have their own.
+  const openShift = shifts.find((shift) => shift.status === 'open' && (!shift.cashierUsername || shift.cashierUsername === cashier)) ?? null
 
   async function handleOpen(): Promise<void> {
     const cents = parseMoney(balance)

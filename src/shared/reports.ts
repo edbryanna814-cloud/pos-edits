@@ -10,7 +10,6 @@ export type SalesReport = {
   grossProfitCents: number
   byPaymentMethod: Record<string, { count: number; totalCents: number }>
   byCashier: Record<string, { count: number; totalCents: number }>
-  byCustomer: { customerId: string; name: string; count: number; totalCents: number }[]
   byProduct: {
     productId: string
     productName: string

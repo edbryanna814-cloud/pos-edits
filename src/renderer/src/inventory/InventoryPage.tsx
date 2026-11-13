@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { Category, Product, Unit } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
 import { centsToInput, formatMoney, parseMoney } from '../money'
+import { expiryState } from '../../../shared/expiry'
 
 interface Props {
   products: Product[]
@@ -173,7 +174,6 @@ const copy = {
 
 const STOCK_CRITICAL = 3
 const STOCK_LOW = 6
-const EXPIRY_SOON_DAYS = 30
 
 function daysUntil(date: string | undefined): number | null {
   if (!date) return null
@@ -900,8 +900,9 @@ export default function InventoryPage({ products, language, currency, onChanged 
             <tbody>
               {filtered.map((product) => {
                 const remaining = daysUntil(product.expiryDate)
-                const expired = remaining !== null && remaining < 0
-                const expiresSoon = remaining !== null && remaining >= 0 && remaining <= EXPIRY_SOON_DAYS
+                const expiry = expiryState(product.expiryDate)
+                const expired = expiry === 'expired'
+                const expiresSoon = expiry === 'soon'
                 const critical = !expired && product.stockQuantity <= STOCK_CRITICAL
                 const low = !expired && !critical && product.stockQuantity <= STOCK_LOW
                 const out = product.stockQuantity <= 0

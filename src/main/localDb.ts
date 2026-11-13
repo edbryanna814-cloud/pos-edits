@@ -1,12 +1,19 @@
 import { app, safeStorage } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { networkInterfaces } from 'node:os'
 import { join } from 'node:path'
 import { MongoClient } from 'mongodb'
 import { rotateIfLarge } from './logRotate'
 import { appUri, createSecrets, directUri, isSecrets, secureBundledMongo, shutdownBundledMongo, type Endpoint, type MongoSecrets } from './mongoAuth'
 
 const ENDPOINT: Endpoint = { host: '127.0.0.1', port: 27028, replicaSet: 'rs0' }
+export const LAN_PORT = ENDPOINT.port
+
+/** This PC's local-network (Wi-Fi / cable) IPv4 addresses: what the other tills type in. */
+export function lanAddresses(): string[] {
+  return Object.values(networkInterfaces()).flat().filter((a) => a && a.family === 'IPv4' && !a.internal).map((a) => a!.address)
+}
 const APP_DB = process.env['MONGODB_DB'] ?? 'pharmacy_pos'
 
 let child: ChildProcess | null = null
@@ -53,7 +60,8 @@ async function loadOrCreateSecrets(file: string): Promise<MongoSecrets> {
   return created
 }
 
-export async function startBundledMongo(): Promise<void> {
+/** joinCode set: this PC is the main one and also listens on the local network for the other tills. */
+export async function startBundledMongo(joinCode: string | null = null): Promise<void> {
   if (!app.isPackaged) return
 
   const userData = app.getPath('userData')
@@ -84,7 +92,9 @@ export async function startBundledMongo(): Promise<void> {
     [
       '--dbpath', dataDir,
       '--port', String(ENDPOINT.port),
-      '--bind_ip', ENDPOINT.host,
+      // shortcut: no TLS on the local network (SCRAM keeps the join code secret, data is not encrypted
+      // on the Wi-Fi); add a self-signed certificate if tills ever join over untrusted networks.
+      '--bind_ip', joinCode ? '0.0.0.0' : ENDPOINT.host,
       '--replSet', ENDPOINT.replicaSet,
       '--keyFile', keyFile, // implies --auth
       '--logpath', logFile,
@@ -105,7 +115,7 @@ export async function startBundledMongo(): Promise<void> {
   } finally {
     await rm(keyFile, { force: true })
   }
-  await secureBundledMongo(ENDPOINT, secrets, APP_DB)
+  await secureBundledMongo(ENDPOINT, secrets, APP_DB, joinCode)
 }
 
 export async function stopBundledMongo(): Promise<void> {

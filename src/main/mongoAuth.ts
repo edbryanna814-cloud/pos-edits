@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomInt } from 'node:crypto'
 import { MongoClient } from 'mongodb'
 
 // Gate 1 S4: the bundled MongoDB runs with access control (keyFile => auth on a replica set).
@@ -9,6 +9,22 @@ import { MongoClient } from 'mongodb'
 export const ADMIN_USER = 'pharmacy_admin'
 export const APP_USER = 'pharmacy_app'
 export const APP_ROLE = 'pharmacyApp'
+/** Local network (Wi-Fi): other tills sign in to the main PC's database with this user and the join code. */
+export const LAN_USER = 'pharmacy_lan'
+
+const JOIN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789' // no 0/O, 1/I/L: read aloud and typed by hand
+
+/** 12 characters (~59 bits) as XXXX-XXXX-XXXX. SCRAM never sends it in clear; MongoDB slows guessing. */
+export function newJoinCode(): string {
+  const chars = Array.from({ length: 12 }, () => JOIN_ALPHABET[randomInt(JOIN_ALPHABET.length)])
+  return [0, 4, 8].map((i) => chars.slice(i, i + 4).join('')).join('-')
+}
+
+export const normalizeJoinCode = (value: unknown) => String(value ?? '').trim().toUpperCase()
+
+/** What a joining till uses: direct to the main PC (its replica-set member name is 127.0.0.1). */
+export const lanUri = (ip: string, port: number, code: string) =>
+  `mongodb://${LAN_USER}:${encodeURIComponent(normalizeJoinCode(code))}@${ip}:${port}/?directConnection=true&authSource=admin`
 
 export type MongoSecrets = { adminPassword: string; appPassword: string; keyFile: string }
 
@@ -70,7 +86,7 @@ async function canAuthenticate(uri: string): Promise<boolean> {
  *  3. the application user created, or its password and roles re-asserted from the stored secrets.
  * Idempotent; safe on every start.
  */
-export async function secureBundledMongo(e: Endpoint, s: MongoSecrets, appDb: string): Promise<'created' | 'existing'> {
+export async function secureBundledMongo(e: Endpoint, s: MongoSecrets, appDb: string, joinCode: string | null = null): Promise<'created' | 'existing'> {
   const admin = adminUri(e, s)
   let result: 'created' | 'existing' = 'existing'
   if (!(await canAuthenticate(admin))) {
@@ -100,6 +116,11 @@ export async function secureBundledMongo(e: Endpoint, s: MongoSecrets, appDb: st
     const existing = await c.db('admin').command({ usersInfo: { user: APP_USER, db: 'admin' } })
     if (existing.users.length === 0) await c.db('admin').command({ createUser: APP_USER, pwd: s.appPassword, roles })
     else await c.db('admin').command({ updateUser: APP_USER, pwd: s.appPassword, roles })
+    // Hosting for the local network: same rights as the app user. Not hosting: the user is removed,
+    // so turning hosting off (or a new join code) locks out every till that used the old code.
+    const lan = (await c.db('admin').command({ usersInfo: { user: LAN_USER, db: 'admin' } })).users.length > 0
+    if (joinCode) await c.db('admin').command(lan ? { updateUser: LAN_USER, pwd: normalizeJoinCode(joinCode), roles } : { createUser: LAN_USER, pwd: normalizeJoinCode(joinCode), roles })
+    else if (lan) await c.db('admin').command({ dropUser: LAN_USER })
   })
   return result
 }

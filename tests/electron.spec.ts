@@ -66,22 +66,15 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'authChangePassword',
         'authLogin',
         'authLogout',
+        'authRecoveryReset',
+        'authRecoveryStart',
+        'authRecoveryVerify',
         'authSetup',
         'authSetupRequired',
         'authState',
-        'crmActivitiesCreate',
-        'crmActivitiesList',
-        'crmContactsCreate',
-        'crmContactsList',
-        'crmCustomersCreate',
-        'crmCustomersList',
-        'crmCustomersUpdate',
-        'crmDealsCreate',
-        'crmDealsList',
-        'crmLeadsCreate',
-        'crmLeadsList',
-        'crmNotesCreate',
-        'crmNotesList',
+        'dbConnectionGet',
+        'dbConnectionSave',
+        'dbConnectionTest',
         'dbHealth',
         'exportBackup',
         'getSettings',
@@ -144,7 +137,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
       expect(health.supportsTransactions).toBe(true)
 
       await expect(window.getByText('Connected', { exact: true }).first()).toBeVisible()
-      await expect(window.getByText('Supported', { exact: true })).toBeVisible()
+      await expect(window.getByText('Response time', { exact: true })).toBeVisible()
 
       const dir = join(process.cwd(), 'screenshots')
       mkdirSync(dir, { recursive: true })
@@ -156,7 +149,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
       ).toBeVisible()
 
       await window.getByLabel('Company name').fill('Test Pharmacy')
-      await window.getByLabel('Currency code (ISO 4217)').fill('USD')
+      await window.getByLabel('Currency code (three letters)').fill('USD')
       await window.getByLabel('Currency decimal places').fill('2')
       await window.getByLabel('Tax rate (%)').fill('10')
       await window.getByLabel('Default language').selectOption('en')
@@ -286,7 +279,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
 
       await window.getByRole('button', { name: 'Settings', exact: true }).click()
       await expect(window.getByLabel('Company name')).toHaveValue('Test Pharmacy')
-      await expect(window.getByLabel('Currency code (ISO 4217)')).toHaveValue('USD')
+      await expect(window.getByLabel('Currency code (three letters)')).toHaveValue('USD')
       await expect(window.getByLabel('Tax rate (%)')).toHaveValue('10.00')
       await expect(window.getByLabel('Default language')).toHaveValue('en')
 
@@ -353,7 +346,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
 
       await window.getByRole('button', { name: 'Settings', exact: true }).click()
       await window.getByLabel('Company name').fill('E2E Pharmacy')
-      await window.getByLabel('Currency code (ISO 4217)').fill('USD')
+      await window.getByLabel('Currency code (three letters)').fill('USD')
       await window.getByLabel('Currency decimal places').fill('2')
       await window.getByLabel('Tax rate (%)').fill('10')
       await window.getByLabel('Default language').selectOption('en')
@@ -418,7 +411,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
           discountCents: 0,
           taxCents: 0,
           paymentMethod: 'cash',
-          paidCents: 2000
+          paidCents: 2200
         }
         const first = await api.posCheckout(input)
         const second = await api.posCheckout(input)
@@ -449,7 +442,8 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
 
       expect(idempotency.sameSale).toBe(true)
       expect(idempotency.before - idempotency.after).toBe(2)
-      expect(idempotency.serverPriceTotal).toBe(2000)
+      // Server tax (10% from saved settings) is added on top of the server-priced lines.
+      expect(idempotency.serverPriceTotal).toBe(2200)
       expect(idempotency.rejectedLowPayment).toBe(true)
 
       const report = await window.evaluate(() => (window as any).api.reportsSales())
@@ -458,7 +452,27 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       expect(report.grossProfitCents).toBe(1000)
       expect(report.returnsCount).toBe(1)
       expect(report.byProduct[0].quantity).toBe(2)
-      expect(report.byCashier.admin).toEqual({ count: 1, totalCents: 2000 })
+      expect(report.byCashier.admin).toEqual({ count: 1, totalCents: 2200 })
+
+      // Cashbox is the physical drawer: the two cash sales and one cash refund net to 2200,
+      // and a card sale must not add anything.
+      const cashbox = await window.evaluate(async () => {
+        const api = (window as any).api
+        const balance = (await api.reportsCashbox()).balanceCents
+        const before = (await api.posCashboxList()).length
+        const product = (await api.invProductsList())[0]
+        const sale = await api.posCheckout({
+          clientRequestId: 'e2e-card-1',
+          lines: [{ productId: product._id, quantity: 1 }],
+          discountCents: 0,
+          paymentMethod: 'card'
+        })
+        const after = (await api.posCashboxList()).length
+        return { balance, before, after, method: sale.paymentMethod }
+      })
+      expect(cashbox.balance).toBe(2200)
+      expect(cashbox.method).toBe('card')
+      expect(cashbox.after).toBe(cashbox.before)
 
       const dir = join(process.cwd(), 'screenshots')
       mkdirSync(dir, { recursive: true })
@@ -556,7 +570,7 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
     await window.getByRole('button', { name: 'Create administrator' }).click()
     await expect(window.getByRole('alert')).toHaveText('The password must be at least 12 characters.')
     await window.screenshot({ path: join(dir, 'gate1-setup-en.png') })
-    await window.getByRole('button', { name: 'AR' }).click()
+    await window.getByRole('button', { name: 'AR', exact: true }).click()
     await expect(window.getByRole('heading', { name: 'إنشاء حساب المدير' })).toBeVisible()
     await window.screenshot({ path: join(dir, 'gate1-setup-ar.png') })
   } finally {
@@ -589,10 +603,10 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
     // Until the password is changed, the session can do nothing else.
     await expect(window.evaluate(() => (window as any).api.usersList())).rejects.toThrow(/PASSWORD_CHANGE_REQUIRED/)
 
-    await window.getByRole('button', { name: 'AR' }).click()
+    await window.getByRole('button', { name: 'AR', exact: true }).click()
     await expect(window.getByRole('heading', { name: 'اختر كلمة مرور جديدة' })).toBeVisible()
     await window.screenshot({ path: join(dir, 'gate1-force-reset-ar.png') })
-    await window.getByRole('button', { name: 'EN' }).click()
+    await window.getByRole('button', { name: 'EN', exact: true }).click()
 
     await window.getByLabel('Current password').fill('admin')
     await window.getByLabel('New password').fill('Changed-Admin-Pass-1')
@@ -665,6 +679,122 @@ test('Gate 1 S2: CSP, window, navigation and permission guards hold in the built
   }
 })
 
+test('shared database: settings panel tests a connection; sign-in offers it while the database is down', async () => {
+  const app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
+  try {
+    const window = await app.firstWindow()
+    await expect(window.getByRole('heading', { name: /^(Sign in|Create the administrator account|Dashboard)$/, level: 1 })).toBeVisible({ timeout: 10000 })
+    if (!(await window.getByRole('heading', { name: 'Dashboard', level: 1 }).isVisible())) await signIn(window)
+    await window.getByRole('button', { name: 'Settings', exact: true }).click()
+    await expect(window.getByRole('heading', { name: 'Database location' })).toBeVisible()
+    await expect(window.getByText('Now: This computer only')).toBeVisible()
+    // Local network: the other device types the main computer's IP and join code.
+    await window.getByLabel('Connect to the main computer on this Wi-Fi').check()
+    await window.getByLabel('Main computer’s IP address').fill('8.8.8.8')
+    await window.getByLabel('Join code').fill('ABCD-EFGH-JKMN')
+    await window.getByRole('button', { name: 'Test connection' }).click()
+    await expect(window.getByRole('alert').filter({ hasText: 'Wi-Fi IP address' })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'Save and restart' })).toBeDisabled()
+    await window.getByLabel('Shared server over the internet (several branches)').check()
+    const field = window.getByLabel('Connection string')
+    await field.fill('mongodb://pos:secret@db.example.com:27017/')
+    await window.getByRole('button', { name: 'Test connection' }).click()
+    await expect(window.getByRole('alert').filter({ hasText: 'encrypted connection' })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'Save and restart' })).toBeDisabled()
+    await field.fill('mongodb://127.0.0.1:27017/?replicaSet=rs0')
+    await window.getByRole('button', { name: 'Test connection' }).click()
+    await expect(window.getByRole('status').filter({ hasText: 'Connected: 127.0.0.1' })).toBeVisible({ timeout: 15000 })
+    await expect(window.getByRole('button', { name: 'Save and restart' })).toBeEnabled()
+    await window.screenshot({ path: join(process.cwd(), 'screenshots', 'shared-db-settings.png') })
+    // Not saved: saving restarts the app onto the chosen server.
+  } finally {
+    await app.close()
+  }
+
+  const down = await electron.launch({
+    args: ['.', `--user-data-dir=${E2E_PROFILE}-down`],
+    env: { ...process.env, MONGODB_DB: TEST_DB, MONGODB_URI: 'mongodb://127.0.0.1:27099/?directConnection=true' }
+  })
+  try {
+    const window = await down.firstWindow()
+    await expect(window.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 15000 })
+    await window.getByRole('button', { name: /Database location/ }).click()
+    await expect(window.getByRole('heading', { name: 'Database location' })).toBeVisible()
+  } finally {
+    await down.close()
+  }
+})
+
+test('shared database: two tills on one server share users (A creates the admin, B signs in)', async () => {
+  await cleanTestDatabase()
+  const shared = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
+  // Each till's own default database points at a dead port: connecting at all proves the saved
+  // shared setting is what the app uses.
+  const env = { ...process.env, MONGODB_DB: TEST_DB, MONGODB_URI: 'mongodb://127.0.0.1:27099/?directConnection=true' }
+  const tills = [`${E2E_PROFILE}-till-a`, `${E2E_PROFILE}-till-b`]
+  try {
+    for (const profile of tills) {
+      const setup = await electron.launch({ args: ['.', `--user-data-dir=${profile}`], env })
+      // What "Save and restart" stores: the shared connection, encrypted with the Windows user key.
+      await setup.evaluate(({ app, safeStorage }, uri) => {
+        const { join } = process.mainModule!.require('node:path')
+        const { writeFileSync } = process.mainModule!.require('node:fs')
+        writeFileSync(join(app.getPath('userData'), 'db-connection.bin'), safeStorage.encryptString(JSON.stringify({ mode: 'shared', uri })))
+      }, shared)
+      await setup.close()
+    }
+
+    const a = await electron.launch({ args: ['.', `--user-data-dir=${tills[0]}`], env })
+    const b = await electron.launch({ args: ['.', `--user-data-dir=${tills[1]}`], env })
+    try {
+      const wa = await a.firstWindow()
+      const wb = await b.firstWindow()
+      for (const w of [wa, wb]) {
+        await expect(w.getByRole('heading', { name: /^(Sign in|Create the administrator account)$/, level: 1 })).toBeVisible({ timeout: 15000 })
+        expect(await w.evaluate(() => (window as any).api.dbConnectionGet())).toMatchObject({ mode: 'shared', hosts: '127.0.0.1', port: 27028 })
+        expect((await w.evaluate(() => (window as any).api.dbHealth())).status).toBe('connected')
+      }
+      // Till A: first run on the shared server creates the administrator.
+      await signIn(wa)
+      await expect(wa.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+      // The administrator adds a seller; till B sees that user at once (no setup) and signs in with it.
+      await wa.evaluate(() => (window as any).api.usersCreate({ username: 'seller1', password: 'Seller-Pass-001', role: 'Seller' })) // gitleaks:allow test-only credential
+      await wb.reload()
+      expect(await wb.evaluate(() => (window as any).api.authSetupRequired())).toBe(false)
+      await expect(wb.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible({ timeout: 10000 })
+      // Forgotten password: both codes to send to the provider; a code not signed by the panel is refused.
+      await wb.getByRole('button', { name: 'Forgot username or password?' }).click()
+      await expect(wb.locator('.recovery-codes dd').nth(1)).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
+      await wb.getByLabel('Reset code').fill('RST1.e30.e30.AAAA')
+      await wb.getByRole('button', { name: 'Check reset code' }).click()
+      await expect(wb.getByRole('alert').filter({ hasText: 'not valid' })).toBeVisible()
+      await wb.getByLabel('Username', { exact: true }).fill('seller1')
+      await wb.getByLabel('Password', { exact: true }).fill('Seller-Pass-001') // gitleaks:allow test-only credential
+      await wb.getByRole('button', { name: /Login|Sign in/ }).click()
+      // A seller sees only POS and Inventory, and opens on POS (no dashboard).
+      const nav = wb.getByRole('navigation')
+      await expect(nav.getByRole('button')).toHaveText([/POS|Point of sale/i, /Inventory/i], { timeout: 10000 })
+      await expect(wb.getByRole('heading', { name: 'Dashboard', level: 1 })).toHaveCount(0)
+      // Both tills write to one audit chain, which still verifies (seq is unique across devices).
+      const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
+      await client.connect()
+      try {
+        const logins = await client.db(TEST_DB).collection('audit').countDocuments({ action: 'login.success' })
+        expect(logins).toBeGreaterThanOrEqual(1)
+        const seqs = (await client.db(TEST_DB).collection('audit').find({ seq: { $exists: true } }).toArray()).map((e) => e.seq).sort((x, y) => x - y)
+        expect(seqs).toEqual(seqs.map((_, i) => i + 1))
+      } finally {
+        await client.close()
+      }
+    } finally {
+      await a.close()
+      await b.close()
+    }
+  } finally {
+    for (const profile of tills) rmSync(profile, { recursive: true, force: true })
+  }
+})
+
 test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', async () => {
   const app = await electron.launch({ args: ['.', `--user-data-dir=${E2E_PROFILE}`], env: { ...process.env, MONGODB_DB: TEST_DB } })
   try {
@@ -689,5 +819,6 @@ test('Gate 1 S3: IPC refuses operator injection, bad ids and extra arguments', a
 
 test.afterAll(async () => {
   rmSync(E2E_PROFILE, { recursive: true, force: true })
+  rmSync(`${E2E_PROFILE}-down`, { recursive: true, force: true })
   await cleanTestDatabase()
 })

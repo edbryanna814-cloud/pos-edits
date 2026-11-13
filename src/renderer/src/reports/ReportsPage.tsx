@@ -47,7 +47,6 @@ const copy = {
     topProducts: 'Top selling products (30 days)',
     restock: 'Restock planner',
     cashiers: 'Cashier performance',
-    customers: 'Top customers',
     totalSales: 'Total sales',
     invoices: 'Invoices',
     average: 'Average invoice',
@@ -74,7 +73,6 @@ const copy = {
     daysLeft: 'Days left',
     suggested: 'Suggested 30d',
     cashier: 'Cashier',
-    customer: 'Customer',
     none: 'No data yet.',
     noData: 'No report data yet.',
     methods: { cash: 'Cash', card: 'Card', other: 'Other' }
@@ -89,7 +87,6 @@ const copy = {
     topProducts: 'الأكثر مبيعًا (30 يومًا)',
     restock: 'خطة إعادة الطلب',
     cashiers: 'أداء الكاشير',
-    customers: 'أفضل العملاء',
     totalSales: 'إجمالي المبيعات',
     invoices: 'الفواتير',
     average: 'متوسط الفاتورة',
@@ -116,7 +113,6 @@ const copy = {
     daysLeft: 'يكفي لـ',
     suggested: 'مقترح 30 يومًا',
     cashier: 'الكاشير',
-    customer: 'العميل',
     none: 'لا توجد بيانات بعد.',
     noData: 'لا توجد بيانات تقارير بعد.',
     methods: { cash: 'نقدًا', card: 'بطاقة', other: 'أخرى' }
@@ -357,20 +353,6 @@ export default function ReportsPage({
                   value: `${value.count} · ${formatMoney(value.totalCents, currency)}`,
                   ratio: salesReport.totalSalesCents > 0 ? value.totalCents / salesReport.totalSalesCents : 0
                 }))}
-            />
-          )}
-        </section>
-
-        <section className="panel">
-          <h3>{text.customers}</h3>
-          {salesReport.byCustomer.length === 0 ? <p className="muted">{text.none}</p> : (
-            <BarList
-              bars={salesReport.byCustomer.slice(0, 8).map((customer) => ({
-                label: customer.name,
-                value: `${customer.count} · ${formatMoney(customer.totalCents, currency)}`,
-                ratio:
-                  salesReport.totalSalesCents > 0 ? customer.totalCents / salesReport.totalSalesCents : 0
-              }))}
             />
           )}
         </section>

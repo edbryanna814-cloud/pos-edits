@@ -2,6 +2,7 @@ import type { CashboxMovement, Sale } from '../../../shared/pos'
 import type { Product } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
 import { formatDateTime, formatMoney, isToday } from '../money'
+import { expiryState } from '../../../shared/expiry'
 
 interface Props {
   language: Language
@@ -70,8 +71,9 @@ export default function DashboardPage({ language, currency, products, sales, cas
   const lowStock = products
     .filter((product) => {
       if (product.active === false) return false
-      const remaining = daysLeft(product.expiryDate)
-      return product.stockQuantity <= 6 || (remaining !== null && remaining <= 30)
+      const minStock = Math.max(0, Math.trunc(Number(product.minStock) || 0))
+      const expiry = expiryState(product.expiryDate)
+      return product.stockQuantity <= minStock || expiry === 'expired' || expiry === 'soon'
     })
     .sort((a, b) => {
       const ae = daysLeft(a.expiryDate)
@@ -147,8 +149,8 @@ export default function DashboardPage({ language, currency, products, sales, cas
                 </thead>
                 <tbody>
                   {lowStock.slice(0, 8).map((product) => {
-                    const remaining = daysLeft(product.expiryDate)
-                    const expired = remaining !== null && remaining < 0
+                    const expiry = expiryState(product.expiryDate)
+                    const expired = expiry === 'expired'
                     return (
                       <tr key={product._id ?? product.sku}>
                         <td>{product.name}</td>
@@ -157,10 +159,12 @@ export default function DashboardPage({ language, currency, products, sales, cas
                         </td>
                         <td>{product.minStock}</td>
                         <td>
-                          {product.expiryDate ? (
+                          {expiry === 'expired' || expiry === 'soon' ? (
                             <span className={`tag ${expired ? 'danger-tag' : 'warning-tag'}`}>
-                              {expired ? text.expired : text.expiresSoon} · {product.expiryDate.slice(0, 10)}
+                              {expired ? text.expired : text.expiresSoon} · {product.expiryDate!.slice(0, 10)}
                             </span>
+                          ) : product.expiryDate ? (
+                            <span>{product.expiryDate.slice(0, 10)}</span>
                           ) : (
                             <span className="muted">-</span>
                           )}

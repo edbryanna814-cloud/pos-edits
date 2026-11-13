@@ -17,7 +17,6 @@ export type Sale = {
   _id?: string
   invoiceNo: string
   clientRequestId?: string
-  customerId?: string
   lines: SaleLine[]
   subtotalCents: number
   discountCents: number
@@ -57,6 +56,8 @@ export type CashboxMovement = {
   amountCents: number
   reason: string
   reference?: string
+  /** Who moved the cash: shifts are per cashier, so several tills can share one database. */
+  cashierUsername?: string
   createdAt: string
 }
 

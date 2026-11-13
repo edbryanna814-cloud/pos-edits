@@ -8,17 +8,21 @@ import { networkInterfaces } from 'node:os'
 import type { LicenseState } from '../shared/ipc'
 import { logAudit } from './auth'
 import { expiryRefusal, preApplyRefusal } from './licenseApplyGuard'
+import { anb2ExpiryMs, extractToken, isAnb2, verifyAnb2 } from './anb2'
+import { PANEL_KEYS } from './panelKeys'
 
 const execFileAsync = promisify(execFile)
 
+// Field-test key (reference phm-fieldtest-2026-01), rotated 2026-11-12 because the old private
+// key was not on the build PC and no code could be issued. The private half is not in this repo.
+// Replace with the panel's public key when panel A3 issues licences; codes from this key then stop.
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEA61OdJ1imcoCzYW6DImq2veDwk0fFfe9YdXeevRMyK98=
+MCowBQYDK2VwAyEAtZhdtfTqM+yx+1xvJcIQqrpJusZmn7PsJqmNGEU7TdA=
 -----END PUBLIC KEY-----`
 
 const LICENSE_FILE = () => join(app.getPath('userData'), 'license.json')
 
 interface HardwareInfo {
-  mac: string
   deviceId: string
 }
 
@@ -26,11 +30,6 @@ interface LicensePayload {
   v: number
   lid: string
   dev: string
-  price: string
-  cur: string
-  per: 'day' | 'month' | 'year'
-  cnt: number
-  iat: number
   exp: number
 }
 
@@ -91,10 +90,7 @@ async function readHardwareIds(): Promise<{ mac?: string; disk?: string; board?:
 
 export function getHardwareInfo(): Promise<HardwareInfo> {
   if (!cached) {
-    cached = readHardwareIds().then((ids) => ({
-      mac: (ids.mac || '').toUpperCase(),
-      deviceId: computeDeviceId(ids)
-    }))
+    cached = readHardwareIds().then((ids) => ({ deviceId: computeDeviceId(ids) }))
   }
   return cached
 }
@@ -120,6 +116,20 @@ function verifyCode(code: string, deviceId: string): LicensePayload {
   return payload
 }
 
+type Verified = { lid: string; expMs: number; token: string }
+
+/** PHM1 (field-test codes) or ANB2 (panel licences, raw token or .anbc file text). */
+function verifyAny(input: string, deviceId: string, allowExpired: boolean): Verified {
+  const token = extractToken(input)
+  if (isAnb2(token)) {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const p = verifyAnb2(token, { keys: PANEL_KEYS, deviceId, appVersion: app.getVersion(), nowSeconds, allowExpired })
+    return { lid: p.lid, expMs: anb2ExpiryMs(p), token }
+  }
+  const p = verifyCode(token, deviceId)
+  return { lid: p.lid, expMs: p.exp, token }
+}
+
 async function readStoredCode(): Promise<string | null> {
   try {
     const raw = await readFile(LICENSE_FILE(), 'utf8')
@@ -130,44 +140,35 @@ async function readStoredCode(): Promise<string | null> {
   }
 }
 
-function validState(info: HardwareInfo, payload: LicensePayload): LicenseState {
+function validState(info: HardwareInfo, v: Verified): LicenseState {
   return {
     status: 'valid',
-    mac: info.mac,
     deviceId: info.deviceId,
-    licenseId: payload.lid,
-    expiresAt: new Date(payload.exp).toISOString(),
-    price: payload.price,
-    currency: payload.cur,
-    period: payload.per,
-    count: payload.cnt
+    licenseId: v.lid,
+    // A one-time (perpetual) panel licence has no expiry.
+    expiresAt: Number.isFinite(v.expMs) ? new Date(v.expMs).toISOString() : undefined
   }
 }
 
-function expiredState(info: HardwareInfo, payload: LicensePayload): LicenseState {
+function expiredState(info: HardwareInfo, v: Verified): LicenseState {
   return {
-    ...validState(info, payload),
+    ...validState(info, v),
     status: 'expired'
   }
 }
 
 export async function getLicenseState(): Promise<LicenseState> {
-  if (devBypass()) return { status: 'valid', mac: 'DEV', deviceId: 'dev' }
+  if (devBypass()) return { status: 'valid', deviceId: 'dev' }
 
   const info = await getHardwareInfo()
   const code = await readStoredCode()
-  if (!code) return { status: 'missing', mac: info.mac, deviceId: info.deviceId }
+  if (!code) return { status: 'missing', deviceId: info.deviceId }
 
   try {
-    const payload = verifyCode(code, info.deviceId)
-    return payload.exp > Date.now() ? validState(info, payload) : expiredState(info, payload)
-  } catch (error) {
-    return {
-      status: 'invalid',
-      mac: info.mac,
-      deviceId: info.deviceId,
-      reason: error instanceof Error ? error.message : String(error)
-    }
+    const verified = verifyAny(code, info.deviceId, true)
+    return verified.expMs > Date.now() ? validState(info, verified) : expiredState(info, verified)
+  } catch {
+    return { status: 'invalid', deviceId: info.deviceId }
   }
 }
 
@@ -180,11 +181,11 @@ export async function applyLicenseCode(code: string): Promise<LicenseState> {
   let refusal = preApplyRefusal(current.status, applyAttempts, now)
   applyAttempts.push(now)
   const info = await getHardwareInfo()
-  let payload: LicensePayload | undefined
+  let payload: Verified | undefined
   if (!refusal) {
     try {
-      payload = verifyCode(String(code ?? ''), info.deviceId)
-      refusal = expiryRefusal(current.expiresAt, payload.exp, now)
+      payload = verifyAny(String(code ?? ''), info.deviceId, false)
+      refusal = expiryRefusal(current.expiresAt, payload.expMs, now)
     } catch (error) {
       refusal = error instanceof Error ? error.message : String(error)
     }
@@ -198,7 +199,8 @@ export async function applyLicenseCode(code: string): Promise<LicenseState> {
     details: { outcome: refusal ? 'refused' : 'accepted', reason: refusal ?? undefined, previousStatus: current.status }
   })
   if (refusal || !payload) throw new Error(refusal ?? 'License code rejected')
-  await writeFile(LICENSE_FILE(), JSON.stringify({ code: code.trim(), appliedAt: new Date().toISOString() }, null, 2), 'utf8')
+  // Store the token itself, not a pasted lease-file wrapper.
+  await writeFile(LICENSE_FILE(), JSON.stringify({ code: payload.token, appliedAt: new Date().toISOString() }, null, 2), 'utf8')
   return validState(info, payload)
 }
 

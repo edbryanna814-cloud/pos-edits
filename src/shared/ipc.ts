@@ -1,6 +1,5 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
 import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
-import type { Activity, Contact, Customer, Deal, Lead, Note } from './crm'
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
 import type { CashboxMovement, CashierShift, Payment, Return, Sale } from './pos'
 
@@ -15,27 +14,20 @@ export const IPC = {
   AuthLogin: 'auth:login',
   AuthLogout: 'auth:logout',
   AuthState: 'auth:state',
+  DbConnectionGet: 'db:connection-get',
+  DbConnectionTest: 'db:connection-test',
+  DbConnectionSave: 'db:connection-save',
   AuthSetupRequired: 'auth:setup-required',
   AuthSetup: 'auth:setup',
   AuthChangePassword: 'auth:change-password',
+  AuthRecoveryStart: 'auth:recovery-start',
+  AuthRecoveryVerify: 'auth:recovery-verify',
+  AuthRecoveryReset: 'auth:recovery-reset',
   UsersList: 'users:list',
   UsersCreate: 'users:create',
   UsersUpdate: 'users:update',
   RolesList: 'roles:list',
   AuditList: 'audit:list',
-  CrmCustomersList: 'crm:customers:list',
-  CrmCustomersCreate: 'crm:customers:create',
-  CrmCustomersUpdate: 'crm:customers:update',
-  CrmContactsList: 'crm:contacts:list',
-  CrmContactsCreate: 'crm:contacts:create',
-  CrmLeadsList: 'crm:leads:list',
-  CrmLeadsCreate: 'crm:leads:create',
-  CrmDealsList: 'crm:deals:list',
-  CrmDealsCreate: 'crm:deals:create',
-  CrmActivitiesList: 'crm:activities:list',
-  CrmActivitiesCreate: 'crm:activities:create',
-  CrmNotesList: 'crm:notes:list',
-  CrmNotesCreate: 'crm:notes:create',
   InvCategoriesList: 'inv:categories:list',
   InvCategoriesCreate: 'inv:categories:create',
   InvUnitsList: 'inv:units:list',
@@ -89,15 +81,9 @@ export type LicenseStateStatus = 'valid' | 'missing' | 'expired' | 'invalid'
 
 export interface LicenseState {
   status: LicenseStateStatus
-  mac: string
   deviceId: string
   licenseId?: string
   expiresAt?: string
-  price?: string
-  currency?: string
-  period?: string
-  count?: number
-  reason?: string
 }
 
 export interface PreloadApi {
@@ -112,27 +98,20 @@ export interface PreloadApi {
   authLogin(input: LoginInput): Promise<LoginResult>
   authLogout(token: string): Promise<{ success: boolean }>
   authState(token?: string): Promise<AuthState>
+  dbConnectionGet(): Promise<{ mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string }>
+  dbConnectionTest(input: { uri: string } | { ip: string; code: string }): Promise<{ ok: true; serverVersion: string; topology: string; hosts: string }>
+  dbConnectionSave(input: { mode: 'local' } | { mode: 'host' } | { mode: 'shared'; uri: string } | { mode: 'join'; ip: string; code: string }): Promise<{ ok: true; restarting: true }>
   authSetupRequired(): Promise<boolean>
   authSetup(input: LoginInput): Promise<LoginResult>
   authChangePassword(input: ChangePasswordInput): Promise<{ success: true }>
+  authRecoveryStart(): Promise<{ deviceId: string; requestCode: string }>
+  authRecoveryVerify(input: { code: string }): Promise<{ admins: string[] }>
+  authRecoveryReset(input: { username: string; password: string }): Promise<{ ok: true }>
   usersList(): Promise<User[]>
   usersCreate(input: Partial<User> & { password: string }): Promise<User>
   usersUpdate(id: string, input: Partial<User>): Promise<User>
   rolesList(): Promise<{ name: string; permissions: Permission[] }[]>
   auditList(limit?: number): Promise<import('./auth').AuditEvent[]>
-  crmCustomersList(): Promise<Customer[]>
-  crmCustomersCreate(input: Partial<Customer>): Promise<Customer>
-  crmCustomersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
-  crmContactsList(customerId?: string): Promise<Contact[]>
-  crmContactsCreate(input: Partial<Contact>): Promise<Contact>
-  crmLeadsList(): Promise<Lead[]>
-  crmLeadsCreate(input: Partial<Lead>): Promise<Lead>
-  crmDealsList(): Promise<Deal[]>
-  crmDealsCreate(input: Partial<Deal>): Promise<Deal>
-  crmActivitiesList(customerId?: string): Promise<Activity[]>
-  crmActivitiesCreate(input: Partial<Activity>): Promise<Activity>
-  crmNotesList(customerId: string): Promise<Note[]>
-  crmNotesCreate(input: Partial<Note>): Promise<Note>
   invCategoriesList(): Promise<Category[]>
   invCategoriesCreate(input: Partial<Category>): Promise<Category>
   invUnitsList(): Promise<Unit[]>
@@ -157,7 +136,7 @@ export interface PreloadApi {
   invPOReceive(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt>
   posCheckout(input: any): Promise<Sale>
   posSalesList(): Promise<Sale[]>
-  posReturn(input: { saleId: string; reason: string; lines?: any[] }): Promise<Return>
+  posReturn(input: { saleId: string; reason: string }): Promise<Return>
   posCashIn(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashOut(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashboxList(): Promise<CashboxMovement[]>

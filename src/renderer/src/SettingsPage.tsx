@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import type { CompanySettings, Language, StoredCompanySettings } from '../../shared/settings'
 import { t } from './i18n'
+import DatabaseLocation from './DatabaseLocation'
 
 interface Props {
   settings: StoredCompanySettings | null
@@ -8,6 +9,8 @@ interface Props {
   settingsError: string
   onSaved: (settings: StoredCompanySettings) => void
   onReload: () => void
+  /** Only administrators see where the database lives. */
+  canManageDatabase: boolean
 }
 
 interface FormState {
@@ -58,7 +61,8 @@ export default function SettingsPage({
   language,
   settingsError,
   onSaved,
-  onReload
+  onReload,
+  canManageDatabase
 }: Props) {
   const [form, setForm] = useState<FormState>(() => toForm(settings))
   const [saving, setSaving] = useState(false)
@@ -274,6 +278,7 @@ export default function SettingsPage({
           {error}
         </p>
       ) : null}
+      {canManageDatabase ? <DatabaseLocation language={language} /> : null}
     </section>
   )
 }

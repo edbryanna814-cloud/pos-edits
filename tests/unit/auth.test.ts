@@ -156,12 +156,50 @@ describe('with MongoDB', () => {
   })
 
   it('user create and admin reset enforce 12 characters; an admin reset forces a change', async () => {
-    await expect(auth.createUser({ username: 'cashier1', password: 'abcd', role: 'Cashier' })).rejects.toThrow('PASSWORD_TOO_SHORT')
-    const created = await auth.createUser({ username: 'cashier1', password: 'Cashier-Pass-01', role: 'Cashier' })
+    await expect(auth.createUser({ username: 'cashier1', password: 'abcd', role: 'Seller' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+    const created = await auth.createUser({ username: 'cashier1', password: 'Cashier-Pass-01', role: 'Seller' }) // gitleaks:allow test-only credential
     expect(created).not.toHaveProperty('passwordHash')
     await expect(auth.updateUser(String(created._id), { password: 'short' })).rejects.toThrow('PASSWORD_TOO_SHORT')
     await auth.updateUser(String(created._id), { password: 'Temp-Reset-Pass-1' })
     expect((await auth.login({ username: 'cashier1', password: 'Temp-Reset-Pass-1' })).mustChangePassword).toBe(true)
+  })
+
+  it('three roles: old roles and custom permissions migrate; a manager cannot see or touch administrators', async () => {
+    const now = new Date().toISOString()
+    await users().insertOne({ username: 'oldacct', passwordHash: sha256('x'), role: 'Accountant', permissions: ['database.manage'], active: true, createdAt: now, updatedAt: now })
+    expect(await auth.migrateRoles()).toBeGreaterThan(0)
+    const migrated = await users().findOne({ username: 'oldacct' })
+    expect(migrated?.role).toBe('Seller')
+    expect(migrated).not.toHaveProperty('permissions')
+
+    await auth.login({ username: 'owner', password: 'Owner-Pass-2026' }) // gitleaks:allow test-only credential
+    expect(auth.requirePermission('database.manage').username).toBe('owner')
+    await auth.createUser({ username: 'mgr1', password: 'Manager-Pass-01', role: 'Manager', permissions: ['database.manage'] }) // gitleaks:allow test-only credential
+
+    const mgr = await auth.login({ username: 'mgr1', password: 'Manager-Pass-01' }) // gitleaks:allow test-only credential
+    expect(mgr.user.permissions).not.toContain('database.manage')
+    expect(() => auth.requirePermission('database.manage')).toThrow('PERMISSION_DENIED')
+    expect((await auth.listUsers()).map((u) => u.role)).not.toContain('Administrator')
+    expect(auth.listRoles().map((r) => r.name)).toEqual(['Manager', 'Seller'])
+    await expect(auth.createUser({ username: 'sneaky', password: 'Sneaky-Pass-001', role: 'Administrator' })).rejects.toThrow('PERMISSION_DENIED')
+    const ownerId = String((await users().findOne({ username: 'owner' }))?._id)
+    await expect(auth.updateUser(ownerId, { active: false })).rejects.toThrow('User not found')
+    expect((await auth.listAudit(1000)).map((e) => e.actorUsername)).not.toContain('owner')
+
+    await auth.createUser({ username: 'seller1', password: 'Seller-Pass-001', role: 'Seller' }) // gitleaks:allow test-only credential
+    const seller = await auth.login({ username: 'seller1', password: 'Seller-Pass-001' }) // gitleaks:allow test-only credential
+    expect(seller.user.permissions).toEqual(['pos.use', 'inventory.manage'])
+  })
+
+  it('recovery: lists administrator names and resets only an administrator (unlocked, active, audited)', async () => {
+    expect(await auth.listAdminUsernames()).toEqual(['admin', 'owner'])
+    await users().updateOne({ username: 'owner' }, { $set: { lockedUntil: new Date(Date.now() + 1e6).toISOString(), failedLoginCount: 5, active: false } })
+    await expect(auth.recoverAdminPassword('owner', 'short')).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.recoverAdminPassword('seller1', 'Recovered-Pass-01')).rejects.toThrow('User not found')
+    await auth.recoverAdminPassword('owner', 'Recovered-Pass-01') // gitleaks:allow test-only credential
+    const r = await auth.login({ username: 'owner', password: 'Recovered-Pass-01' }) // gitleaks:allow test-only credential
+    expect(r.mustChangePassword).toBe(false)
+    expect((await audit()).map((e) => e.action)).toContain('password.recovered')
   })
 })
 

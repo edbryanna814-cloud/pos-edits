@@ -5,7 +5,7 @@ import { getDb } from './db'
 import { hashPassword, hashToken, newPasswordError, verifyPassword } from './password'
 import { chainEntry, verifyChain, type ChainReport } from './auditChain'
 import type { AuditEvent, LoginInput, LoginResult, Permission, Session, User } from '../shared/auth'
-import { BUILTIN_ROLES, DEFAULT_SESSION_TTL_MS } from '../shared/auth'
+import { ADMIN_ROLE, BUILTIN_ROLES, DEFAULT_SESSION_TTL_MS, LEGACY_ROLES } from '../shared/auth'
 
 const USERS_COL = 'users'
 const SESSIONS_COL = 'sessions'
@@ -59,8 +59,22 @@ function requireDb(): Db {
 }
 
 function getRolePermissions(role: string): Permission[] {
-  const r = BUILTIN_ROLES.find((x) => x.name === role)
+  const r = BUILTIN_ROLES.find((x) => x.name === (LEGACY_ROLES[role] ?? role))
   return r ? r.permissions : []
+}
+
+const isAdminViewer = () => currentSession?.role === ADMIN_ROLE
+
+/** Earlier versions had Cashier / Inventory Manager / Accountant roles and per-user permissions. */
+export async function migrateRoles(): Promise<number> {
+  const db = requireDb()
+  let changed = 0
+  for (const [from, to] of Object.entries(LEGACY_ROLES)) {
+    changed += (await db.collection(USERS_COL).updateMany({ role: from }, { $set: { role: to } })).modifiedCount
+  }
+  changed += (await db.collection(USERS_COL).updateMany({ permissions: { $exists: true } }, { $unset: { permissions: '' } })).modifiedCount
+  if (changed) await logAudit({ actorUsername: 'system:migration', action: 'users.roles_migrated', resource: 'users', details: { changed } })
+  return changed
 }
 
 export async function ensureAuthSchema(): Promise<void> {
@@ -93,7 +107,10 @@ let auditQueue: Promise<unknown> = Promise.resolve()
 
 async function appendChained(db: Db, record: AuditEvent): Promise<void> {
   const audit = db.collection<AuditEvent & { seq?: number; hash?: string }>(AUDIT_COL)
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Several PCs on one shared database can race for the same seq: retry with a short random wait.
+  const ATTEMPTS = 8
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 5 + Math.floor(Math.random() * 40) * attempt))
     // Read the tail on every write (indexed): stays correct after a backup import replaces the log.
     const last = await audit.find({ seq: { $exists: true } }).sort({ seq: -1 }).limit(1).next()
     const entry = chainEntry({ ...record } as Record<string, unknown>, last ? { seq: last.seq as number, hash: last.hash as string } : null)
@@ -101,8 +118,8 @@ async function appendChained(db: Db, record: AuditEvent): Promise<void> {
       await audit.insertOne(entry as any)
       return
     } catch (error) {
-      // Another writer took this seq (unique index): re-read the tail once and retry.
-      if ((error as { code?: number })?.code !== 11000 || attempt > 0) throw error
+      // Another writer took this seq (unique index): re-read the tail and retry.
+      if ((error as { code?: number })?.code !== 11000 || attempt === ATTEMPTS - 1) throw error
     }
   }
 }
@@ -146,7 +163,8 @@ function normalizeUsername(value: unknown): string {
 }
 
 async function startSession(db: Db, user: User & { _id?: unknown }, mustChangePassword: boolean): Promise<LoginResult> {
-  const permissions = user.permissions?.length ? user.permissions : getRolePermissions(user.role)
+  // The role decides; per-user permissions from older versions are ignored so nobody can escalate.
+  const permissions = getRolePermissions(user.role)
   const token = randomBytes(32).toString('hex')
   const now = Date.now()
   const session: Session = {
@@ -329,9 +347,11 @@ function validateRole(role: unknown): string {
 
 const USER_PROJECTION = { passwordHash: 0, failedLoginCount: 0, lockedUntil: 0 }
 
+/** Managers never see Administrator accounts. */
 export async function listUsers(): Promise<User[]> {
   const db = requireDb()
-  const users = await db.collection<User>(USERS_COL).find({}, { projection: USER_PROJECTION }).toArray()
+  const filter = isAdminViewer() ? {} : { role: { $ne: ADMIN_ROLE } }
+  const users = await db.collection<User>(USERS_COL).find(filter, { projection: USER_PROJECTION }).toArray()
   return users.map(withStringId)
 }
 
@@ -341,11 +361,11 @@ export async function createUser(input: any): Promise<User> {
   const username = requireText(input?.username, 'Username')
   const passwordError = newPasswordError(input?.password)
   if (passwordError) throw new Error(passwordError)
+  if (!isAdminViewer() && input?.role === ADMIN_ROLE) throw new Error(AUTH_ERRORS.permissionDenied)
   const user: any = {
     username,
     passwordHash: await hashPassword(input.password),
-    role: validateRole(input?.role || 'Cashier'),
-    permissions: Array.isArray(input?.permissions) ? input.permissions : undefined,
+    role: validateRole(input?.role || 'Seller'),
     active: input?.active !== false,
     createdAt: now,
     updatedAt: now
@@ -366,10 +386,15 @@ export async function createUser(input: any): Promise<User> {
 export async function updateUser(id: string, input: any): Promise<User> {
   const db = requireDb()
   if (!ObjectId.isValid(id)) throw new Error('Invalid user')
+  if (!isAdminViewer()) {
+    // A manager cannot touch, or even confirm the existence of, an Administrator account.
+    const target = await db.collection<User>(USERS_COL).findOne({ _id: new ObjectId(id) } as any, { projection: { role: 1 } })
+    if (!target || target.role === ADMIN_ROLE) throw new Error('User not found')
+    if (input?.role === ADMIN_ROLE) throw new Error(AUTH_ERRORS.permissionDenied)
+  }
   const update: any = { updatedAt: new Date().toISOString() }
   if (input?.role !== undefined) update.role = validateRole(input.role)
   if (typeof input?.active === 'boolean') update.active = input.active
-  if (input?.permissions !== undefined) update.permissions = Array.isArray(input.permissions) ? input.permissions : undefined
   if (input?.password) {
     const passwordError = newPasswordError(input.password)
     if (passwordError) throw new Error(passwordError)
@@ -391,9 +416,37 @@ export async function updateUser(id: string, input: any): Promise<User> {
 export async function listAudit(limit = 100): Promise<AuditEvent[]> {
   const db = requireDb()
   const safeLimit = Number.isInteger(limit) ? Math.max(1, Math.min(1000, limit)) : 100
-  return (await db.collection<AuditEvent>(AUDIT_COL).find({}).sort({ createdAt: -1 }).limit(safeLimit).toArray()).map(withStringId)
+  // Managers do not see entries made by Administrator accounts.
+  let filter = {}
+  if (!isAdminViewer()) {
+    const admins = await db.collection<User>(USERS_COL).find({ role: ADMIN_ROLE }, { projection: { username: 1 } }).toArray()
+    filter = { actorUsername: { $nin: admins.map((a) => a.username) } }
+  }
+  return (await db.collection<AuditEvent>(AUDIT_COL).find(filter).sort({ createdAt: -1 }).limit(safeLimit).toArray()).map(withStringId)
 }
 
 export function listRoles() {
-  return BUILTIN_ROLES
+  return isAdminViewer() ? BUILTIN_ROLES : BUILTIN_ROLES.filter((r) => r.name !== ADMIN_ROLE)
+}
+
+/** Forgotten-password recovery (after a panel-signed reset code): the administrator accounts by name. */
+export async function listAdminUsernames(): Promise<string[]> {
+  const db = requireDb()
+  return (await db.collection<User>(USERS_COL).find({ role: ADMIN_ROLE }, { projection: { username: 1 } }).sort({ username: 1 }).toArray()).map((u) => u.username)
+}
+
+/** Sets a new password for an administrator account and reopens it (unlocked, active). Caller checks the reset code. */
+export async function recoverAdminPassword(username: unknown, newPassword: unknown): Promise<void> {
+  const db = requireDb()
+  const passwordError = newPasswordError(newPassword)
+  if (passwordError) throw new Error(passwordError)
+  const result = await db.collection<User>(USERS_COL).updateOne(
+    { username: String(username ?? ''), role: ADMIN_ROLE },
+    {
+      $set: { passwordHash: await hashPassword(String(newPassword)), active: true, mustChangePassword: false, updatedAt: new Date().toISOString() },
+      $unset: { failedLoginCount: '', lockedUntil: '' }
+    }
+  )
+  if (result.matchedCount !== 1) throw new Error('User not found')
+  await logAudit({ actorUsername: 'system:recovery', action: 'password.recovered', resource: 'users', details: { username: String(username) } })
 }

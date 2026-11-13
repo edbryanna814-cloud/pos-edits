@@ -5,25 +5,30 @@ export type Permission =
   | 'permissions.manage'
   | 'pos.use'
   | 'inventory.manage'
-  | 'crm.manage'
   | 'reports.view'
   | 'cashbox.manage'
   | 'settings.manage'
   | 'audit.view'
+  | 'database.manage'
 
 export type Role = {
   name: string
   permissions: Permission[]
 }
 
+/** The three roles. Permissions come only from the role (no per-user overrides). */
+export const ADMIN_ROLE = 'Administrator'
 export const BUILTIN_ROLES: Role[] = [
-  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'crm.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view'] },
-  { name: 'Manager', permissions: ['users.read', 'pos.use', 'inventory.manage', 'crm.manage', 'reports.view', 'cashbox.manage'] },
-  { name: 'Cashier', permissions: ['pos.use', 'reports.view'] },
-  { name: 'Inventory Manager', permissions: ['inventory.manage', 'reports.view'] },
-  { name: 'Accountant', permissions: ['cashbox.manage', 'reports.view'] },
-  { name: 'CRM Employee', permissions: ['crm.manage'] }
+  // Everything, including where the database lives.
+  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage'] },
+  // Everything except the database location; Administrator accounts are hidden from managers.
+  { name: 'Manager', permissions: ['users.read', 'users.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view'] },
+  // POS and inventory only.
+  { name: 'Seller', permissions: ['pos.use', 'inventory.manage'] }
 ]
+
+/** Roles from earlier versions, renamed on startup. */
+export const LEGACY_ROLES: Record<string, string> = { Cashier: 'Seller', 'Inventory Manager': 'Seller', Accountant: 'Seller' }
 
 export type User = {
   _id?: string

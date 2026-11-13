@@ -18,10 +18,9 @@ import PosPage from './pos/PosPage'
 import ShiftPanel from './pos/ShiftPanel'
 import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
-import CrmPage from './crm/CrmPage'
 import UsersPage from './users/UsersPage'
 
-type SectionId = 'dashboard' | 'pos' | 'inventory' | 'crm' | 'reports' | 'settings' | 'users' | 'audit'
+type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit'
 
 interface Section {
   id: SectionId
@@ -36,7 +35,8 @@ const sections: Section[] = [
     id: 'dashboard',
     labelKey: 'dashboard',
     titleKey: 'dashboardTitle',
-    descriptionKey: 'dashboardDesc'
+    descriptionKey: 'dashboardDesc',
+    permission: 'reports.view'
   },
   {
     id: 'pos',
@@ -51,13 +51,6 @@ const sections: Section[] = [
     titleKey: 'inventoryTitle',
     descriptionKey: 'inventoryDesc',
     permission: 'inventory.manage'
-  },
-  {
-    id: 'crm',
-    labelKey: 'crm',
-    titleKey: 'crmTitle',
-    descriptionKey: 'crmDesc',
-    permission: 'crm.manage'
   },
   {
     id: 'reports',
@@ -156,24 +149,8 @@ function DatabasePanel({
       {db ? (
         <dl className="status-grid">
           <div>
-            <dt>{t(language, 'database')}</dt>
-            <dd>{db.database}</dd>
-          </div>
-          <div>
             <dt>{t(language, 'serverVersion')}</dt>
             <dd>{db.serverVersion ?? '-'}</dd>
-          </div>
-          <div>
-            <dt>{t(language, 'topology')}</dt>
-            <dd>{db.topology ?? '-'}</dd>
-          </div>
-          <div>
-            <dt>{t(language, 'transactions')}</dt>
-            <dd>
-              {db.supportsTransactions
-                ? t(language, 'supported')
-                : t(language, 'unsupported')}
-            </dd>
           </div>
           <div>
             <dt>{t(language, 'latency')}</dt>
@@ -182,7 +159,7 @@ function DatabasePanel({
         </dl>
       ) : null}
 
-      {db?.error ? <p className="error">{db.error}</p> : null}
+      {db?.error ? <p className="error">{t(language, 'databaseUnavailable')}</p> : null}
 
       <button type="button" onClick={onRetry}>
         {t(language, 'retry')}
@@ -240,6 +217,10 @@ export default function App() {
   const visibleSections = sections.filter(
     (item) => !item.permission || (authUser?.permissions ?? []).includes(item.permission)
   )
+  // A Seller has no dashboard: open the first page this role may see.
+  useEffect(() => {
+    if (authUser && visibleSections.length && !visibleSections.some((item) => item.id === active)) setActive(visibleSections[0].id)
+  }, [authUser, active])
   const currency = settings?.currencyCode ?? ''
   const taxRateBasisPoints = settings?.taxRateBasisPoints ?? 0
   const dbConnected = db?.status === 'connected'
@@ -305,12 +286,37 @@ export default function App() {
       .licenseStatus()
       .then((state) => setLicense(state))
       .catch(() =>
-        setLicense({ status: 'invalid', mac: '', deviceId: '', reason: 'License check failed' })
+        setLicense({ status: 'invalid', deviceId: '' })
       )
       .finally(() => setLicenseLoaded(true))
 
     void load()
     void loadAuth()
+  }, [])
+
+  // Settings are refused while unlicensed; reload them once the license becomes valid (after activation),
+  // otherwise the dashboard keeps showing "Could not load settings: License required".
+  useEffect(() => {
+    if (license?.status === 'valid') void load()
+  }, [license?.status])
+
+  // Poll the license so an expiry during a shift locks the screens without waiting for a restart.
+  // The main process enforces the same rule on every call; this only keeps the UI honest.
+  useEffect(() => {
+    if (!window.api) return
+
+    const check = (): void => {
+      window.api
+        .licenseStatus()
+        .then((state) => setLicense(state))
+        .catch(() => setLicense({ status: 'invalid', deviceId: '' }))
+    }
+    const timer = setInterval(check, 60_000)
+    window.addEventListener('focus', check)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
   }, [])
 
   useEffect(() => {
@@ -459,7 +465,7 @@ export default function App() {
     return (
       <>
         {languageToggle}
-        <LoginPage language={language} onLogin={handleLogin} />
+        <LoginPage language={language} onLogin={handleLogin} dbUnavailable={db?.status === 'disconnected'} />
       </>
     )
   }
@@ -541,6 +547,7 @@ export default function App() {
             settingsError={settingsError}
             onSaved={handleSaved}
             onReload={handleReload}
+            canManageDatabase={(authUser?.permissions ?? []).includes('database.manage')}
           />
         ) : active === 'users' ? (
           <UsersPage language={language} />        ) : active === 'audit' ? (
@@ -567,8 +574,7 @@ export default function App() {
               </tbody>
             </table>
           </section>
-        ) : active === 'crm' ? (
-          <CrmPage language={language} currency={currency} />        ) : active === 'inventory' ? (
+        ) : active === 'inventory' ? (
           <>
             <InventoryPage
               products={products}

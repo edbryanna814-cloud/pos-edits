@@ -4,16 +4,21 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { IPC, type IpcChannel } from '../shared/ipc'
 import type { Permission } from '../shared/auth'
-import { closeDb, connectDb, dbHealth } from './db'
-import { startBundledMongo, stopBundledMongo } from './localDb'
+import { closeDb, connectDb, dbHealth, getDb } from './db'
+import { describeDbMode, loadDbMode, saveDbMode } from './dbConfig'
+import { DB_ERRORS, isPrivateLanIp, testSharedUri } from './dbConnection'
+import { LAN_PORT, lanAddresses, startBundledMongo, stopBundledMongo } from './localDb'
+import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
-import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
+import { changePassword, createUser, ensureAuthSchema, listAdminUsernames, migrateRoles, recoverAdminPassword, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
-import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
+import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
+import { PANEL_KEYS } from './panelKeys'
+import { RESET_ERRORS, verifyResetCode } from './recovery'
+import { licenseRequired } from './licenseGate'
 import { publicError, validateIpcArgs } from './ipcSchema'
 import { rotateIfLarge } from './logRotate'
 
@@ -47,19 +52,6 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.UsersUpdate]: ['users.manage'],
   [IPC.RolesList]: ['users.read'],
   [IPC.AuditList]: ['audit.view'],
-  [IPC.CrmCustomersCreate]: ['crm.manage'],
-  [IPC.CrmCustomersUpdate]: ['crm.manage'],
-  [IPC.CrmContactsCreate]: ['crm.manage'],
-  [IPC.CrmLeadsCreate]: ['crm.manage'],
-  [IPC.CrmDealsCreate]: ['crm.manage'],
-  [IPC.CrmActivitiesCreate]: ['crm.manage'],
-  [IPC.CrmNotesCreate]: ['crm.manage'],
-  [IPC.CrmCustomersList]: 'authenticated',
-  [IPC.CrmContactsList]: 'authenticated',
-  [IPC.CrmLeadsList]: 'authenticated',
-  [IPC.CrmDealsList]: 'authenticated',
-  [IPC.CrmActivitiesList]: 'authenticated',
-  [IPC.CrmNotesList]: 'authenticated',
   [IPC.InvCategoriesCreate]: ['inventory.manage'],
   [IPC.InvUnitsCreate]: ['inventory.manage'],
   [IPC.InvProductsCreate]: ['inventory.manage'],
@@ -97,6 +89,11 @@ function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...ar
       const guard = channelGuards[channel]
       if (guard === 'authenticated') requireSession()
       else if (guard) requirePermission(...guard)
+      // Gate 2: re-check the licence on every call, not only at sign-in, so an expiry mid-session
+      // locks the business screens instead of letting them run to the next restart.
+      if (licenseRequired(channel) && !(await hasValidLicense().catch(() => false))) {
+        throw new Error('License required or expired')
+      }
       return await listener(event, ...args)
     } catch (error) {
       const safe = publicError(error)
@@ -172,6 +169,80 @@ function registerIpc(): void {
     return applyLicenseCode(code)
   })
 
+  // Database location. Administrators (database.manage) only; before sign-in only on a fresh install
+  // (no users yet) or while the database is unreachable, so a new cashier PC can join the shared server.
+  async function mayChangeDatabase(): Promise<void> {
+    try {
+      requirePermission('database.manage')
+      return
+    } catch {
+      if (!getDb() || (await isSetupRequired())) return
+      throw new Error('PERMISSION_DENIED')
+    }
+  }
+
+  /** Joining the main PC on the local network: its IP and join code become a connection string. */
+  function joinUri(input: { ip?: unknown; code?: unknown }): string {
+    if (!isPrivateLanIp(input?.ip)) throw new Error(DB_ERRORS.lanAddress)
+    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalizeJoinCode(input?.code))) throw new Error(DB_ERRORS.joinCode)
+    return lanUri(String(input.ip).trim(), LAN_PORT, String(input.code))
+  }
+
+  handle(IPC.DbConnectionGet, async () => {
+    await mayChangeDatabase()
+    const state = await describeDbMode()
+    const current = await loadDbMode()
+    // The join code is shown to a signed-in administrator only (never before sign-in).
+    let joinCode: string | undefined
+    try {
+      requirePermission('database.manage')
+      if (current.mode === 'host') joinCode = current.joinCode
+    } catch {
+      joinCode = undefined
+    }
+    return { ...state, ips: lanAddresses(), port: LAN_PORT, joinCode }
+  })
+
+  handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown; ip?: unknown; code?: unknown }) => {
+    await mayChangeDatabase()
+    return testSharedUri(input?.ip !== undefined ? joinUri(input) : input?.uri)
+  })
+
+  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown; ip?: unknown; code?: unknown }) => {
+    await mayChangeDatabase()
+    let hosts = ''
+    if (input?.mode === 'shared') {
+      hosts = (await testSharedUri(input.uri)).hosts
+      await saveDbMode({ mode: 'shared', uri: String(input.uri).trim() })
+    } else if (input?.mode === 'join') {
+      const uri = joinUri(input)
+      hosts = (await testSharedUri(uri)).hosts
+      await saveDbMode({ mode: 'shared', uri })
+    } else if (input?.mode === 'host') {
+      // Hosting needs this PC's own database; keep the code if it already hosts.
+      if (!getDb()) throw new Error(DB_ERRORS.unreachable)
+      const current = await loadDbMode()
+      await saveDbMode({ mode: 'host', joinCode: current.mode === 'host' ? current.joinCode : newJoinCode() })
+      hosts = lanAddresses().join(', ')
+    } else if (input?.mode === 'local') {
+      await saveDbMode({ mode: 'local' })
+    } else {
+      throw new Error('VALIDATION_FAILED')
+    }
+    await logAudit({
+      actorUsername: getCurrentSession()?.username ?? 'system:db-connection',
+      action: 'db.connection.change',
+      resource: 'settings',
+      details: { mode: input.mode, hosts }
+    }).catch(() => undefined)
+    // Restart so every module reconnects to the chosen database.
+    setTimeout(() => {
+      app.relaunch()
+      app.quit()
+    }, 500)
+    return { ok: true, restarting: true }
+  })
+
   handle(IPC.SettingsGet, async (event) => {
     assertTrusted(event)
     return getSettings()
@@ -216,6 +287,31 @@ function registerIpc(): void {
     return setupFirstAdmin(input as any)
   })
 
+  // Forgotten administrator password: request code → panel-signed reset code → new password.
+  // In memory only: a restart starts over. One request at a time; unlocked for 10 minutes.
+  let recovery: { requestCode: string; until: number; unlockedUntil?: number } | null = null
+
+  handle(IPC.AuthRecoveryStart, async () => {
+    if (!recovery || recovery.until < Date.now() || recovery.unlockedUntil) recovery = { requestCode: newJoinCode(), until: Date.now() + 2 * 3600_000 }
+    return { deviceId: (await getHardwareInfo()).deviceId, requestCode: recovery.requestCode }
+  })
+
+  handle(IPC.AuthRecoveryVerify, async (_event, input: { code?: unknown }) => {
+    if (!recovery || recovery.until < Date.now()) throw new Error(RESET_ERRORS.request)
+    const { deviceId } = await getHardwareInfo()
+    verifyResetCode(input?.code, { keys: PANEL_KEYS, deviceId, requestCode: recovery.requestCode, nowSeconds: Math.floor(Date.now() / 1000) })
+    recovery.unlockedUntil = Date.now() + 10 * 60_000
+    await logAudit({ actorUsername: 'system:recovery', action: 'password.recovery_unlocked', resource: 'users' }).catch(() => undefined)
+    return { admins: await listAdminUsernames() }
+  })
+
+  handle(IPC.AuthRecoveryReset, async (_event, input: { username?: unknown; password?: unknown }) => {
+    if (!recovery?.unlockedUntil || recovery.unlockedUntil < Date.now()) throw new Error(RESET_ERRORS.locked)
+    await recoverAdminPassword(input?.username, input?.password)
+    recovery = null // single use
+    return { ok: true }
+  })
+
   // No channel guard: a session that must change its password may call this, and only this.
   handle(IPC.AuthChangePassword, async (_event, input: unknown) => changePassword(input as any))
 
@@ -244,59 +340,6 @@ function registerIpc(): void {
     return listAudit(limit)
   })
 
-  handle(IPC.CrmCustomersList, async (event) => {
-    assertTrusted(event)
-    return listCustomers()
-  })
-  handle(IPC.CrmCustomersCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createCustomer(input)
-  })
-  handle(IPC.CrmCustomersUpdate, async (event, id: string, input: any) => {
-    assertTrusted(event)
-    return updateCustomer(id, input)
-  })
-  handle(IPC.CrmContactsList, async (event, customerId?: string) => {
-    assertTrusted(event)
-    return listContacts(customerId)
-  })
-  handle(IPC.CrmContactsCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createContact(input)
-  })
-  handle(IPC.CrmLeadsList, async (event) => {
-    assertTrusted(event)
-    return listLeads()
-  })
-  handle(IPC.CrmLeadsCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createLead(input)
-  })
-  handle(IPC.CrmDealsList, async (event) => {
-    assertTrusted(event)
-    return listDeals()
-  })
-  handle(IPC.CrmDealsCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createDeal(input)
-  })
-  handle(IPC.CrmActivitiesList, async (event, customerId?: string) => {
-    assertTrusted(event)
-    return listActivities(customerId)
-  })
-  handle(IPC.CrmActivitiesCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createActivity(input)
-  })
-  handle(IPC.CrmNotesList, async (event, customerId: string) => {
-    assertTrusted(event)
-    return listNotes(customerId)
-  })
-  handle(IPC.CrmNotesCreate, async (event, input: any) => {
-    assertTrusted(event)
-    return createNote(input)
-  })
-
   handle(IPC.InvCategoriesList, async (event) => { assertTrusted(event); return listCategories() })
   handle(IPC.InvCategoriesCreate, async (event, input: any) => { assertTrusted(event); return createCategory(input) })
   handle(IPC.InvUnitsList, async (event) => { assertTrusted(event); return listUnits() })
@@ -316,11 +359,11 @@ function registerIpc(): void {
   handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input, requireSession().username) })
   handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
   handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input, requireSession().username) })
-  handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason) })
-  handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason) })
+  handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason, requireSession().username) })
+  handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason, requireSession().username) })
   handle(IPC.PosCashboxList, async (event) => { assertTrusted(event); return listCashbox() })
   handle(IPC.PosShiftOpen, async (event, openingBalanceCents: number) => { assertTrusted(event); return openShift(requireSession().username, openingBalanceCents) })
-  handle(IPC.PosShiftClose, async (event) => { assertTrusted(event); return closeShift() })
+  handle(IPC.PosShiftClose, async (event) => { assertTrusted(event); return closeShift(requireSession().username) })
   handle(IPC.PosShiftsList, async (event) => { assertTrusted(event); return listShifts() })
 
   handle(IPC.ReportsSales, async (event) => { assertTrusted(event); return salesReport() })
@@ -354,10 +397,26 @@ if (!app.requestSingleInstanceLock()) {
     const auditFallback = join(app.getPath('userData'), 'audit-fallback.jsonl')
     await rotateIfLarge(auditFallback).catch(() => undefined)
     setAuditFallbackFile(auditFallback)
+    // Shared live database (several PCs, one server) or this PC's bundled database.
+    let shared = false
+    let hostCode: string | null = null
     try {
-      await startBundledMongo()
+      const mode = await loadDbMode()
+      if (mode.mode === 'shared') {
+        process.env['MONGODB_URI'] = mode.uri
+        shared = true
+      } else if (mode.mode === 'host') {
+        hostCode = mode.joinCode
+      }
     } catch (error) {
-      console.error('[main] bundled MongoDB failed to start', error)
+      console.error('[main] database setting unreadable; using this PC only', error instanceof Error ? error.message : error)
+    }
+    if (!shared) {
+      try {
+        await startBundledMongo(hostCode)
+      } catch (error) {
+        console.error('[main] bundled MongoDB failed to start', error)
+      }
     }
     await connectDb()
     try {
@@ -367,6 +426,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       await ensureAuthSchema()
+      await migrateRoles()
       // Gate 1 S5: verify the audit hash chain on every start; a break is itself audited.
       const chain = await verifyAuditLog()
       if (!chain.ok) {
@@ -375,11 +435,6 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch (error) {
       console.error('[main] auth schema setup failed', error)
-    }
-    try {
-      await ensureCrmSchema()
-    } catch (error) {
-      console.error('[main] crm schema setup failed', error)
     }
     try {
       await ensureInventorySchema()

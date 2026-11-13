@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MongoClient } from 'mongodb'
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { adminUri, appUri, createSecrets, directUri, isSecrets, secureBundledMongo, shutdownBundledMongo, type Endpoint } from '../../src/main/mongoAuth'
+import { testSharedUri } from '../../src/main/dbConnection'
+import { adminUri, appUri, createSecrets, directUri, isSecrets, lanUri, newJoinCode, secureBundledMongo, shutdownBundledMongo, type Endpoint } from '../../src/main/mongoAuth'
 
 // Gate 1 S4: real mongod with --keyFile. Binary: MONGOD_BIN (CI copies it from the mongo:9.0 service
 // container), else the vendored or installed Windows binary. In CI a missing binary is a failure.
@@ -115,6 +116,11 @@ describe.skipIf(!MONGOD)('bundled MongoDB access control (Gate 1 S4)', () => {
       }
     })).toBe('ok')
 
+    // dbHealth (src/main/db.ts) reads the version and topology as the app user, so both
+    // commands must be allowed without clusterMonitor/admin roles.
+    expect(await outcome(app, (c) => c.db('admin').command({ buildInfo: 1 }))).toBe('ok')
+    expect(await outcome(app, (c) => c.db('admin').command({ hello: 1 }))).toBe('ok')
+
     // App user: nothing outside its database, no user/role admin, no dropDatabase, no shutdown.
     expect(await outcome(app, (c) => c.db('other').collection('x').findOne({}))).toBe('Unauthorized')
     expect(await outcome(app, (c) => c.db('admin').collection('system.users').findOne({}))).toBe('Unauthorized')
@@ -124,6 +130,19 @@ describe.skipIf(!MONGOD)('bundled MongoDB access control (Gate 1 S4)', () => {
 
     // Wrong credentials are refused.
     expect(await outcome(appUri(e, createSecrets()), (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
+
+    // Hosting for the Wi-Fi: the join code signs in with app rights only; hosting off removes it.
+    const code = newJoinCode()
+    const lan = lanUri('127.0.0.1', e.port, code)
+    expect(await outcome(lan, (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
+    await secureBundledMongo(e, s, 'pharmacy_pos', code)
+    expect(await outcome(lan, (c) => c.db('pharmacy_pos').collection('items').insertOne({ name: 'from till 2' }))).toBe('ok')
+    expect(await outcome(lan, (c) => c.db('admin').command({ shutdown: 1 }))).toBe('Unauthorized')
+    // What 'Test connection' on the joining till checks: a replica set (transactions), reached directly.
+    expect((await testSharedUri(lan, 5000)).topology).toBe('replicaSet:rs0')
+    expect(await outcome(lanUri('127.0.0.1', e.port, newJoinCode()), (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
+    await secureBundledMongo(e, s, 'pharmacy_pos')
+    expect(await outcome(lan, (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
 
     await shutdownBundledMongo(e, s)
     await waitExit(p)
