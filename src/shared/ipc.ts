@@ -20,6 +20,9 @@ export const IPC = {
   AuthSetupRequired: 'auth:setup-required',
   AuthSetup: 'auth:setup',
   AuthChangePassword: 'auth:change-password',
+  AuthRecoveryStart: 'auth:recovery-start',
+  AuthRecoveryVerify: 'auth:recovery-verify',
+  AuthRecoveryReset: 'auth:recovery-reset',
   UsersList: 'users:list',
   UsersCreate: 'users:create',
   UsersUpdate: 'users:update',
@@ -101,6 +104,9 @@ export interface PreloadApi {
   authSetupRequired(): Promise<boolean>
   authSetup(input: LoginInput): Promise<LoginResult>
   authChangePassword(input: ChangePasswordInput): Promise<{ success: true }>
+  authRecoveryStart(): Promise<{ deviceId: string; requestCode: string }>
+  authRecoveryVerify(input: { code: string }): Promise<{ admins: string[] }>
+  authRecoveryReset(input: { username: string; password: string }): Promise<{ ok: true }>
   usersList(): Promise<User[]>
   usersCreate(input: Partial<User> & { password: string }): Promise<User>
   usersUpdate(id: string, input: Partial<User>): Promise<User>

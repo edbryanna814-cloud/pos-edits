@@ -428,3 +428,25 @@ export async function listAudit(limit = 100): Promise<AuditEvent[]> {
 export function listRoles() {
   return isAdminViewer() ? BUILTIN_ROLES : BUILTIN_ROLES.filter((r) => r.name !== ADMIN_ROLE)
 }
+
+/** Forgotten-password recovery (after a panel-signed reset code): the administrator accounts by name. */
+export async function listAdminUsernames(): Promise<string[]> {
+  const db = requireDb()
+  return (await db.collection<User>(USERS_COL).find({ role: ADMIN_ROLE }, { projection: { username: 1 } }).sort({ username: 1 }).toArray()).map((u) => u.username)
+}
+
+/** Sets a new password for an administrator account and reopens it (unlocked, active). Caller checks the reset code. */
+export async function recoverAdminPassword(username: unknown, newPassword: unknown): Promise<void> {
+  const db = requireDb()
+  const passwordError = newPasswordError(newPassword)
+  if (passwordError) throw new Error(passwordError)
+  const result = await db.collection<User>(USERS_COL).updateOne(
+    { username: String(username ?? ''), role: ADMIN_ROLE },
+    {
+      $set: { passwordHash: await hashPassword(String(newPassword)), active: true, mustChangePassword: false, updatedAt: new Date().toISOString() },
+      $unset: { failedLoginCount: '', lockedUntil: '' }
+    }
+  )
+  if (result.matchedCount !== 1) throw new Error('User not found')
+  await logAudit({ actorUsername: 'system:recovery', action: 'password.recovered', resource: 'users', details: { username: String(username) } })
+}

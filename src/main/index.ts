@@ -11,11 +11,13 @@ import { LAN_PORT, lanAddresses, startBundledMongo, stopBundledMongo } from './l
 import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { changePassword, createUser, ensureAuthSchema, migrateRoles, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
+import { changePassword, createUser, ensureAuthSchema, listAdminUsernames, migrateRoles, recoverAdminPassword, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
-import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
+import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
+import { PANEL_KEYS } from './panelKeys'
+import { RESET_ERRORS, verifyResetCode } from './recovery'
 import { licenseRequired } from './licenseGate'
 import { publicError, validateIpcArgs } from './ipcSchema'
 import { rotateIfLarge } from './logRotate'
@@ -283,6 +285,31 @@ function registerIpc(): void {
   handle(IPC.AuthSetup, async (_event, input: unknown) => {
     if (!(await hasValidLicense())) throw new Error('License required or expired')
     return setupFirstAdmin(input as any)
+  })
+
+  // Forgotten administrator password: request code → panel-signed reset code → new password.
+  // In memory only: a restart starts over. One request at a time; unlocked for 10 minutes.
+  let recovery: { requestCode: string; until: number; unlockedUntil?: number } | null = null
+
+  handle(IPC.AuthRecoveryStart, async () => {
+    if (!recovery || recovery.until < Date.now() || recovery.unlockedUntil) recovery = { requestCode: newJoinCode(), until: Date.now() + 2 * 3600_000 }
+    return { deviceId: (await getHardwareInfo()).deviceId, requestCode: recovery.requestCode }
+  })
+
+  handle(IPC.AuthRecoveryVerify, async (_event, input: { code?: unknown }) => {
+    if (!recovery || recovery.until < Date.now()) throw new Error(RESET_ERRORS.request)
+    const { deviceId } = await getHardwareInfo()
+    verifyResetCode(input?.code, { keys: PANEL_KEYS, deviceId, requestCode: recovery.requestCode, nowSeconds: Math.floor(Date.now() / 1000) })
+    recovery.unlockedUntil = Date.now() + 10 * 60_000
+    await logAudit({ actorUsername: 'system:recovery', action: 'password.recovery_unlocked', resource: 'users' }).catch(() => undefined)
+    return { admins: await listAdminUsernames() }
+  })
+
+  handle(IPC.AuthRecoveryReset, async (_event, input: { username?: unknown; password?: unknown }) => {
+    if (!recovery?.unlockedUntil || recovery.unlockedUntil < Date.now()) throw new Error(RESET_ERRORS.locked)
+    await recoverAdminPassword(input?.username, input?.password)
+    recovery = null // single use
+    return { ok: true }
   })
 
   // No channel guard: a session that must change its password may call this, and only this.

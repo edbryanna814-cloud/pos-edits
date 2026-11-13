@@ -1915,3 +1915,22 @@ h3 {
 .db-host-info p {
   margin: 0 0 4px;
 }
+
+.recovery-panel {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.recovery-codes {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.recovery-codes dd {
+  margin: 0;
+  font-weight: 600;
+  word-break: break-all;
+  user-select: all;
+}

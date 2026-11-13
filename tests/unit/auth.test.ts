@@ -190,6 +190,17 @@ describe('with MongoDB', () => {
     const seller = await auth.login({ username: 'seller1', password: 'Seller-Pass-001' }) // gitleaks:allow test-only credential
     expect(seller.user.permissions).toEqual(['pos.use', 'inventory.manage'])
   })
+
+  it('recovery: lists administrator names and resets only an administrator (unlocked, active, audited)', async () => {
+    expect(await auth.listAdminUsernames()).toEqual(['admin', 'owner'])
+    await users().updateOne({ username: 'owner' }, { $set: { lockedUntil: new Date(Date.now() + 1e6).toISOString(), failedLoginCount: 5, active: false } })
+    await expect(auth.recoverAdminPassword('owner', 'short')).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.recoverAdminPassword('seller1', 'Recovered-Pass-01')).rejects.toThrow('User not found')
+    await auth.recoverAdminPassword('owner', 'Recovered-Pass-01') // gitleaks:allow test-only credential
+    const r = await auth.login({ username: 'owner', password: 'Recovered-Pass-01' }) // gitleaks:allow test-only credential
+    expect(r.mustChangePassword).toBe(false)
+    expect((await audit()).map((e) => e.action)).toContain('password.recovered')
+  })
 })
 
 describe('audit chain in MongoDB (Gate 1 S5)', () => {

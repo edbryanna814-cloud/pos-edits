@@ -66,6 +66,9 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'authChangePassword',
         'authLogin',
         'authLogout',
+        'authRecoveryReset',
+        'authRecoveryStart',
+        'authRecoveryVerify',
         'authSetup',
         'authSetupRequired',
         'authState',
@@ -759,7 +762,13 @@ test('shared database: two tills on one server share users (A creates the admin,
       await wb.reload()
       expect(await wb.evaluate(() => (window as any).api.authSetupRequired())).toBe(false)
       await expect(wb.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible({ timeout: 10000 })
-      await wb.getByLabel('Username').fill('seller1')
+      // Forgotten password: both codes to send to the provider; a code not signed by the panel is refused.
+      await wb.getByRole('button', { name: 'Forgot username or password?' }).click()
+      await expect(wb.locator('.recovery-codes dd').nth(1)).toHaveText(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
+      await wb.getByLabel('Reset code').fill('RST1.e30.e30.AAAA')
+      await wb.getByRole('button', { name: 'Check reset code' }).click()
+      await expect(wb.getByRole('alert').filter({ hasText: 'not valid' })).toBeVisible()
+      await wb.getByLabel('Username', { exact: true }).fill('seller1')
       await wb.getByLabel('Password', { exact: true }).fill('Seller-Pass-001') // gitleaks:allow test-only credential
       await wb.getByRole('button', { name: /Login|Sign in/ }).click()
       // A seller sees only POS and Inventory, and opens on POS (no dashboard).

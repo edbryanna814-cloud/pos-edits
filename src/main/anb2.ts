@@ -32,6 +32,16 @@ const SUPPORTED_FPV = new Set([1])
 const SPKI_ED25519_PREFIX = Buffer.from('302a300506032b6570032100', 'hex')
 const MAX_TOKEN = 8192
 
+/** Ed25519 over "<parts[1]>.<parts[2]>" with the panel key named by kid (not retired). Used by leases and reset codes. */
+export function panelSignatureOk(parts: string[], kid: unknown, keys: PanelKey[]): boolean {
+  const key = keys.find((k) => k.kid === kid)
+  if (!key || key.retired) return false
+  const raw = Buffer.from(key.publicKey, 'base64')
+  if (raw.length !== 32) return false
+  const publicKey = createPublicKey({ key: Buffer.concat([SPKI_ED25519_PREFIX, raw]), format: 'der', type: 'spki' })
+  return verify(null, Buffer.from(`${parts[1]}.${parts[2]}`, 'ascii'), publicKey, Buffer.from(parts[3], 'base64url'))
+}
+
 /** Accepts the raw token or the text of a .anbc lease file. */
 export function extractToken(input: string): string {
   const text = String(input ?? '').trim()
@@ -80,14 +90,7 @@ export function verifyAnb2(
     throw new Error('Invalid license code format')
   }
   if (header.alg !== 'Ed25519' || header.typ !== 'ANB-ENT') throw new Error('Invalid license code format')
-  const key = opts.keys.find((k) => k.kid === header.kid)
-  if (!key || key.retired) throw new Error('Invalid license code signature')
-  const raw = Buffer.from(key.publicKey, 'base64')
-  if (raw.length !== 32) throw new Error('Invalid license code signature')
-  const publicKey = createPublicKey({ key: Buffer.concat([SPKI_ED25519_PREFIX, raw]), format: 'der', type: 'spki' })
-  if (!verify(null, Buffer.from(`${parts[1]}.${parts[2]}`, 'ascii'), publicKey, Buffer.from(parts[3], 'base64url'))) {
-    throw new Error('Invalid license code signature')
-  }
+  if (!panelSignatureOk(parts, header.kid, opts.keys)) throw new Error('Invalid license code signature')
   if (payload.v !== 2) throw new Error('Unsupported license code version')
   if (payload.prod !== PRODUCT) throw new Error('This license code is for a different product')
   if (payload.dev !== opts.deviceId) throw new Error('This license code belongs to a different device')

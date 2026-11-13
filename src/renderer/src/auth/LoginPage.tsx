@@ -3,6 +3,7 @@ import type { LoginResult } from '../../../shared/auth'
 import { t, type TranslationKey } from '../i18n'
 import type { Language } from '../../../shared/settings'
 import DatabaseLocation from '../DatabaseLocation'
+import RecoveryPanel from './RecoveryPanel'
 
 interface Props {
   language: Language
@@ -32,6 +33,7 @@ function errorText(language: Language, err: unknown): string {
 
 export default function LoginPage({ language, onLogin, dbUnavailable }: Props) {
   const [showDb, setShowDb] = useState(false)
+  const [showRecovery, setShowRecovery] = useState(false)
   const [mode, setMode] = useState<Mode>('checking')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -161,6 +163,12 @@ export default function LoginPage({ language, onLogin, dbUnavailable }: Props) {
           </button>
         ) : null}
         {showDb ? <DatabaseLocation language={language} /> : null}
+        {mode === 'login' && !dbUnavailable ? (
+          <button type="button" className="link-button" onClick={() => setShowRecovery(!showRecovery)}>
+            {language === 'ar' ? 'نسيت اسم المستخدم أو كلمة المرور؟' : 'Forgot username or password?'}
+          </button>
+        ) : null}
+        {showRecovery ? <RecoveryPanel language={language} /> : null}
       </section>
     </div>
   )
