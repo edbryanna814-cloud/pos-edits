@@ -170,10 +170,20 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - `installation/` now holds only `WHAT-TO-INSTALL.txt`. Installer 0.2.3 SHA-256
   `a7bcf2eb885ca73e05c75059742fc7844eda9ed74b91db08db0669c41c2b8a9e` (release asset, tag `field-test-0.2.3`).
 
+## Field-test 0.2.4 (2026-11-13): three roles, panel customer groups
+
+- `c31ff1d` roles: Administrator (all + `database.manage`), Manager (all except the database location;
+  Administrator users, their audit entries and the role are hidden and refused), Seller (POS + Inventory only).
+  Permissions come only from the role; custom per-user permissions removed. Old roles become Seller on startup.
+- Panel `1257d52`: customer groups (name, contact, product, payment type, price, currency, period, count saved
+  once); "Add device" needs only the device code, name and passphrase. Licenses listed per customer.
+- Installer 0.2.4 SHA-256 `b49d3d2ca8f6dbaf3aed585892d29b3ad005d6411c9c88bf17d4a84c2ee357ba` (release asset, tag `field-test-0.2.4`).
+- Open decision (owner): device-to-device link. Internet = one shared server (built). LAN host-by-IP mode not built.
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-13: field-test 0.2.3 (shared live database, receipt/expiry/dashboard fixes) built, smoke-tested and released as pre-release `field-test-0.2.3` with only the installer and a short txt.
+2026-11-13: field-test 0.2.4 (three roles; panel customer groups) built and released as pre-release `field-test-0.2.4` with only the installer and a short txt.
