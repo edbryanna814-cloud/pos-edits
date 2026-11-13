@@ -197,10 +197,20 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Panel `b4edc37`: Licenses → Forgotten password (product, device code, request code, passphrase); audited.
 - Installer 0.2.6 SHA-256 `af0792bf419a56d8e045ab032961f4b98f68bd79c9848fd1030176cc5af314ca` (release asset, tag `field-test-0.2.6`).
 
+## Field test closed (2026-11-13)
+
+- Owner: field-test job finalized. 0.2.6 published as the latest release of the private distribution repo
+  `Anubis-hub/pharmacy-pos-release` (README + WHAT-TO-INSTALL + installer, no source), tag `v0.2.6`,
+  SHA-256 `af0792bf419a56d8e045ab032961f4b98f68bd79c9848fd1030176cc5af314ca`.
+- Owner-confirmed deletions on the laptop: old app data backup, the app's own database, dev test databases
+  (pharmacy_pos, pharmacy_pos_gatecheck, pharmacy_pos_shot, anubis_switcher_scratch_a3). Panel Atlas data untouched.
+- Still open: PR #2 (Gate 1) and `field-test/0.2.0` not merged to main; panel default period still 'hour'
+  (set to month after testing); MongoDB SSPL legal opinion before any sale.
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-13: field-test 0.2.6 (forgotten password recovery via panel-signed reset code) built and released as pre-release `field-test-0.2.6`.
+2026-11-13: field test closed; 0.2.6 published in private repo Anubis-hub/pharmacy-pos-release (tag v0.2.6).
