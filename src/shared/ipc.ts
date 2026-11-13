@@ -1,5 +1,5 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
-import type { AuthState, LoginInput, LoginResult, Permission, User } from './auth'
+import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
 import type { Activity, Contact, Customer, Deal, Lead, Note } from './crm'
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
 import type { CashboxMovement, CashierShift, Payment, Return, Sale } from './pos'
@@ -15,6 +15,9 @@ export const IPC = {
   AuthLogin: 'auth:login',
   AuthLogout: 'auth:logout',
   AuthState: 'auth:state',
+  AuthSetupRequired: 'auth:setup-required',
+  AuthSetup: 'auth:setup',
+  AuthChangePassword: 'auth:change-password',
   UsersList: 'users:list',
   UsersCreate: 'users:create',
   UsersUpdate: 'users:update',
@@ -103,11 +106,15 @@ export interface PreloadApi {
   dbHealth(): Promise<DbHealth>
   getSettings(): Promise<StoredCompanySettings | null>
   saveSettings(input: CompanySettings): Promise<StoredCompanySettings>
-  exportBackup(): Promise<BackupResult>
-  importBackup(): Promise<BackupResult>
+  /** Gate 1 S4: the passphrase encrypts the backup; it is never stored. */
+  exportBackup(input: { passphrase: string }): Promise<BackupResult>
+  importBackup(input: { passphrase?: string }): Promise<BackupResult>
   authLogin(input: LoginInput): Promise<LoginResult>
   authLogout(token: string): Promise<{ success: boolean }>
   authState(token?: string): Promise<AuthState>
+  authSetupRequired(): Promise<boolean>
+  authSetup(input: LoginInput): Promise<LoginResult>
+  authChangePassword(input: ChangePasswordInput): Promise<{ success: true }>
   usersList(): Promise<User[]>
   usersCreate(input: Partial<User> & { password: string }): Promise<User>
   usersUpdate(id: string, input: Partial<User>): Promise<User>

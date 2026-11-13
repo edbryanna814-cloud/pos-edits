@@ -32,19 +32,29 @@ export type User = {
   role: string
   permissions?: Permission[]
   active: boolean
+  mustChangePassword?: boolean
+  failedLoginCount?: number
+  lockedUntil?: string
   createdAt: string
   updatedAt: string
 }
 
 export type Session = {
   _id?: string
-  token: string
+  /** SHA-256 of the session token; the raw token is never stored. */
+  tokenHash: string
   userId: string
   username: string
   role: string
   permissions: Permission[]
+  mustChangePassword?: boolean
   expiresAt: string
   createdAt: string
+}
+
+export type ChangePasswordInput = {
+  currentPassword: string
+  newPassword: string
 }
 
 export type AuditEvent = {
@@ -73,6 +83,8 @@ export type LoginResult = {
     permissions: Permission[]
   }
   expiresAt: string
+  /** True after a legacy-hash migration or an administrator reset: only changePassword is allowed. */
+  mustChangePassword?: boolean
 }
 
 export type AuthState = {

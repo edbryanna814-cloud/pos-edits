@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, session } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -8,12 +8,14 @@ import { closeDb, connectDb, dbHealth } from './db'
 import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { createDefaultAdminIfMissing, createUser, ensureAuthSchema, getAuthState, listAudit, listRoles, listUsers, login, logout, requirePermission, requireSession, updateUser } from './auth'
+import { changePassword, createUser, ensureAuthSchema, getAuthState, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { createActivity, createContact, createCustomer, createDeal, createLead, createNote, ensureCrmSchema, listActivities, listContacts, listCustomers, listDeals, listLeads, listNotes, updateCustomer } from './crm'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getLicenseState, hasValidLicense } from './license'
+import { publicError, validateIpcArgs } from './ipcSchema'
+import { rotateIfLarge } from './logRotate'
 
 const rendererUrl = process.env['ELECTRON_RENDERER_URL']
 const isDev = Boolean(rendererUrl)
@@ -89,11 +91,22 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
 
 function handle(channel: IpcChannel, listener: (event: IpcMainInvokeEvent, ...args: any[]) => any): void {
   ipcMain.handle(channel, async (event, ...args) => {
-    assertTrusted(event)
-    const guard = channelGuards[channel]
-    if (guard === 'authenticated') requireSession()
-    else if (guard) requirePermission(...guard)
-    return listener(event, ...args)
+    try {
+      assertTrusted(event)
+      validateIpcArgs(channel, args) // Gate 1 S3: schema + NoSQL-operator/size checks for every channel
+      const guard = channelGuards[channel]
+      if (guard === 'authenticated') requireSession()
+      else if (guard) requirePermission(...guard)
+      return await listener(event, ...args)
+    } catch (error) {
+      const safe = publicError(error)
+      // Gate 1 S4: no message text here. Driver messages can carry data (E11000 prints the duplicate value).
+      if (safe.message !== (error as Error)?.message) {
+        const e = error as { name?: string; code?: unknown; codeName?: string }
+        console.error(`[ipc] ${channel} failed`, { name: e?.name, code: e?.code, codeName: e?.codeName })
+      }
+      throw safe
+    }
   })
 }
 
@@ -111,7 +124,9 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webSecurity: true
+      webSecurity: true,
+      // Gate 1 S2: no DevTools in a packaged (production) build.
+      devTools: !app.isPackaged
     }
   })
 
@@ -167,14 +182,14 @@ function registerIpc(): void {
     return saveSettings(input)
   })
 
-  handle(IPC.BackupExport, async (event) => {
+  handle(IPC.BackupExport, async (event, input: { passphrase?: unknown }) => {
     assertTrusted(event)
-    return exportBackup(senderWindow(event))
+    return exportBackup(senderWindow(event), input)
   })
 
-  handle(IPC.BackupImport, async (event) => {
+  handle(IPC.BackupImport, async (event, input: { passphrase?: unknown }) => {
     assertTrusted(event)
-    return importBackup(senderWindow(event))
+    return importBackup(senderWindow(event), input)
   })
 
   handle(IPC.AuthLogin, async (event, input: unknown) => {
@@ -193,6 +208,16 @@ function registerIpc(): void {
     assertTrusted(event)
     return getAuthState(token)
   })
+
+  handle(IPC.AuthSetupRequired, async () => isSetupRequired())
+
+  handle(IPC.AuthSetup, async (_event, input: unknown) => {
+    if (!(await hasValidLicense())) throw new Error('License required or expired')
+    return setupFirstAdmin(input as any)
+  })
+
+  // No channel guard: a session that must change its password may call this, and only this.
+  handle(IPC.AuthChangePassword, async (_event, input: unknown) => changePassword(input as any))
 
   handle(IPC.UsersList, async (event) => {
     assertTrusted(event)
@@ -314,7 +339,21 @@ if (!app.requestSingleInstanceLock()) {
     }
   })
 
+  // Gate 1 S2: app-wide guards for every webContents, not only the main window.
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('will-attach-webview', (event) => event.preventDefault())
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  })
+
   app.whenReady().then(async () => {
+    // Deny every permission (camera, microphone, geolocation, notifications, …) except the
+    // clipboard write used by the device-code copy button.
+    const allowedPermissions = new Set(['clipboard-sanitized-write'])
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowedPermissions.has(permission)))
+    session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowedPermissions.has(permission))
+    const auditFallback = join(app.getPath('userData'), 'audit-fallback.jsonl')
+    await rotateIfLarge(auditFallback).catch(() => undefined)
+    setAuditFallbackFile(auditFallback)
     try {
       await startBundledMongo()
     } catch (error) {
@@ -328,7 +367,12 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       await ensureAuthSchema()
-      await createDefaultAdminIfMissing()
+      // Gate 1 S5: verify the audit hash chain on every start; a break is itself audited.
+      const chain = await verifyAuditLog()
+      if (!chain.ok) {
+        console.error('[audit] chain verification failed', chain)
+        await logAudit({ action: 'audit.chain_broken', resource: 'audit', details: { brokenAtSeq: chain.brokenAtSeq, reason: chain.reason } })
+      }
     } catch (error) {
       console.error('[main] auth schema setup failed', error)
     }

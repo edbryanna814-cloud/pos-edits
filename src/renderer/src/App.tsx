@@ -426,7 +426,8 @@ export default function App() {
   }
 
   const languageToggle = (
-    <div style={{ position: 'absolute', top: 10, insetInlineEnd: 10 }}>
+    // zIndex: without it .login-shell (position: relative, later in the DOM) covers the toggle before sign-in.
+    <div style={{ position: 'absolute', top: 10, insetInlineEnd: 10, zIndex: 1 }}>
       <div className="language-toggle" role="group" aria-label={t(language, 'language')}>
         <button type="button" className={language === 'en' ? 'active' : ''} aria-pressed={language === 'en'} onClick={() => setLanguage('en')}>EN</button>
         <button type="button" className={language === 'ar' ? 'active' : ''} aria-pressed={language === 'ar'} onClick={() => setLanguage('ar')}>AR</button>

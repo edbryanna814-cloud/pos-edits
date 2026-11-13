@@ -5,7 +5,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $serviceName = 'MongoDB'
-$logFile = 'C:\Program Files\MongoDB\Server\9.0\log\mongod.log'
+# Gate 1 S6: find the log through the installed service's --config file, not a hard-coded version folder.
+function Get-MongoLogFile {
+  $svc = Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue
+  if ($svc -and $svc.PathName -match '--config\s+"?([^"]+?\.cfg)"?') {
+    $line = Select-String -Path $Matches[1] -Pattern '^\s*path:\s*(.+)$' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($line) { return $line.Matches[0].Groups[1].Value.Trim() }
+  }
+  return '(unknown: service or config not found)'
+}
+$logFile = Get-MongoLogFile
 
 function Get-MongoService {
   Get-Service -Name $serviceName -ErrorAction SilentlyContinue

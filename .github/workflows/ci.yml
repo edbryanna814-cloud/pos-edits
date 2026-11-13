@@ -9,19 +9,58 @@ permissions:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # matches the mongod build used by the access-control tests
+    services:
+      # Auth integration tests (tests/unit/auth.test.ts) need a real MongoDB. CI only; never shipped.
+      mongo:
+        image: mongo:9.0
+        ports:
+          - 27017:27017
     env:
       # The build and unit tests do not launch Electron.
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      MONGODB_TEST_URI: mongodb://127.0.0.1:27017/?directConnection=true
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for the secret scan
+      - name: Secret scan (gitleaks 8.30.1, full history)
+        env:
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          curl -sSfL -o gitleaks.tgz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "$GITLEAKS_SHA256  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+          ./gitleaks git . --log-opts=--all --redact --no-banner
+          rm -f gitleaks gitleaks.tgz
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Electron 45 runs Node 24.
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
       - name: Signing / issuance scan
         run: npm run scan:signing
+      - name: mongod 9.0.8 for the access-control tests (official build, SHA-256 verified)
+        env:
+          MONGOD_TGZ: mongodb-linux-x86_64-ubuntu2404-9.0.8.tgz
+          MONGOD_SHA256: 834da9b0eb7cd5dcd95f69a56f3a249505307e12026f7b0951d5e502dde4b26a
+        run: |
+          set -o pipefail
+          cd "$RUNNER_TEMP"
+          curl -sSfL -o "$MONGOD_TGZ" "https://fastdl.mongodb.org/linux/$MONGOD_TGZ"
+          echo "$MONGOD_SHA256  $MONGOD_TGZ" | sha256sum -c -
+          tar -xzf "$MONGOD_TGZ" --strip-components=2 --wildcards '*/bin/mongod'
+          ./mongod --version | head -1
+          echo "MONGOD_BIN=$RUNNER_TEMP/mongod" >> "$GITHUB_ENV"
       - run: npm run test:unit
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+      - name: SBOM + licence check
+        run: npm run sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: release/sbom.cdx.json
