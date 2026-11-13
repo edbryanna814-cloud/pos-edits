@@ -13,7 +13,7 @@ describe('IPC schema (Gate 1 S3)', () => {
 
   it('accepts well-formed arguments', () => {
     ok(() => validateIpcArgs(IPC.AuthLogin, [{ username: 'owner', password: 'x' }]))
-    ok(() => validateIpcArgs(IPC.UsersUpdate, ['65a1b2c3d4e5f60718293a4b', { role: 'Cashier' }]))
+    ok(() => validateIpcArgs(IPC.UsersUpdate, ['65a1b2c3d4e5f60718293a4b', { role: 'Seller' }]))
     ok(() => validateIpcArgs(IPC.AuditList, []))
     ok(() => validateIpcArgs(IPC.AuditList, [undefined]))
     ok(() => validateIpcArgs(IPC.PosCashIn, [500, 'float']))

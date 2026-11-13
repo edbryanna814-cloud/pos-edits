@@ -9,6 +9,8 @@ interface Props {
   settingsError: string
   onSaved: (settings: StoredCompanySettings) => void
   onReload: () => void
+  /** Only administrators see where the database lives. */
+  canManageDatabase: boolean
 }
 
 interface FormState {
@@ -59,7 +61,8 @@ export default function SettingsPage({
   language,
   settingsError,
   onSaved,
-  onReload
+  onReload,
+  canManageDatabase
 }: Props) {
   const [form, setForm] = useState<FormState>(() => toForm(settings))
   const [saving, setSaving] = useState(false)
@@ -275,7 +278,7 @@ export default function SettingsPage({
           {error}
         </p>
       ) : null}
-      <DatabaseLocation language={language} />
+      {canManageDatabase ? <DatabaseLocation language={language} /> : null}
     </section>
   )
 }

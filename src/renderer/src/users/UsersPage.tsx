@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { Permission, Role, User } from '../../../shared/auth'
+import type { Role, User } from '../../../shared/auth'
 import type { Language } from '../../../shared/settings'
 import { formatDateTime } from '../money'
 
@@ -74,19 +74,6 @@ const copy = {
   }
 } as const
 
-const ALL_PERMISSIONS: Permission[] = [
-  'users.read',
-  'users.manage',
-  'roles.manage',
-  'permissions.manage',
-  'pos.use',
-  'inventory.manage',
-  'reports.view',
-  'cashbox.manage',
-  'settings.manage',
-  'audit.view'
-]
-
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
@@ -99,8 +86,7 @@ export default function UsersPage({ language }: Props) {
   const [editing, setEditing] = useState<User | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('Cashier')
-  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [role, setRole] = useState('Seller')
   const [active, setActive] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -136,8 +122,7 @@ export default function UsersPage({ language }: Props) {
     setEditing(null)
     setUsername('')
     setPassword('')
-    setRole('Cashier')
-    setPermissions([])
+    setRole('Seller')
     setActive(true)
   }
 
@@ -148,7 +133,6 @@ export default function UsersPage({ language }: Props) {
     setUsername(user.username)
     setPassword('')
     setRole(user.role)
-    setPermissions(user.permissions ?? [])
     setActive(user.active !== false)
   }
 
@@ -157,13 +141,6 @@ export default function UsersPage({ language }: Props) {
     setEditing(null)
     setUsername('')
     setPassword('')
-    setPermissions([])
-  }
-
-  function togglePermission(permission: Permission): void {
-    setPermissions((current) =>
-      current.includes(permission) ? current.filter((item) => item !== permission) : [...current, permission]
-    )
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -179,7 +156,6 @@ export default function UsersPage({ language }: Props) {
         await window.api.usersUpdate(editing._id, {
           role,
           active,
-          permissions: permissions.length > 0 ? permissions : undefined,
           ...(password ? { password } : {})
         })
       } else {
@@ -187,8 +163,7 @@ export default function UsersPage({ language }: Props) {
           username: trimmed,
           password,
           role,
-          active,
-          permissions: permissions.length > 0 ? permissions : undefined
+          active
         })
       }
       closeForm()
@@ -239,17 +214,6 @@ export default function UsersPage({ language }: Props) {
               <input type="checkbox" checked={active} onChange={(event) => setActive(event.target.checked)} />
               <span>{text.active}</span>
             </label>
-            <fieldset className="permissions-field wide">
-              <legend>{text.permissions}</legend>
-              <div className="permissions-grid">
-                {ALL_PERMISSIONS.map((permission) => (
-                  <label key={permission} className="checkbox">
-                    <input type="checkbox" checked={permissions.includes(permission)} onChange={() => togglePermission(permission)} />
-                    <span>{permission}</span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
           </div>
           <div className="form-actions">
             <button type="submit" className="primary" disabled={busy}>{busy ? text.saving : text.save}</button>
@@ -300,7 +264,6 @@ export default function UsersPage({ language }: Props) {
               </div>
               <dl className="stat-list">
                 <div><dt>{text.created}</dt><dd>{formatDateTime(user.createdAt, language)}</dd></div>
-                <div><dt>{text.permissions}</dt><dd>{user.permissions?.length ?? 0}</dd></div>
               </dl>
               <div className="form-actions">
                 <button type="button" onClick={() => openEdit(user)}>{text.edit}</button>

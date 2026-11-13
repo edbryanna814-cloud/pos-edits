@@ -747,11 +747,18 @@ test('shared database: two tills on one server share users (A creates the admin,
       // Till A: first run on the shared server creates the administrator.
       await signIn(wa)
       await expect(wa.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
-      // Till B: the same account now exists for it; no setup, sign in directly.
+      // The administrator adds a seller; till B sees that user at once (no setup) and signs in with it.
+      await wa.evaluate(() => (window as any).api.usersCreate({ username: 'seller1', password: 'Seller-Pass-001', role: 'Seller' })) // gitleaks:allow test-only credential
       await wb.reload()
       expect(await wb.evaluate(() => (window as any).api.authSetupRequired())).toBe(false)
-      await signIn(wb)
-      await expect(wb.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+      await expect(wb.getByRole('heading', { name: 'Sign in', level: 1 })).toBeVisible({ timeout: 10000 })
+      await wb.getByLabel('Username').fill('seller1')
+      await wb.getByLabel('Password', { exact: true }).fill('Seller-Pass-001') // gitleaks:allow test-only credential
+      await wb.getByRole('button', { name: /Login|Sign in/ }).click()
+      // A seller sees only POS and Inventory, and opens on POS (no dashboard).
+      const nav = wb.getByRole('navigation')
+      await expect(nav.getByRole('button')).toHaveText([/POS|Point of sale/i, /Inventory/i], { timeout: 10000 })
+      await expect(wb.getByRole('heading', { name: 'Dashboard', level: 1 })).toHaveCount(0)
       // Both tills write to one audit chain, which still verifies (seq is unique across devices).
       const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
       await client.connect()

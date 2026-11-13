@@ -10,7 +10,7 @@ import { testSharedUri } from './dbConnection'
 import { startBundledMongo, stopBundledMongo } from './localDb'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
-import { changePassword, createUser, ensureAuthSchema, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
+import { changePassword, createUser, ensureAuthSchema, migrateRoles, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
@@ -166,11 +166,11 @@ function registerIpc(): void {
     return applyLicenseCode(code)
   })
 
-  // Database location. Admins (settings.manage) may change it; before sign-in only on a fresh install
+  // Database location. Administrators (database.manage) only; before sign-in only on a fresh install
   // (no users yet) or while the database is unreachable, so a new cashier PC can join the shared server.
   async function mayChangeDatabase(): Promise<void> {
     try {
-      requirePermission('settings.manage')
+      requirePermission('database.manage')
       return
     } catch {
       if (!getDb() || (await isSetupRequired())) return
@@ -178,7 +178,10 @@ function registerIpc(): void {
     }
   }
 
-  handle(IPC.DbConnectionGet, async () => describeDbMode())
+  handle(IPC.DbConnectionGet, async () => {
+    await mayChangeDatabase()
+    return describeDbMode()
+  })
 
   handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown }) => {
     await mayChangeDatabase()
@@ -365,6 +368,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     try {
       await ensureAuthSchema()
+      await migrateRoles()
       // Gate 1 S5: verify the audit hash chain on every start; a break is itself audited.
       const chain = await verifyAuditLog()
       if (!chain.ok) {

@@ -35,7 +35,8 @@ const sections: Section[] = [
     id: 'dashboard',
     labelKey: 'dashboard',
     titleKey: 'dashboardTitle',
-    descriptionKey: 'dashboardDesc'
+    descriptionKey: 'dashboardDesc',
+    permission: 'reports.view'
   },
   {
     id: 'pos',
@@ -216,6 +217,10 @@ export default function App() {
   const visibleSections = sections.filter(
     (item) => !item.permission || (authUser?.permissions ?? []).includes(item.permission)
   )
+  // A Seller has no dashboard: open the first page this role may see.
+  useEffect(() => {
+    if (authUser && visibleSections.length && !visibleSections.some((item) => item.id === active)) setActive(visibleSections[0].id)
+  }, [authUser, active])
   const currency = settings?.currencyCode ?? ''
   const taxRateBasisPoints = settings?.taxRateBasisPoints ?? 0
   const dbConnected = db?.status === 'connected'
@@ -542,6 +547,7 @@ export default function App() {
             settingsError={settingsError}
             onSaved={handleSaved}
             onReload={handleReload}
+            canManageDatabase={(authUser?.permissions ?? []).includes('database.manage')}
           />
         ) : active === 'users' ? (
           <UsersPage language={language} />        ) : active === 'audit' ? (
