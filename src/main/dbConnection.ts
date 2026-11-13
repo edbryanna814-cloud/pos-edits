@@ -10,10 +10,20 @@ export const DB_ERRORS = {
   auth: 'DB_LOGIN_REQUIRED',
   unreachable: 'DB_UNREACHABLE',
   authFailed: 'DB_AUTH_FAILED',
-  noTransactions: 'DB_NO_TRANSACTIONS'
+  noTransactions: 'DB_NO_TRANSACTIONS',
+  lanAddress: 'DB_LAN_ADDRESS_INVALID',
+  joinCode: 'DB_JOIN_CODE_INVALID'
 } as const
 
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+
+/** A private local-network IPv4 address (10.x, 172.16-31.x, 192.168.x): the main PC on the same Wi-Fi. */
+export function isPrivateLanIp(value: unknown): boolean {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(String(value ?? '').trim())
+  if (!m || m.slice(1).some((n) => Number(n) > 255)) return false
+  const [a, b] = [Number(m[1]), Number(m[2])]
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+}
 
 type Parsed = { srv: boolean; hosts: string[]; username: string; params: URLSearchParams }
 
@@ -35,7 +45,10 @@ export function validateSharedUri(value: unknown): string {
   if (!uri || uri.length > 2000) throw new Error(DB_ERRORS.invalid)
   const parsed = parse(uri)
   const local = parsed.hosts.every((h) => LOCAL_HOSTS.has(h))
-  if (!local) {
+  const lan = parsed.hosts.every((h) => isPrivateLanIp(h))
+  if (lan && !parsed.username) throw new Error(DB_ERRORS.auth)
+  // The local network is exempt from TLS (see localDb.ts), never from the login.
+  if (!local && !lan) {
     const tls = parsed.srv || ['tls', 'ssl'].some((k) => parsed.params.get(k) === 'true')
     if (!tls) throw new Error(DB_ERRORS.tls)
     if (['tlsInsecure', 'tlsAllowInvalidCertificates', 'tlsAllowInvalidHostnames'].some((k) => parsed.params.get(k) === 'true')) {

@@ -685,7 +685,14 @@ test('shared database: settings panel tests a connection; sign-in offers it whil
     await window.getByRole('button', { name: 'Settings', exact: true }).click()
     await expect(window.getByRole('heading', { name: 'Database location' })).toBeVisible()
     await expect(window.getByText('Now: This computer only')).toBeVisible()
-    await window.getByLabel('Shared server (several devices)').check()
+    // Local network: the other device types the main computer's IP and join code.
+    await window.getByLabel('Connect to the main computer on this Wi-Fi').check()
+    await window.getByLabel('Main computer’s IP address').fill('8.8.8.8')
+    await window.getByLabel('Join code').fill('ABCD-EFGH-JKMN')
+    await window.getByRole('button', { name: 'Test connection' }).click()
+    await expect(window.getByRole('alert').filter({ hasText: 'Wi-Fi IP address' })).toBeVisible()
+    await expect(window.getByRole('button', { name: 'Save and restart' })).toBeDisabled()
+    await window.getByLabel('Shared server over the internet (several branches)').check()
     const field = window.getByLabel('Connection string')
     await field.fill('mongodb://pos:secret@db.example.com:27017/')
     await window.getByRole('button', { name: 'Test connection' }).click()
@@ -741,7 +748,7 @@ test('shared database: two tills on one server share users (A creates the admin,
       const wb = await b.firstWindow()
       for (const w of [wa, wb]) {
         await expect(w.getByRole('heading', { name: /^(Sign in|Create the administrator account)$/, level: 1 })).toBeVisible({ timeout: 15000 })
-        expect(await w.evaluate(() => (window as any).api.dbConnectionGet())).toEqual({ mode: 'shared', hosts: '127.0.0.1' })
+        expect(await w.evaluate(() => (window as any).api.dbConnectionGet())).toMatchObject({ mode: 'shared', hosts: '127.0.0.1', port: 27028 })
         expect((await w.evaluate(() => (window as any).api.dbHealth())).status).toBe('connected')
       }
       // Till A: first run on the shared server creates the administrator.

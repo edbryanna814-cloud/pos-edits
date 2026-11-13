@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { describeUri, testSharedUri, validateSharedUri } from '../../src/main/dbConnection'
+import { describeUri, isPrivateLanIp, testSharedUri, validateSharedUri } from '../../src/main/dbConnection'
+import { lanUri, newJoinCode } from '../../src/main/mongoAuth'
 
 // Shared live database (several tills, one server). CI: mongo:9.0 service (standalone); local: rs0.
 const LOCAL = process.env['MONGODB_TEST_URI'] ?? 'mongodb://127.0.0.1:27017/?directConnection=true'
@@ -23,6 +24,16 @@ describe('shared database connection', () => {
 
   it('allows a server on this PC without TLS', () => {
     expect(validateSharedUri('mongodb://127.0.0.1:27017/?replicaSet=rs0')).toContain('127.0.0.1')
+  })
+
+  it('local network: the main PC by its private IP, login required, no TLS', () => {
+    for (const ip of ['192.168.1.10', '10.0.0.5', '172.16.0.1', '172.31.255.254']) expect(isPrivateLanIp(ip)).toBe(true)
+    for (const ip of ['8.8.8.8', '172.32.0.1', '192.169.1.1', '256.1.1.1', '192.168.1', '', 'host.local']) expect(isPrivateLanIp(ip)).toBe(false)
+    const code = newJoinCode()
+    expect(code).toMatch(/^[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}$/)
+    expect(validateSharedUri(lanUri('192.168.1.10', 27028, code.toLowerCase()))).toBe(`mongodb://pharmacy_lan:${code}@192.168.1.10:27028/?directConnection=true&authSource=admin`)
+    expect(() => validateSharedUri('mongodb://192.168.1.10:27028/')).toThrow('DB_LOGIN_REQUIRED')
+    expect(() => validateSharedUri('mongodb://pos:x@203.0.113.9:27028/')).toThrow('DB_TLS_REQUIRED')
   })
 
   it('never shows the user or password', () => {

@@ -6,8 +6,9 @@ import { IPC, type IpcChannel } from '../shared/ipc'
 import type { Permission } from '../shared/auth'
 import { closeDb, connectDb, dbHealth, getDb } from './db'
 import { describeDbMode, loadDbMode, saveDbMode } from './dbConfig'
-import { testSharedUri } from './dbConnection'
-import { startBundledMongo, stopBundledMongo } from './localDb'
+import { DB_ERRORS, isPrivateLanIp, testSharedUri } from './dbConnection'
+import { LAN_PORT, lanAddresses, startBundledMongo, stopBundledMongo } from './localDb'
+import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { changePassword, createUser, ensureAuthSchema, migrateRoles, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
@@ -178,22 +179,49 @@ function registerIpc(): void {
     }
   }
 
+  /** Joining the main PC on the local network: its IP and join code become a connection string. */
+  function joinUri(input: { ip?: unknown; code?: unknown }): string {
+    if (!isPrivateLanIp(input?.ip)) throw new Error(DB_ERRORS.lanAddress)
+    if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalizeJoinCode(input?.code))) throw new Error(DB_ERRORS.joinCode)
+    return lanUri(String(input.ip).trim(), LAN_PORT, String(input.code))
+  }
+
   handle(IPC.DbConnectionGet, async () => {
     await mayChangeDatabase()
-    return describeDbMode()
+    const state = await describeDbMode()
+    const current = await loadDbMode()
+    // The join code is shown to a signed-in administrator only (never before sign-in).
+    let joinCode: string | undefined
+    try {
+      requirePermission('database.manage')
+      if (current.mode === 'host') joinCode = current.joinCode
+    } catch {
+      joinCode = undefined
+    }
+    return { ...state, ips: lanAddresses(), port: LAN_PORT, joinCode }
   })
 
-  handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown }) => {
+  handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown; ip?: unknown; code?: unknown }) => {
     await mayChangeDatabase()
-    return testSharedUri(input?.uri)
+    return testSharedUri(input?.ip !== undefined ? joinUri(input) : input?.uri)
   })
 
-  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown }) => {
+  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown; ip?: unknown; code?: unknown }) => {
     await mayChangeDatabase()
     let hosts = ''
     if (input?.mode === 'shared') {
       hosts = (await testSharedUri(input.uri)).hosts
       await saveDbMode({ mode: 'shared', uri: String(input.uri).trim() })
+    } else if (input?.mode === 'join') {
+      const uri = joinUri(input)
+      hosts = (await testSharedUri(uri)).hosts
+      await saveDbMode({ mode: 'shared', uri })
+    } else if (input?.mode === 'host') {
+      // Hosting needs this PC's own database; keep the code if it already hosts.
+      if (!getDb()) throw new Error(DB_ERRORS.unreachable)
+      const current = await loadDbMode()
+      await saveDbMode({ mode: 'host', joinCode: current.mode === 'host' ? current.joinCode : newJoinCode() })
+      hosts = lanAddresses().join(', ')
     } else if (input?.mode === 'local') {
       await saveDbMode({ mode: 'local' })
     } else {
@@ -344,18 +372,21 @@ if (!app.requestSingleInstanceLock()) {
     setAuditFallbackFile(auditFallback)
     // Shared live database (several PCs, one server) or this PC's bundled database.
     let shared = false
+    let hostCode: string | null = null
     try {
       const mode = await loadDbMode()
       if (mode.mode === 'shared') {
         process.env['MONGODB_URI'] = mode.uri
         shared = true
+      } else if (mode.mode === 'host') {
+        hostCode = mode.joinCode
       }
     } catch (error) {
       console.error('[main] database setting unreadable; using this PC only', error instanceof Error ? error.message : error)
     }
     if (!shared) {
       try {
-        await startBundledMongo()
+        await startBundledMongo(hostCode)
       } catch (error) {
         console.error('[main] bundled MongoDB failed to start', error)
       }
