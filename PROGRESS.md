@@ -189,10 +189,18 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Not tested: hosting in the packaged app across two real PCs (E2E runs unpackaged); Windows Firewall prompt.
 - Installer 0.2.5 SHA-256 `f4d6278bb21f7912aca81d164f45631e24ae141586a8f4849b198ac266cbd29f` (release asset, tag `field-test-0.2.5`).
 
+## Field-test 0.2.6 (2026-11-13): forgotten username/password
+
+- `d16cc99` sign-in → "Forgot username or password?": device code + one-time request code; a panel-signed reset
+  code (RST1, Ed25519, typ ANB-RST, bound to device + request, 1 h) lists Administrator names and sets a new
+  password (unlocked, re-activated, audited `password.recovered`). Passwords stay one-way hashes.
+- Panel `b4edc37`: Licenses → Forgotten password (product, device code, request code, passphrase); audited.
+- Installer 0.2.6 SHA-256 `af0792bf419a56d8e045ab032961f4b98f68bd79c9848fd1030176cc5af314ca` (release asset, tag `field-test-0.2.6`).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-13: field-test 0.2.5 (local network mode: main computer + join by IP and code) built and released as pre-release `field-test-0.2.5`.
+2026-11-13: field-test 0.2.6 (forgotten password recovery via panel-signed reset code) built and released as pre-release `field-test-0.2.6`.
