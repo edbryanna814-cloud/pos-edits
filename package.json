@@ -1,6 +1,6 @@
 {
   "name": "pharmacy-pos-management",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Pharmacy POS and management desktop application for one company.",
   "main": "./out/main/index.js",
   "private": true,

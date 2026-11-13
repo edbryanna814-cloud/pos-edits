@@ -178,7 +178,16 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Panel `1257d52`: customer groups (name, contact, product, payment type, price, currency, period, count saved
   once); "Add device" needs only the device code, name and passphrase. Licenses listed per customer.
 - Installer 0.2.4 SHA-256 `b49d3d2ca8f6dbaf3aed585892d29b3ad005d6411c9c88bf17d4a84c2ee357ba` (release asset, tag `field-test-0.2.4`).
-- Open decision (owner): device-to-device link. Internet = one shared server (built). LAN host-by-IP mode not built.
+- Owner decision: build both device links (internet server, and local network by IP).
+
+## Field-test 0.2.5 (2026-11-13): local network (Wi-Fi) mode
+
+- `667e43b` Settings → Database location (Administrator): "Main computer for this Wi-Fi" (bundled MongoDB
+  binds 0.0.0.0:27028; join-only user `pharmacy_lan`, app rights, 12-char join code; this PC's IPs shown) and
+  "Connect to the main computer" (private IP + join code, tested before saving; direct connection).
+  Hosting off drops the join user. Shortcut: no TLS on the LAN; join code protected by SCRAM.
+- Not tested: hosting in the packaged app across two real PCs (E2E runs unpackaged); Windows Firewall prompt.
+- Installer 0.2.5 SHA-256 `f4d6278bb21f7912aca81d164f45631e24ae141586a8f4849b198ac266cbd29f` (release asset, tag `field-test-0.2.5`).
 
 ## Next
 
@@ -186,4 +195,4 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 
 ## Last completed step
 
-2026-11-13: field-test 0.2.4 (three roles; panel customer groups) built and released as pre-release `field-test-0.2.4` with only the installer and a short txt.
+2026-11-13: field-test 0.2.5 (local network mode: main computer + join by IP and code) built and released as pre-release `field-test-0.2.5`.
