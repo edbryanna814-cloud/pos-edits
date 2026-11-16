@@ -95,6 +95,18 @@ function packagingFields(input: any): Partial<Product> | null {
   })
 }
 
+/** Warning margin (smallest unit) and return period (days, at most a year); null or '' clears them. */
+function optionalCounts(input: any): Partial<Product> {
+  const out: any = {}
+  if (input?.stockWarnMargin !== undefined) out.stockWarnMargin = input.stockWarnMargin === null || input.stockWarnMargin === '' ? 0 : toInteger(input.stockWarnMargin, 'Warning margin')
+  if (input?.returnDays !== undefined) {
+    const days = input.returnDays === null || input.returnDays === '' ? 0 : toInteger(input.returnDays, 'Return days')
+    if (days > 365) throw new Error('Return days must be 365 or fewer')
+    out.returnDays = days
+  }
+  return out
+}
+
 export async function createProduct(input: Partial<Product>): Promise<Product> {
   const db = requireDb(); const now = new Date().toISOString()
   const product: any = {
@@ -114,7 +126,8 @@ export async function createProduct(input: Partial<Product>): Promise<Product> {
     active: input.active !== false,
     createdAt: now,
     updatedAt: now,
-    ...packagingFields(input)
+    ...packagingFields(input),
+    ...optionalCounts(input)
   }
   let insertedId: ObjectId
   try {
@@ -147,6 +160,7 @@ export async function updateProduct(id: string, input: Partial<Product>): Promis
   if (input.active !== undefined) update.active = Boolean(input.active)
   const pack = packagingFields(input)
   if (pack) Object.assign(update, pack)
+  Object.assign(update, optionalCounts(input))
   if (Object.keys(update).length === 0) throw new Error('No product changes supplied')
 
   let updated: any

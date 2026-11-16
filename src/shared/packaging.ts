@@ -87,3 +87,18 @@ export function breakdown(stock: number, p: PackagingFields): { boxes: number; s
   const strips = Math.floor(rest / k.pillsPerStrip)
   return { boxes, strips, pills: rest - strips * k.pillsPerStrip }
 }
+
+export type StockLevel = 'out' | 'min' | 'near' | 'ok'
+
+/**
+ * Red at or below the minimum (or empty), yellow within the product's warning margin above it.
+ * All three numbers are in the smallest counted unit.
+ */
+export function stockLevel(p: { stockQuantity: number; minStock: number; stockWarnMargin?: number }): StockLevel {
+  const stock = Math.trunc(p.stockQuantity)
+  const min = Math.max(0, Math.trunc(p.minStock || 0))
+  if (stock <= 0) return 'out'
+  if (stock <= min) return 'min'
+  if (stock <= min + Math.max(0, Math.trunc(p.stockWarnMargin || 0))) return 'near'
+  return 'ok'
+}

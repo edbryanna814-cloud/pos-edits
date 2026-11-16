@@ -1957,3 +1957,38 @@ h3 {
   display: grid;
   gap: 4px;
 }
+
+/* A tick box sits right next to its words, on one line. */
+.settings-form label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+.settings-form label.checkbox input {
+  width: auto;
+  margin: 0;
+}
+
+/* Stock against the product's minimum: red at or below it (or empty), yellow within the warning margin. */
+tr.level-min td,
+tr.level-out td {
+  background: #fef2f2;
+}
+
+tr.level-near td {
+  background: #fffbeb;
+}
+
+.product-card.level-min,
+.product-card.level-out {
+  border-color: #f87171;
+  background: #fef2f2;
+}
+
+.product-card.level-near {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}

@@ -30,6 +30,10 @@ export type Product = {
   stripsPerBox?: number
   pillsPerStrip?: number
   stripPriceCents?: number
+  /** Yellow warning this far above the minimum (smallest counted unit). */
+  stockWarnMargin?: number
+  /** Days a customer may return it; empty = cannot be returned. */
+  returnDays?: number
   /** In the smallest counted unit (pill when pills per strip is set, else strip). */
   stockQuantity: number
   minStock: number

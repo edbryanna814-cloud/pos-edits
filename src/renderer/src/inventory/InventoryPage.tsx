@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import ImportProducts from './ImportProducts'
-import { derivePackaging, packOf, saleUnits, unitPrice, unitSize, type Packaging } from '../../../shared/packaging'
+import { derivePackaging, packOf, saleUnits, stockLevel, unitPrice, unitSize, type Packaging, type SaleUnit } from '../../../shared/packaging'
 import { stockText, UNIT_NAMES } from '../units'
 import type { Category, Product, Unit } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
@@ -45,6 +45,10 @@ const copy = {
     perUnit: { box: 'per box', strip: 'per strip', pill: 'per pill' },
     inUnits: { box: 'boxes', strip: 'strips', pill: 'pills' },
     derived: 'Sells at',
+    warnMargin: 'Warn (yellow) this much before the minimum',
+    returnDays: 'Customer may return it within (days, optional)',
+    nearMin: 'Near minimum',
+    atMin: 'At or below minimum',
     stripsInvalid: 'Strips in one box must be 1 or more.',
     pillsInvalid: 'Pills in one strip must be 1 or more, or left empty.',
     perBox: 'per box',
@@ -75,6 +79,7 @@ const copy = {
     adjust: 'Adjust stock',
     adjustTitle: 'Stock adjustment',
     adjustQuantity: 'Quantity (+ receive, - remove)',
+    adjustUnit: 'Counted in',
     adjustReason: 'Reason',
     adjustSave: 'Apply adjustment',
     currentStock: 'Current stock',
@@ -133,6 +138,10 @@ const copy = {
     perUnit: { box: 'للعلبة', strip: 'للشريط', pill: 'للقرص' },
     inUnits: { box: 'علب', strip: 'شرائط', pill: 'أقراص' },
     derived: 'يباع بـ',
+    warnMargin: 'تنبيه (أصفر) قبل الحد الأدنى بمقدار',
+    returnDays: 'يمكن للعميل إرجاعه خلال (أيام، اختياري)',
+    nearMin: 'قريب من الحد الأدنى',
+    atMin: 'عند الحد الأدنى أو أقل',
     stripsInvalid: 'عدد الشرائط في العلبة يجب أن يكون 1 أو أكثر.',
     pillsInvalid: 'عدد الأقراص في الشريط يجب أن يكون 1 أو أكثر، أو اتركه فارغًا.',
     perBox: 'لكل علبة',
@@ -163,6 +172,7 @@ const copy = {
     adjust: 'تعديل الرصيد',
     adjustTitle: 'تعديل رصيد المخزون',
     adjustQuantity: 'الكمية (+ إضافة، - خصم)',
+    adjustUnit: 'بوحدة',
     adjustReason: 'السبب',
     adjustSave: 'تطبيق التعديل',
     currentStock: 'الرصيد الحالي',
@@ -193,8 +203,6 @@ const copy = {
   }
 } as const
 
-const STOCK_CRITICAL = 3
-const STOCK_LOW = 6
 
 function daysUntil(date: string | undefined): number | null {
   if (!date) return null
@@ -220,6 +228,8 @@ interface FormState {
   pillsPerStrip: string
   stock: string
   minStock: string
+  warnMargin: string
+  returnDays: string
   active: boolean
 }
 
@@ -238,6 +248,8 @@ function emptyForm(): FormState {
     pillsPerStrip: '',
     stock: '0',
     minStock: '0',
+    warnMargin: '',
+    returnDays: '',
     active: true
   }
 }
@@ -260,6 +272,8 @@ function formFrom(product: Product): FormState {
     pillsPerStrip: k.pillsPerStrip > 1 ? String(k.pillsPerStrip) : '',
     stock: String(Math.floor(product.stockQuantity / size)),
     minStock: String(Math.ceil(product.minStock / size)),
+    warnMargin: product.stockWarnMargin ? String(Math.ceil(product.stockWarnMargin / size)) : '',
+    returnDays: product.returnDays ? String(product.returnDays) : '',
     active: product.active !== false
   }
 }
@@ -290,6 +304,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
   const [form, setForm] = useState<FormState>(emptyForm)
   const [adjusting, setAdjusting] = useState<Product | null>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
+  const [adjustUnit, setAdjustUnit] = useState<SaleUnit>('box')
   const [adjustReason, setAdjustReason] = useState('')
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
@@ -359,6 +374,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
 
   function openAdjust(product: Product): void {
     setAdjusting(product)
+    setAdjustUnit(packOf(product).packaging)
     setAdjustQuantity('')
     setAdjustReason('')
     setFormOpen(false)
@@ -381,6 +397,10 @@ export default function InventoryPage({ products, language, currency, onChanged 
     if (purchase === null || selling === null) return setError(text.priceInvalid)
     const minStock = wholeNumber(form.minStock, 0)
     if (minStock === null) return setError(text.minInvalid)
+    const warnMargin = form.warnMargin.trim() ? wholeNumber(form.warnMargin, 0) : 0
+    if (warnMargin === null) return setError(text.minInvalid)
+    const returnDays = form.returnDays.trim() ? wholeNumber(form.returnDays, 0) : 0
+    if (returnDays === null || returnDays > 365) return setError(text.minInvalid)
     const openingStock = wholeNumber(form.stock, 0)
     if (openingStock === null) return setError(text.stockInvalid)
     const stripsPerBox = form.packaging === 'box' ? wholeNumber(form.stripsPerBox, 1) : 1
@@ -403,6 +423,8 @@ export default function InventoryPage({ products, language, currency, onChanged 
       pillsPerStrip,
       unitPriceCents: selling,
       minStock: minStock * size,
+      stockWarnMargin: warnMargin * size,
+      returnDays,
       active: form.active
     } as Partial<Product>
     if (!editing) payload.stockQuantity = openingStock * size
@@ -432,7 +454,8 @@ export default function InventoryPage({ products, language, currency, onChanged 
     setSuccess('')
 
     if (!/^-?\d+$/.test(adjustQuantity.trim())) return setError(text.adjustInvalid)
-    const quantity = Number(adjustQuantity)
+    // Entered in boxes, strips or pills; stored in the smallest counted unit.
+    const quantity = Number(adjustQuantity) * unitSize(adjusting, adjustUnit)
     if (!Number.isSafeInteger(quantity) || quantity === 0) return setError(text.adjustInvalid)
     if (adjusting.stockQuantity + quantity < 0) return setError(text.adjustInvalid)
     const reason = adjustReason.trim()
@@ -556,7 +579,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
   }
 
   const previewStock = adjusting
-    ? adjusting.stockQuantity + (Number.isSafeInteger(Number(adjustQuantity)) ? Number(adjustQuantity) : 0)
+    ? adjusting.stockQuantity + (Number.isSafeInteger(Number(adjustQuantity)) ? Number(adjustQuantity) * unitSize(adjusting, adjustUnit) : 0)
     : 0
 
   return (
@@ -693,6 +716,14 @@ export default function InventoryPage({ products, language, currency, onChanged 
                 onChange={(event) => update('minStock', event.target.value)}
                 required
               />
+            </label>
+            <label>
+              <span>{text.warnMargin} ({text.inUnits[form.packaging]})</span>
+              <input type="number" min={0} step={1} value={form.warnMargin} onChange={(event) => update('warnMargin', event.target.value)} />
+            </label>
+            <label>
+              <span>{text.returnDays}</span>
+              <input type="number" min={0} max={365} step={1} value={form.returnDays} onChange={(event) => update('returnDays', event.target.value)} />
             </label>
             <label className="checkbox wide">
               <input
@@ -852,12 +883,18 @@ export default function InventoryPage({ products, language, currency, onChanged 
           <div className="crud-grid">
             <div className="readout">
               <span>{text.currentStock}</span>
-              <strong>{adjusting.stockQuantity}</strong>
+              <strong>{stockText(adjusting.stockQuantity, adjusting, language)}</strong>
             </div>
             <div className="readout">
               <span>{text.afterAdjust}</span>
-              <strong className={previewStock < 0 ? 'danger-text' : ''}>{previewStock}</strong>
+              <strong className={previewStock < 0 ? 'danger-text' : ''}>{previewStock < 0 ? previewStock : stockText(previewStock, adjusting, language)}</strong>
             </div>
+            <label>
+              <span>{text.adjustUnit}</span>
+              <select value={adjustUnit} onChange={(event) => setAdjustUnit(event.target.value as SaleUnit)}>
+                {saleUnits(adjusting).map((unit) => <option key={unit} value={unit}>{UNIT_NAMES[language][unit]}</option>)}
+              </select>
+            </label>
             <label>
               <span>{text.adjustQuantity}</span>
               <input
@@ -931,11 +968,12 @@ export default function InventoryPage({ products, language, currency, onChanged 
                 const expiry = expiryState(product.expiryDate)
                 const expired = expiry === 'expired'
                 const expiresSoon = expiry === 'soon'
-                const critical = !expired && product.stockQuantity <= STOCK_CRITICAL
-                const low = !expired && !critical && product.stockQuantity <= STOCK_LOW
-                const out = product.stockQuantity <= 0
+                const level = stockLevel(product)
+                const critical = !expired && level === 'min'
+                const low = !expired && level === 'near'
+                const out = level === 'out'
                 return (
-                  <tr key={product._id ?? product.sku} className={product.active ? '' : 'row-muted'}>
+                  <tr key={product._id ?? product.sku} className={`${product.active ? '' : 'row-muted'} level-${level}`}>
                     <td>
                       <strong>{product.name}</strong>
                       {product.barcode ? <small className="block-muted">{product.barcode}</small> : null}
@@ -945,7 +983,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
                     </td>
                     <td>{product.sku}</td>
                     <td>{formatMoney(unitPrice(product, packOf(product).packaging), currency)} <small className="muted">{text.perUnit[packOf(product).packaging]}</small></td>
-                    <td className={critical || expired ? 'danger-text' : low ? 'warning-text' : ''}>{stockText(product.stockQuantity, product, language)}</td>
+                    <td className={critical || out || expired ? 'danger-text' : low ? 'warning-text' : ''}>{stockText(product.stockQuantity, product, language)}</td>
                     <td>{stockText(product.minStock, product, language)}</td>
                     <td>
                       {product.expiryDate ? (
@@ -964,9 +1002,9 @@ export default function InventoryPage({ products, language, currency, onChanged 
                       ) : out ? (
                         <span className="tag danger-tag">{text.outOfStock}</span>
                       ) : critical ? (
-                        <span className="tag danger-tag">{text.criticalStock}</span>
+                        <span className="tag danger-tag">{text.atMin}</span>
                       ) : low ? (
-                        <span className="tag warning-tag">{text.lowStock}</span>
+                        <span className="tag warning-tag">{text.nearMin}</span>
                       ) : expiresSoon ? (
                         <span className="tag warning-tag">{text.expiresSoon}</span>
                       ) : (

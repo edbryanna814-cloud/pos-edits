@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Customer } from '../../../shared/customers'
 import CustomerPicker from './CustomerPicker'
 import { percentText } from '../customers/CustomersPage'
-import { packOf, saleUnits, unitPrice, unitSize, type SaleUnit } from '../../../shared/packaging'
+import { packOf, saleUnits, stockLevel, unitPrice, unitSize, type SaleUnit } from '../../../shared/packaging'
 import { stockText, UNIT_NAMES } from '../units'
 import type { CashboxMovement, Sale } from '../../../shared/pos'
 import type { Product } from '../../../shared/inventory'
@@ -638,9 +638,10 @@ export default function PosPage({
           ) : (
             <div className="product-grid">
               {visibleProducts.map((product) => {
-                const low = product.stockQuantity <= product.minStock
+                const level = stockLevel(product)
+                const low = level !== 'ok'
                 return (
-                  <div key={product._id ?? product.sku} className="product-card">
+                  <div key={product._id ?? product.sku} className={`product-card level-${level}`}>
                     <button
                       type="button"
                       className="product-card-main"

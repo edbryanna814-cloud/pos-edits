@@ -43,3 +43,13 @@ describe('box / strip / pill', () => {
     expect(saleUnits({ sellingPriceCents: 500 })).toEqual(['strip'])
   })
 })
+
+describe('stock colours', () => {
+  it('red at or below the minimum, yellow within the warning margin, else ok', async () => {
+    const { stockLevel } = await import('../../src/shared/packaging')
+    // Boxes of 36 pills: minimum 8 boxes, warn 8 boxes before it.
+    const p = (boxes: number) => ({ stockQuantity: boxes * 36, minStock: 8 * 36, stockWarnMargin: 8 * 36 })
+    expect([stockLevel(p(2)), stockLevel(p(8)), stockLevel(p(9)), stockLevel(p(16)), stockLevel(p(17)), stockLevel(p(0))]).toEqual(['min', 'min', 'near', 'near', 'ok', 'out'])
+    expect(stockLevel({ stockQuantity: 5, minStock: 0 })).toBe('ok')
+  })
+})
