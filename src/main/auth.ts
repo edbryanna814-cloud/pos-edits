@@ -63,7 +63,7 @@ function getRolePermissions(role: string): Permission[] {
   return r ? r.permissions : []
 }
 
-const isAdminViewer = () => currentSession?.role === ADMIN_ROLE
+export const isAdminViewer = () => currentSession?.role === ADMIN_ROLE
 
 /** Earlier versions had Cashier / Inventory Manager / Accountant roles and per-user permissions. */
 const COUNTERS = 'counters'

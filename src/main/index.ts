@@ -3,6 +3,8 @@ import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { MAX_FILE_BYTES, readSheet } from './sheet'
 import { checkProductRows, holdImport, takeImport } from './productImport'
+import { parsePunches } from './attendanceRules'
+import { attendanceDays, importPunches, sellerKpis } from './attendance'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -68,6 +70,10 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvPOReceive]: ['inventory.manage'],
   [IPC.InvImportPreview]: ['inventory.manage'],
   [IPC.InvImportConfirm]: ['inventory.manage'],
+  // Attendance belongs with staff (users.manage: Administrator and Manager); KPIs with reports.
+  [IPC.AttendanceImport]: ['users.manage'],
+  [IPC.AttendanceDays]: ['users.manage'],
+  [IPC.KpiSellers]: ['reports.view'],
   [IPC.InvCategoriesList]: 'authenticated',
   [IPC.InvUnitsList]: 'authenticated',
   [IPC.InvProductsList]: 'authenticated',
@@ -381,6 +387,22 @@ function registerIpc(): void {
     const rows = checkProductRows(readSheet(await readFile(file), file), existing)
     return { batchId: holdImport(rows), fileName: basename(file), rows: rows.map(({ input: _input, ...shown }) => shown) }
   })
+
+  // Fingerprint machine: its exported attendance log (Excel or attlog.dat), matched by user ID.
+  handle(IPC.AttendanceImport, async (event) => {
+    const picked = await dialog.showOpenDialog(senderWindow(event), {
+      title: 'Import attendance',
+      properties: ['openFile'],
+      filters: [{ name: 'Attendance export', extensions: ['xlsx', 'csv', 'txt', 'dat'] }]
+    })
+    if (picked.canceled || picked.filePaths.length === 0) return null
+    const file = picked.filePaths[0]
+    if ((await stat(file)).size > MAX_FILE_BYTES) throw new Error('SHEET_TOO_LARGE')
+    const { punches, skipped } = parsePunches(readSheet(await readFile(file), file))
+    return { ...(await importPunches(punches, requireSession().username)), skipped }
+  })
+  handle(IPC.AttendanceDays, async (_event, range: unknown) => attendanceDays(range))
+  handle(IPC.KpiSellers, async (_event, range: unknown) => sellerKpis(range))
 
   handle(IPC.InvImportConfirm, async (_event, batchId: string) => {
     let added = 0

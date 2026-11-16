@@ -20,8 +20,9 @@ import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
 import UsersPage from './users/UsersPage'
 import CustomersPage from './customers/CustomersPage'
+import AttendancePage, { SellerKpis } from './attendance/AttendancePage'
 
-type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit' | 'customers'
+type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit' | 'customers' | 'attendance'
 
 interface Section {
   id: SectionId
@@ -66,6 +67,13 @@ const sections: Section[] = [
     titleKey: 'customers',
     descriptionKey: 'customersDesc',
     permission: 'customers.manage'
+  },
+  {
+    id: 'attendance',
+    labelKey: 'attendance',
+    titleKey: 'attendance',
+    descriptionKey: 'attendanceDesc',
+    permission: 'users.manage'
   },
   {
     id: 'users',
@@ -558,7 +566,9 @@ export default function App() {
             canManageDatabase={(authUser?.permissions ?? []).includes('database.manage')}
           />
         ) : active === 'users' ? (
-          <UsersPage language={language} />        ) : active === 'customers' ? (
+          <UsersPage language={language} />        ) : active === 'attendance' ? (
+          <AttendancePage language={language} />
+        ) : active === 'customers' ? (
           <CustomersPage language={language} />
         ) : active === 'audit' ? (
           <section className="panel">
@@ -651,6 +661,7 @@ export default function App() {
               cashbox={cashbox}
               onNavigate={(target) => setActive(target)}
             />
+            {(authUser?.permissions ?? []).includes('reports.view') ? <SellerKpis language={language} currency={currency} /> : null}
             <DatabasePanel db={db} language={language} onRetry={handleReload} />
           </>
         ) : null}

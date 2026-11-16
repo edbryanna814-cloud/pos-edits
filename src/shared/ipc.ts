@@ -1,4 +1,5 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
+import type { AttendanceDay, AttendanceImportResult, SellerKpi } from './attendance'
 import type { Customer } from './customers'
 import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
@@ -53,6 +54,9 @@ export const IPC = {
   InvPOReceive: 'inv:po:receive',
   InvImportPreview: 'inv:import:preview',
   InvImportConfirm: 'inv:import:confirm',
+  AttendanceImport: 'attendance:import',
+  AttendanceDays: 'attendance:days',
+  KpiSellers: 'kpi:sellers',
   PosCheckout: 'pos:checkout',
   CustomersList: 'customers:list',
   CustomersCreate: 'customers:create',
@@ -150,6 +154,9 @@ export interface PreloadApi {
   posCheckout(input: any): Promise<Sale>
   invImportPreview(): Promise<ProductImportPreview | null>
   invImportConfirm(batchId: string): Promise<{ added: number; skipped: number }>
+  attendanceImport(): Promise<AttendanceImportResult | null>
+  attendanceDays(range: { from: string; to: string }): Promise<AttendanceDay[]>
+  kpiSellers(range: { from: string; to: string }): Promise<SellerKpi[]>
   customersList(): Promise<Customer[]>
   customersCreate(input: Partial<Customer>): Promise<Customer>
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>

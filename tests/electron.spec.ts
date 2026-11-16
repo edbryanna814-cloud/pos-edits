@@ -62,6 +62,8 @@ test.describe.serial('Phase 2 - database and settings', () => {
       expect(
         await window.evaluate(() => Object.keys((window as any).api).sort())
       ).toEqual([
+        'attendanceDays',
+        'attendanceImport',
         'auditList',
         'authChangePassword',
         'authLogin',
@@ -100,6 +102,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'invSuppliersList',
         'invUnitsCreate',
         'invUnitsList',
+        'kpiSellers',
         'licenseApply',
         'licenseStatus',
         'ping',
@@ -594,6 +597,24 @@ test('receives cartons and sells whole boxes in base units', async () => {
     await window.getByRole('button', { name: 'Add 2 products' }).click()
     await expect(window.getByRole('status').filter({ hasText: 'Added 2 products' })).toBeVisible()
     await expect(window.getByRole('row').filter({ hasText: 'Aspirin' })).toContainText('3 boxes')
+
+    // Fingerprint machine: an attlog.dat export for user ID 1 (the administrator) on one day:
+    // in 08:00, break 13:00-13:30, out 17:00 = 8h 30m worked, 30m break. Imported twice: stored once.
+    const dat = join(sheetDir, 'attlog.dat')
+    const punch = (user: number, time: string, state: number) => [user, `2026-11-16 ${time}`, 1, state, 1, 0].join('\t')
+    writeFileSync(dat, [punch(1, '08:00:00', 0), punch(1, '13:00:00', 2), punch(1, '13:30:00', 3), punch(1, '17:00:00', 1), punch(9, '09:00:00', 0)].join('\n'))
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as any }, dat)
+    await window.getByRole('button', { name: 'Attendance', exact: true }).click()
+    await window.getByRole('button', { name: 'Import from the fingerprint machine' }).click()
+    await expect(window.getByRole('status')).toContainText('Added 5 punches')
+    await expect(window.getByText('Machine user numbers with no user here: 9.')).toBeVisible()
+    await window.getByRole('button', { name: 'Import from the fingerprint machine' }).click()
+    await expect(window.getByRole('status')).toContainText('Added 0 punches, 5 already imported')
+    await window.getByLabel('From').fill('2026-11-16')
+    await window.getByLabel('To').fill('2026-11-16')
+    await expect(window.getByRole('row').filter({ hasText: '2026-11-16' }).first()).toContainText('8h 30m')
+    const kpi = await window.evaluate(() => (window as any).api.kpiSellers({ from: '2026-11-16', to: '2026-11-16' }))
+    expect(kpi.find((r: any) => r.userNo === 1)).toMatchObject({ daysPresent: 1, workedMinutes: 510, breakMinutes: 30 })
     rmSync(sheetDir, { recursive: true, force: true })
   } finally {
     await app.close()
