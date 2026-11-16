@@ -13,6 +13,8 @@ export type Permission =
   | 'customers.manage'
   /** Import or export files (Excel, backups, exports): Administrators only. */
   | 'data.transfer'
+  /** Delete categories, products and suppliers: Administrator and Manager (a Seller can add stock, not delete). */
+  | 'catalog.delete'
 
 export type Role = {
   name: string
@@ -23,9 +25,9 @@ export type Role = {
 export const ADMIN_ROLE = 'Administrator'
 export const BUILTIN_ROLES: Role[] = [
   // Everything, including where the database lives.
-  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage', 'customers.manage', 'data.transfer'] },
+  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage', 'customers.manage', 'data.transfer', 'catalog.delete'] },
   // Everything except the database location; Administrator accounts are hidden from managers.
-  { name: 'Manager', permissions: ['users.read', 'users.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'customers.manage'] },
+  { name: 'Manager', permissions: ['users.read', 'users.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'customers.manage', 'catalog.delete'] },
   // POS and inventory only.
   { name: 'Seller', permissions: ['pos.use', 'inventory.manage'] }
 ]

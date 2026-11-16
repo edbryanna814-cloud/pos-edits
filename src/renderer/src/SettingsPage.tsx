@@ -16,6 +16,7 @@ interface Props {
 
 interface FormState {
   companyName: string
+  companyPhone: string
   currencyCode: string
   currencyPrecision: string
   taxEnabled: boolean
@@ -28,6 +29,7 @@ function toForm(settings: StoredCompanySettings | null): FormState {
   if (!settings) {
     return {
       companyName: '',
+      companyPhone: '',
       currencyCode: '',
       currencyPrecision: '',
       taxEnabled: false,
@@ -39,6 +41,7 @@ function toForm(settings: StoredCompanySettings | null): FormState {
 
   return {
     companyName: settings.companyName,
+    companyPhone: settings.companyPhone ?? '',
     currencyCode: settings.currencyCode,
     currencyPrecision: String(settings.currencyPrecision),
     taxEnabled: settings.taxRateBasisPoints > 0,
@@ -116,6 +119,7 @@ export default function SettingsPage({
       currencyCode: form.currencyCode,
       currencyPrecision: precision,
       taxRateBasisPoints: Math.round(taxPercent * 100),
+      companyPhone: form.companyPhone,
       defaultLanguage: form.defaultLanguage,
       backupDirectory: form.backupDirectory
     }
@@ -209,6 +213,11 @@ export default function SettingsPage({
             onChange={(event) => update('currencyPrecision', event.target.value)}
             required
           />
+        </label>
+
+        <label>
+          <span>{t(language, 'companyPhone')}</span>
+          <input dir="ltr" inputMode="tel" maxLength={30} value={form.companyPhone} onChange={(event) => update('companyPhone', event.target.value)} />
         </label>
 
         <label className="checkbox">

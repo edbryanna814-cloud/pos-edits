@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { confirmDelete, deleteLabel } from '../confirmDelete'
 import { ExportButton, RecordId } from '../session'
 import type { Customer } from '../../../shared/customers'
 import type { Language } from '../../../shared/settings'
@@ -154,7 +155,12 @@ export default function CustomersPage({ language }: { language: Language }) {
                 <td>{c.nationalId}</td>
                 <td dir="ltr">{c.phone}</td>
                 <td>{c.discountBasisPoints ? `${c.discountBasisPoints / 100}%` : ''}</td>
-                <td><button type="button" onClick={() => open(c)}>{text.edit}</button></td>
+                <td>
+                  <button type="button" onClick={() => open(c)}>{text.edit}</button>
+                  <button type="button" className="danger-text" onClick={async () => setError(await confirmDelete(language, c.name || c.phone || c.nationalId, () => window.api.customersDelete(c._id as string), () => void load()))}>
+                    {deleteLabel(language)}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

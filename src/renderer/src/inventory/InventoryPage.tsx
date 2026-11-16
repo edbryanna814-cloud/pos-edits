@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { confirmDelete, deleteLabel } from '../confirmDelete'
 import { ExportButton, RecordId, useCan } from '../session'
 import ImportProducts from './ImportProducts'
 import { derivePackaging, packOf, saleUnits, stockLevel, unitPrice, unitSize, type Packaging, type SaleUnit } from '../../../shared/packaging'
@@ -28,7 +29,8 @@ const copy = {
     category: 'Category',
     unit: 'Unit',
     none: 'None',
-    manageCatalog: 'Categories & units',
+    manageCatalog: 'Categories',
+    unitsBuiltIn: 'Units are built in: choose box, strip or pill in each product’s “Unit type”.',
     categoryName: 'Category name',
     unitName: 'Unit name',
     unitAbbreviation: 'Abbreviation',
@@ -126,6 +128,7 @@ const copy = {
     unitName: 'اسم الوحدة',
     unitAbbreviation: 'الاختصار',
     addCategory: 'إضافة فئة',
+    unitsBuiltIn: 'الوحدات مدمجة: اختر علبة أو شريط أو قرص من "نوع الوحدة" في كل منتج.',
     addUnit: 'إضافة وحدة',
     noCategories: 'لا توجد فئات بعد.',
     noUnits: 'لا توجد وحدات بعد.',
@@ -306,6 +309,12 @@ export default function InventoryPage({ products, language, currency, onChanged 
   const [adjusting, setAdjusting] = useState<Product | null>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
   const canTransfer = useCan('data.transfer')
+  const canDelete = useCan('catalog.delete')
+
+  async function remove(name: string, call: () => Promise<unknown>, after: () => void): Promise<void> {
+    setSuccess('')
+    setError(await confirmDelete(language, name, call, after))
+  }
   const [adjustUnit, setAdjustUnit] = useState<SaleUnit>('box')
   const [adjustReason, setAdjustReason] = useState('')
   const [query, setQuery] = useState('')
@@ -848,11 +857,21 @@ export default function InventoryPage({ products, language, currency, onChanged 
             </form>
             {categories.length === 0 ? <p className="muted">{text.noCategories}</p> : (
               <ul className="movement-list">
-                {categories.map((category) => <li key={category._id}><span>{category.name}</span></li>)}
+                {categories.map((category) => (
+                  <li key={category._id}>
+                    <span>{category.name}</span>
+                    {canDelete ? (
+                      <button type="button" className="link-button danger-text" onClick={() => void remove(category.name, () => window.api.invCategoriesDelete(category._id as string), loadCatalog)}>
+                        {deleteLabel(language)}
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
               </ul>
             )}
           </div>
-          <div>
+          <p className="muted">{text.unitsBuiltIn}</p>
+          <div hidden>
             <form className="crud-form compact-form" onSubmit={addUnit}>
               <div className="crud-grid">
                 <label>
@@ -1027,6 +1046,11 @@ export default function InventoryPage({ products, language, currency, onChanged 
                         <button type="button" onClick={() => openAdjust(product)}>
                           {text.adjust}
                         </button>
+                        {canDelete ? (
+                          <button type="button" className="danger-text" onClick={() => void remove(product.name, () => window.api.invProductsDelete(product._id as string), onChanged)}>
+                            {deleteLabel(language)}
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

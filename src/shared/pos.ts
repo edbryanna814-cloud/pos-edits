@@ -34,6 +34,7 @@ export type Sale = {
   cashierUsername?: string
   customerId?: string
   customerName?: string
+  customerPhone?: string
   /** The sale's discount as a percentage (1250 = 12.5%). */
   discountBasisPoints?: number
   /** Money given back so far by returns. */

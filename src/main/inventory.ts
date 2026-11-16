@@ -395,3 +395,46 @@ export async function receivePO(purchaseOrderId: string, notes?: string): Promis
     createdAt: now
   }
 }
+
+// Deleting. Sales, returns and receipts keep their own copy of names, so history stays readable.
+
+function objectId(id: unknown, what: string): ObjectId {
+  if (typeof id !== 'string' || !ObjectId.isValid(id)) throw new Error(`${what} not found`)
+  return new ObjectId(id)
+}
+
+/** Products in it simply lose the category. */
+export async function deleteCategory(id: unknown): Promise<{ ok: true }> {
+  const db = requireDb()
+  const _id = objectId(id, 'Category')
+  const category = await db.collection(CATEGORIES).findOne({ _id })
+  if (!category) throw new Error('Category not found')
+  await db.collection(PRODUCTS).updateMany({ categoryId: String(id) }, { $unset: { categoryId: '' } })
+  await db.collection(CATEGORIES).deleteOne({ _id })
+  await logAudit({ action: 'inventory.category.delete', resource: CATEGORIES, resourceId: String(id), details: { name: category.name } })
+  return { ok: true }
+}
+
+/** Refused while the product is on a purchase order that has not been received or cancelled. */
+export async function deleteProduct(id: unknown): Promise<{ ok: true }> {
+  const db = requireDb()
+  const _id = objectId(id, 'Product')
+  const product = await db.collection(PRODUCTS).findOne({ _id })
+  if (!product) throw new Error('Product not found')
+  if (await db.collection(PO).findOne({ status: { $in: ['draft', 'ordered'] }, 'lines.productId': String(id) })) throw new Error('PRODUCT_ON_OPEN_ORDER')
+  await db.collection(PRODUCTS).deleteOne({ _id })
+  await logAudit({ action: 'inventory.product.delete', resource: PRODUCTS, resourceId: String(id), details: { name: product.name, sku: product.sku, stockQuantity: product.stockQuantity } })
+  return { ok: true }
+}
+
+/** Refused while any purchase order names the supplier (deactivate it instead). */
+export async function deleteSupplier(id: unknown): Promise<{ ok: true }> {
+  const db = requireDb()
+  const _id = objectId(id, 'Supplier')
+  const supplier = await db.collection(SUPPLIERS).findOne({ _id })
+  if (!supplier) throw new Error('Supplier not found')
+  if (await db.collection(PO).findOne({ supplierId: String(id) })) throw new Error('SUPPLIER_HAS_ORDERS')
+  await db.collection(SUPPLIERS).deleteOne({ _id })
+  await logAudit({ action: 'inventory.supplier.delete', resource: SUPPLIERS, resourceId: String(id), details: { name: supplier.name } })
+  return { ok: true }
+}

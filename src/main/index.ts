@@ -19,13 +19,13 @@ import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { changePassword, createUser, ensureAuthSchema, listAdminUsernames, migrateRoles, recoverAdminPassword, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
-import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
+import { deleteCategory, deleteProduct, deleteSupplier, createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn, listReturnable } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
 import { PANEL_KEYS } from './panelKeys'
 import { RESET_ERRORS, verifyResetCode } from './recovery'
-import { createCustomer, listCustomers, updateCustomer } from './customers'
+import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers'
 import { licenseRequired } from './licenseGate'
 import { publicError, validateIpcArgs } from './ipcSchema'
 import { rotateIfLarge } from './logRotate'
@@ -75,6 +75,10 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   // Attendance belongs with staff (users.manage: Administrator and Manager); KPIs with reports.
   [IPC.AttendanceImport]: ['data.transfer'],
   [IPC.ExportSection]: ['data.transfer'],
+  [IPC.InvCategoriesDelete]: ['catalog.delete'],
+  [IPC.InvProductsDelete]: ['catalog.delete'],
+  [IPC.InvSuppliersDelete]: ['catalog.delete'],
+  [IPC.CustomersDelete]: ['customers.manage'],
   [IPC.AttendanceDays]: ['users.manage'],
   [IPC.KpiSellers]: ['reports.view'],
   [IPC.InvCategoriesList]: 'authenticated',
@@ -406,6 +410,10 @@ function registerIpc(): void {
     return { ...(await importPunches(punches, requireSession().username)), skipped }
   })
   handle(IPC.AttendanceDays, async (_event, range: unknown) => attendanceDays(range))
+  handle(IPC.InvCategoriesDelete, async (_event, id: string) => deleteCategory(id))
+  handle(IPC.InvProductsDelete, async (_event, id: string) => deleteProduct(id))
+  handle(IPC.InvSuppliersDelete, async (_event, id: string) => deleteSupplier(id))
+  handle(IPC.CustomersDelete, async (_event, id: string) => deleteCustomer(id, requireSession().username))
 
   handle(IPC.ExportSection, async (event, section: string, format: string) => {
     const out = await exportSection(section, format)

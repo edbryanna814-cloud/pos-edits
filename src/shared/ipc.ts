@@ -59,6 +59,10 @@ export const IPC = {
   AttendanceDays: 'attendance:days',
   KpiSellers: 'kpi:sellers',
   ExportSection: 'export:section',
+  InvCategoriesDelete: 'inv:categories:delete',
+  InvProductsDelete: 'inv:products:delete',
+  InvSuppliersDelete: 'inv:suppliers:delete',
+  CustomersDelete: 'customers:delete',
   PosCheckout: 'pos:checkout',
   CustomersList: 'customers:list',
   CustomersCreate: 'customers:create',
@@ -161,6 +165,10 @@ export interface PreloadApi {
   attendanceDays(range: { from: string; to: string }): Promise<AttendanceDay[]>
   kpiSellers(range: { from: string; to: string }): Promise<SellerKpi[]>
   exportSection(section: string, format: 'xlsx' | 'db'): Promise<{ fileName: string; count: number } | null>
+  invCategoriesDelete(id: string): Promise<{ ok: true }>
+  invProductsDelete(id: string): Promise<{ ok: true }>
+  invSuppliersDelete(id: string): Promise<{ ok: true }>
+  customersDelete(id: string): Promise<{ ok: true }>
   customersList(): Promise<Customer[]>
   customersCreate(input: Partial<Customer>): Promise<Customer>
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>

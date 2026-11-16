@@ -627,6 +627,7 @@ export default function App() {
               taxRateBasisPoints={taxRateBasisPoints}
               cashier={authUser.username}
               companyName={settings?.companyName ?? ''}
+              companyPhone={settings?.companyPhone ?? ''}
               onChanged={refreshBusinessData}
             />
             <ShiftPanel

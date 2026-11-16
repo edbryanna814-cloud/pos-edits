@@ -55,10 +55,19 @@ export async function updateCustomer(id: unknown, input: unknown, actor: string)
 }
 
 /** For a sale: the customer's display name (name, else phone, else ID), or null when not found. */
-export async function customerForSale(db: Db, id: unknown, session?: any): Promise<{ customerId: string; customerName: string } | null> {
+export async function customerForSale(db: Db, id: unknown, session?: any): Promise<{ customerId: string; customerName: string; customerPhone?: string } | null> {
   if (id === undefined || id === null || id === '') return null
   if (typeof id !== 'string' || !ObjectId.isValid(id)) throw new Error('Customer not found')
   const c = await db.collection(COL).findOne({ _id: new ObjectId(id) }, { session })
   if (!c) throw new Error('Customer not found')
-  return { customerId: id, customerName: String(c.name || c.phone || c.nationalId || '') }
+  return { customerId: id, customerName: String(c.name || c.phone || c.nationalId || ''), ...(c.phone ? { customerPhone: String(c.phone) } : {}) }
+}
+
+/** Past sales keep the customer's name. */
+export async function deleteCustomer(id: unknown, actor: string): Promise<{ ok: true }> {
+  if (typeof id !== 'string' || !ObjectId.isValid(id)) throw new Error('Customer not found')
+  const c = await requireDb().collection(COL).findOneAndDelete({ _id: new ObjectId(id) })
+  if (!c) throw new Error('Customer not found')
+  await logAudit({ actorUsername: actor, action: 'customer.delete', resource: COL, resourceId: id, details: { name: c.name, phone: c.phone } })
+  return { ok: true }
 }

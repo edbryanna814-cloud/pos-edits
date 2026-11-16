@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import InvoicePrint from './InvoicePrint'
 import { ExportButton, RecordId } from '../session'
 import ReturnablePanel, { returnErrorText } from './ReturnablePanel'
 import type { Customer } from '../../../shared/customers'
@@ -20,6 +21,7 @@ interface Props {
   taxRateBasisPoints: number
   cashier: string
   companyName: string
+  companyPhone: string
   onChanged: () => void
 }
 
@@ -212,6 +214,7 @@ export default function PosPage({
   taxRateBasisPoints,
   cashier,
   companyName,
+  companyPhone,
   onChanged
 }: Props) {
   const text = copy[language]
@@ -503,78 +506,7 @@ export default function PosPage({
               </button>
             </div>
           </div>
-          <div className="receipt-brand">
-            <strong>{companyName}</strong>
-          </div>
-          <div className="receipt-meta">
-            <div>
-              <span>{text.invoice}</span>
-              <strong>{receipt.invoiceNo}</strong>
-            </div>
-            {receipt.customerName ? (
-              <div>
-                <span>{language === 'ar' ? 'العميل' : 'Customer'}</span>
-                <strong>{receipt.customerName}</strong>
-              </div>
-            ) : null}
-            <div>
-              <span>{text.date}</span>
-              <strong>{formatDateTime(receipt.createdAt, language)}</strong>
-            </div>
-            <div>
-              <span>{text.cashierLabel}</span>
-              <strong>{receipt.cashierUsername ?? cashier}</strong>
-            </div>
-          </div>
-          <table className="data-table compact">
-            <thead>
-              <tr>
-                <th>{text.quantity}</th>
-                <th>{text.total}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receipt.lines.map((line) => (
-                <tr key={line.productId}>
-                  <td>
-                    {line.productName} × {line.quantity}
-                    {line.saleUnit && line.saleUnit !== 'base' ? ` ${UNIT_NAMES[language][line.saleUnit]}` : ''}
-                  </td>
-                  <td>{formatMoney(line.lineTotalCents, currency)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <dl className="totals-list">
-            <div>
-              <dt>{text.subtotal}</dt>
-              <dd>{formatMoney(receipt.subtotalCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.discount}</dt>
-              <dd>{formatMoney(receipt.discountCents, currency)}</dd>
-            </div>
-            {receipt.taxCents > 0 ? (
-              <div>
-                <dt>
-                  {text.tax} ({taxPercent}%)
-                </dt>
-                <dd>{formatMoney(receipt.taxCents, currency)}</dd>
-              </div>
-            ) : null}
-            <div className="total-row">
-              <dt>{text.total}</dt>
-              <dd>{formatMoney(receipt.totalCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.paidReceipt}</dt>
-              <dd>{formatMoney(receipt.paidCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.change}</dt>
-              <dd>{formatMoney(receipt.changeCents, currency)}</dd>
-            </div>
-          </dl>
+          <InvoicePrint sale={receipt} companyName={companyName} companyPhone={companyPhone} cashier={cashier} />
         </section>
       ) : null}
 

@@ -75,6 +75,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'authSetupRequired',
         'authState',
         'customersCreate',
+        'customersDelete',
         'customersList',
         'customersUpdate',
         'dbConnectionGet',
@@ -87,6 +88,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'getVersion',
         'importBackup',
         'invCategoriesCreate',
+        'invCategoriesDelete',
         'invCategoriesList',
         'invImportConfirm',
         'invImportPreview',
@@ -94,12 +96,14 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'invPOList',
         'invPOReceive',
         'invProductsCreate',
+        'invProductsDelete',
         'invProductsList',
         'invProductsUpdate',
         'invReceiveCarton',
         'invStockAdjust',
         'invStockMovementsList',
         'invSuppliersCreate',
+        'invSuppliersDelete',
         'invSuppliersList',
         'invUnitsCreate',
         'invUnitsList',
@@ -389,8 +393,14 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await window.getByRole('button', { name: /Complete sale/ }).click()
 
       await expect(window.getByRole('heading', { name: 'Receipt' })).toBeVisible()
-      await expect(window.locator('.receipt-panel')).toContainText('11.00 USD')
-      await expect(window.locator('.receipt-panel')).toContainText('9.00 USD')
+      // The printed invoice (Arabic template): total, paid and change; the seller is on it.
+      await expect(window.locator('.invoice-grand')).toContainText('11.00')
+      await expect(window.locator('.invoice-change')).toContainText('9.00')
+      await expect(window.locator('.invoice')).toContainText('صيدلية E2E Pharmacy')
+      await expect(window.locator('.invoice')).toContainText(E2E_ADMIN.username)
+      await window.emulateMedia({ media: 'print' })
+      await window.locator('.invoice').screenshot({ path: join(process.cwd(), 'screenshots', 'invoice-print.png') })
+      await window.emulateMedia({ media: 'screen' })
 
       const sale = await window.evaluate(async () => {
         const sales = await (window as any).api.posSalesList()
@@ -641,6 +651,38 @@ test('receives cartons and sells whole boxes in base units', async () => {
     }
     expect(readFileSync(xlsxOut).subarray(0, 2).toString()).toBe('PK')
     expect(JSON.parse(readFileSync(dbOut, 'utf8')).some((p: any) => p.sku === 'ASP-1')).toBe(true)
+
+    // Deleting: refused while a product is on an open purchase order or a supplier has orders.
+    const del = await window.evaluate(async () => {
+      const api = (window as any).api
+      const cat = await api.invCategoriesCreate({ name: 'Temp category' })
+      const vit = (await api.invProductsList()).find((x: any) => x.sku === 'VIT-C')
+      const sup = await api.invSuppliersCreate({ name: 'Supplier X' })
+      await api.invPOCreate({ supplierId: sup._id, status: 'ordered', lines: [{ productId: vit._id, quantity: 1, unitCostCents: 100 }] })
+      const blocked = await api.invProductsDelete(vit._id).then(() => 'deleted', (e: Error) => e.message)
+      const supplierBlocked = await api.invSuppliersDelete(sup._id).then(() => 'deleted', (e: Error) => e.message)
+      await api.invCategoriesDelete(cat._id)
+      const mona = (await api.customersList()).find((c: any) => c.name === 'Mona')
+      await api.customersDelete(mona._id)
+      const noRet = (await api.invProductsList()).find((x: any) => x.sku === 'NO-RET')
+      await api.invProductsDelete(noRet._id)
+      return {
+        blocked, supplierBlocked,
+        category: (await api.invCategoriesList()).some((c: any) => c.name === 'Temp category'),
+        mona: (await api.customersList()).some((c: any) => c.name === 'Mona'),
+        noRet: (await api.invProductsList()).some((x: any) => x.sku === 'NO-RET')
+      }
+    })
+    expect(del.blocked).toContain('PRODUCT_ON_OPEN_ORDER')
+    expect(del.supplierBlocked).toContain('SUPPLIER_HAS_ORDERS')
+    expect([del.category, del.mona, del.noRet]).toEqual([false, false, false])
+    // In the screen: Delete asks first; accepting removes the product.
+    window.once('dialog', (d) => void d.accept())
+    await window.reload()
+    await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+    await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+    await window.getByRole('row').filter({ hasText: 'Aspirin' }).getByRole('button', { name: 'Delete' }).click()
+    await expect(window.getByRole('row').filter({ hasText: 'Aspirin' })).toHaveCount(0)
     rmSync(sheetDir, { recursive: true, force: true })
   } finally {
     await app.close()
@@ -872,6 +914,7 @@ test('shared database: two tills on one server share users (A creates the admin,
       await expect(wb.getByRole('button', { name: 'Import from Excel' })).toHaveCount(0)
       await expect(wb.getByRole('button', { name: 'Export' })).toHaveCount(0)
       // Files in or out are for Administrators only: refused for a seller, and the buttons are not shown.
+      expect(await wb.evaluate(() => (window as any).api.invProductsDelete('65a1b2c3d4e5f60718293a4b').then(() => 'ok', (e: Error) => e.message))).toContain('PERMISSION_DENIED')
       for (const call of ['exportSection', 'exportBackup', 'invImportPreview', 'attendanceImport']) {
         const outcome = await wb.evaluate((c) => (window as any).api[c](c === 'exportSection' ? 'users' : { passphrase: 'x' }, 'xlsx').then(() => 'ok', (e: Error) => e.message), call)
         expect(outcome).toContain('PERMISSION_DENIED')
