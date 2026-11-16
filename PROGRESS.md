@@ -233,10 +233,21 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
   database IDs (`_id`, always created by MongoDB) shown to Administrators only - never shown before, incl. 3f70318.
 - Installer 0.3.1 SHA-256 `d363e5cd5f9c83cbacb2467845e0551fcd83cfcb241cbb500e3445422f8de78a` (pre-release `field-test-0.3.1`).
 
+## 0.3.2 (2026-11-17): delete options and the pharmacy's invoice template (PR #4)
+
+- `6089be0` delete categories, products, suppliers, customers (permission `catalog.delete`: Administrator, Manager;
+  customers: `customers.manage`); asked first, audited with the name; refused while a product is on an open PO or a
+  supplier has orders. Users are not deleted (deactivate keeps the audit trail readable). The free-text Units list
+  (unused since 0.3.0) is hidden behind a note.
+- Printed invoice = owner's Arabic template (`src/renderer/src/pos/InvoicePrint.tsx`): "صيدلية" + pharmacy name,
+  customer name/phone, seller, pharmacy phone (new Settings field `companyPhone`), totals with paid and الباقي.
+  Page size follows the printer (80 mm / A5 / A4).
+- Installer 0.3.2 SHA-256 `9a934fdd1313c909abfba707a500c77b8c7ffe5f16ba539bd28c72781da86d12` (pre-release `field-test-0.3.2`).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-16: 0.3.1 (owner review fixes) built; pre-release `field-test-0.3.1`; PR #4 open (not merged); release repo still 0.2.6.
+2026-11-17: 0.3.2 (deletes, invoice template) built; pre-release `field-test-0.3.2`; PR #4 open (not merged); release repo still 0.2.6.

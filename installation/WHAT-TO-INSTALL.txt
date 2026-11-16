@@ -1,4 +1,4 @@
-Pharmacy POS 0.3.1
+Pharmacy POS 0.3.2
 
 Install alongside the program:
 - Windows 10 or 11 (64-bit)
@@ -11,7 +11,7 @@ Optional:
 
 ------------------------------
 
-Pharmacy POS 0.3.1
+Pharmacy POS 0.3.2
 
 المطلوب تثبيته مع البرنامج:
 - ويندوز 10 أو 11 (64-بت)
