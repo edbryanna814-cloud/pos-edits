@@ -207,10 +207,25 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Still open: PR #2 (Gate 1) and `field-test/0.2.0` not merged to main; panel default period still 'hour'
   (set to month after testing); MongoDB SSPL legal opinion before any sale.
 
+## 0.3.0 (2026-11-16): pharmacy requests (branch feat/pharmacy-requests)
+
+- TD catch-up: no Pharmacy changes since the merge; panel (`Anubis-hub/anubis-switcher`) gained the Factory field-test key + FAC
+  subscription (`6502d98`) and explained refusals (`b216177`, `98dfcd1`).
+- `4472324` passwords: minimum 3 characters (lockout still 5 tries); backup passphrase stays 12.
+- `058522c` tax optional ("Charge tax on sales" switch); POS discount in percent (server computes the amount).
+- `8c8d7df` units box / strip / pill (`src/shared/packaging.ts`): box price divided into strip and pill prices; stock in
+  the smallest counted unit, shown as boxes · strips · pills; POS sells any unit; pre-0.3.0 products unchanged.
+- `f176608` customers (name, ID number, phone, discount %; at least one) + POS picker; user ID numbers (counter from 1
+  or typed, unique; existing users numbered on start).
+- `fe6bb24` product import from Excel/CSV with a checked preview; own .xlsx reader on fflate 0.8.3 (no deps).
+- `f746319` fingerprint attendance import (Excel export or ZKTeco attlog.dat, matched by user ID; in/out/breaks; hours)
+  and per-seller KPIs on the dashboard. Not built: a live network link to the machine (needs the model).
+- Installer 0.3.0 SHA-256 `10896fb3b3b5c4c9adea20375f24ed50bdd5a2c348302dd6909675c27a81a483` (pre-release `field-test-0.3.0`). Release repo not updated yet (owner: later).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-13: field test closed; 0.2.6 published in private repo Anubis-hub/pharmacy-pos-release (tag v0.2.6).
+2026-11-16: 0.3.0 (pharmacy requests 1-9) built; pre-release `field-test-0.3.0`; Anubis-hub/pharmacy-pos-release still at 0.2.6.
