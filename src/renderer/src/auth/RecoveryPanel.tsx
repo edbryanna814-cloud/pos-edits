@@ -13,7 +13,7 @@ const strings = {
     code: 'Reset code',
     verify: 'Check reset code',
     account: 'Administrator account',
-    password: 'New password (at least 12 characters)',
+    password: 'New password (at least 3 characters)',
     confirm: 'Confirm new password',
     save: 'Set new password',
     done: 'Password changed. Sign in with the account above and the new password.',
@@ -24,7 +24,7 @@ const strings = {
       RESET_CODE_WRONG_REQUEST: 'That reset code was made for an older request code. Send the request code shown now.',
       RESET_CODE_EXPIRED: 'That reset code has expired. Ask for a new one.',
       RESET_NOT_UNLOCKED: 'Time ran out. Check the reset code again.',
-      PASSWORD_TOO_SHORT: 'The password must be at least 12 characters.',
+      PASSWORD_TOO_SHORT: 'The password must be at least 3 characters.',
       PASSWORD_TOO_LONG: 'The password is too long.',
       other: 'Something went wrong. Try again.'
     }
@@ -37,7 +37,7 @@ const strings = {
     code: 'رمز إعادة التعيين',
     verify: 'تحقق من الرمز',
     account: 'حساب المدير',
-    password: 'كلمة مرور جديدة (12 حرفًا على الأقل)',
+    password: 'كلمة مرور جديدة (3 أحرف على الأقل)',
     confirm: 'تأكيد كلمة المرور الجديدة',
     save: 'تعيين كلمة المرور',
     done: 'تم تغيير كلمة المرور. سجّل الدخول بالحساب أعلاه وكلمة المرور الجديدة.',
@@ -48,7 +48,7 @@ const strings = {
       RESET_CODE_WRONG_REQUEST: 'هذا الرمز صادر لرمز طلب قديم. أرسل رمز الطلب الظاهر الآن.',
       RESET_CODE_EXPIRED: 'انتهت صلاحية الرمز. اطلب رمزًا جديدًا.',
       RESET_NOT_UNLOCKED: 'انتهى الوقت. تحقق من الرمز مرة أخرى.',
-      PASSWORD_TOO_SHORT: 'يجب أن تكون كلمة المرور 12 حرفًا على الأقل.',
+      PASSWORD_TOO_SHORT: 'يجب أن تكون كلمة المرور 3 أحرف على الأقل.',
       PASSWORD_TOO_LONG: 'كلمة المرور طويلة جدًا.',
       other: 'حدث خطأ. حاول مرة أخرى.'
     }

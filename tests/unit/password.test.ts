@@ -32,10 +32,10 @@ describe('password hashing (Gate 1, Argon2id)', () => {
     expect(isLegacyHash(await hashPassword('correct horse battery'))).toBe(false)
   })
 
-  it('enforces a 12-character minimum', () => {
-    expect(newPasswordError('admin')).toBe('PASSWORD_TOO_SHORT')
-    expect(newPasswordError('elevenchars')).toBe('PASSWORD_TOO_SHORT')
-    expect(newPasswordError('twelve-chars')).toBeNull()
+  it('enforces a 3-character minimum (pharmacy request)', () => {
+    expect(newPasswordError('ab')).toBe('PASSWORD_TOO_SHORT')
+    expect(newPasswordError('')).toBe('PASSWORD_TOO_SHORT')
+    expect(newPasswordError('abc')).toBeNull()
     expect(newPasswordError('x'.repeat(257))).toBe('PASSWORD_TOO_LONG')
     expect(newPasswordError(undefined)).toBe('PASSWORD_TOO_SHORT')
   })

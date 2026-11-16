@@ -27,7 +27,7 @@ const copy = {
     noUsers: 'No users yet.',
     roles: 'Built-in roles',
     usernameRequired: 'Username is required.',
-    passwordRequired: 'Password must be at least 12 characters.',
+    passwordRequired: 'Password must be at least 3 characters.',
     error: 'Could not save user',
     saved: 'Saved successfully.',
     columns: ['Username', 'Role', 'Status', 'Created', ''],
@@ -59,7 +59,7 @@ const copy = {
     noUsers: 'لا يوجد مستخدمون بعد.',
     roles: 'الأدوار المضمنة',
     usernameRequired: 'اسم المستخدم مطلوب.',
-    passwordRequired: 'كلمة المرور يجب أن تكون 12 حرفًا على الأقل.',
+    passwordRequired: 'كلمة المرور يجب أن تكون 3 أحرف على الأقل.',
     error: 'تعذر حفظ المستخدم',
     saved: 'تم الحفظ بنجاح.',
     columns: ['اسم المستخدم', 'الدور', 'الحالة', 'تاريخ الإنشاء', ''],
@@ -148,8 +148,8 @@ export default function UsersPage({ language }: Props) {
     resetMessages()
     const trimmed = username.trim()
     if (!trimmed) return setError(text.usernameRequired)
-    if (!editing && password.length < 12) return setError(text.passwordRequired)
-    if (editing && password && password.length < 12) return setError(text.passwordRequired)
+    if (!editing && password.length < 3) return setError(text.passwordRequired)
+    if (editing && password && password.length < 3) return setError(text.passwordRequired)
     setBusy(true)
     try {
       if (editing?._id) {
