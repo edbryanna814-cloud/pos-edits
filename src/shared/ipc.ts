@@ -58,6 +58,7 @@ export const IPC = {
   AttendanceImport: 'attendance:import',
   AttendanceDays: 'attendance:days',
   KpiSellers: 'kpi:sellers',
+  ExportSection: 'export:section',
   PosCheckout: 'pos:checkout',
   CustomersList: 'customers:list',
   CustomersCreate: 'customers:create',
@@ -159,6 +160,7 @@ export interface PreloadApi {
   attendanceImport(): Promise<AttendanceImportResult | null>
   attendanceDays(range: { from: string; to: string }): Promise<AttendanceDay[]>
   kpiSellers(range: { from: string; to: string }): Promise<SellerKpi[]>
+  exportSection(section: string, format: 'xlsx' | 'db'): Promise<{ fileName: string; count: number } | null>
   customersList(): Promise<Customer[]>
   customersCreate(input: Partial<Customer>): Promise<Customer>
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>

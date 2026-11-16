@@ -1,10 +1,11 @@
 import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { MAX_FILE_BYTES, readSheet } from './sheet'
 import { checkProductRows, holdImport, takeImport } from './productImport'
 import { parsePunches } from './attendanceRules'
 import { attendanceDays, importPunches, sellerKpis } from './attendance'
+import { exportSection } from './exports'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -52,8 +53,9 @@ type ChannelGuard = Permission[] | 'authenticated'
 
 const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.SettingsSave]: ['settings.manage'],
-  [IPC.BackupExport]: ['settings.manage'],
-  [IPC.BackupImport]: ['settings.manage'],
+  // Files in or out (backups, Excel imports, exports): Administrators only.
+  [IPC.BackupExport]: ['data.transfer'],
+  [IPC.BackupImport]: ['data.transfer'],
   [IPC.UsersList]: ['users.read'],
   [IPC.UsersCreate]: ['users.manage'],
   [IPC.UsersUpdate]: ['users.manage'],
@@ -68,10 +70,11 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvSuppliersCreate]: ['inventory.manage'],
   [IPC.InvPOCreate]: ['inventory.manage'],
   [IPC.InvPOReceive]: ['inventory.manage'],
-  [IPC.InvImportPreview]: ['inventory.manage'],
-  [IPC.InvImportConfirm]: ['inventory.manage'],
+  [IPC.InvImportPreview]: ['data.transfer'],
+  [IPC.InvImportConfirm]: ['data.transfer'],
   // Attendance belongs with staff (users.manage: Administrator and Manager); KPIs with reports.
-  [IPC.AttendanceImport]: ['users.manage'],
+  [IPC.AttendanceImport]: ['data.transfer'],
+  [IPC.ExportSection]: ['data.transfer'],
   [IPC.AttendanceDays]: ['users.manage'],
   [IPC.KpiSellers]: ['reports.view'],
   [IPC.InvCategoriesList]: 'authenticated',
@@ -403,6 +406,20 @@ function registerIpc(): void {
     return { ...(await importPunches(punches, requireSession().username)), skipped }
   })
   handle(IPC.AttendanceDays, async (_event, range: unknown) => attendanceDays(range))
+
+  handle(IPC.ExportSection, async (event, section: string, format: string) => {
+    const out = await exportSection(section, format)
+    const day = new Date().toISOString().slice(0, 10)
+    const picked = await dialog.showSaveDialog(senderWindow(event), {
+      title: 'Export',
+      defaultPath: `${section}-${day}.${out.ext}`,
+      filters: [out.ext === 'xlsx' ? { name: 'Excel', extensions: ['xlsx'] } : { name: 'Database records', extensions: ['db'] }]
+    })
+    if (picked.canceled || !picked.filePath) return null
+    await writeFile(picked.filePath, out.data)
+    await logAudit({ actorUsername: requireSession().username, action: 'data.export', resource: section, details: { format: out.ext, count: out.count } })
+    return { fileName: basename(picked.filePath), count: out.count }
+  })
   handle(IPC.KpiSellers, async (_event, range: unknown) => sellerKpis(range))
 
   handle(IPC.InvImportConfirm, async (_event, batchId: string) => {

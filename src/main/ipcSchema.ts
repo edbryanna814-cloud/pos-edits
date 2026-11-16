@@ -60,6 +60,7 @@ export const IPC_ARGS: Record<IpcChannel, ArgSpec[]> = {
   [IPC.AttendanceImport]: none,
   [IPC.AttendanceDays]: ['object'],
   [IPC.KpiSellers]: ['object'],
+  [IPC.ExportSection]: ['string', 'string'],
   [IPC.PosCheckout]: ['object'],
   [IPC.CustomersList]: none,
   [IPC.CustomersCreate]: ['object'],

@@ -39,3 +39,11 @@ describe('reading sheets', () => {
     expect(excelDate('abc')).toBeNull()
   })
 })
+
+describe('writing sheets', () => {
+  it('writes an .xlsx that reads back the same (text, numbers, Arabic, symbols, gaps)', async () => {
+    const { writeXlsx } = await import('../../src/main/sheetWrite')
+    const rows = [['Name', 'Price', 'Note'], ['بنادول <أقراص> & "x"', 12.5, null], ['B', 0, 'ok']]
+    expect(readSheet(writeXlsx(rows, 'Products'), 'out.xlsx')).toEqual([['Name', 'Price', 'Note'], ['بنادول <أقراص> & "x"', '12.5'], ['B', '0', 'ok']])
+  })
+})

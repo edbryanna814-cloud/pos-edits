@@ -19,6 +19,7 @@ import ShiftPanel from './pos/ShiftPanel'
 import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
 import UsersPage from './users/UsersPage'
+import { ExportButton, RecordId, SessionContext } from './session'
 import CustomersPage from './customers/CustomersPage'
 import AttendancePage, { SellerKpis } from './attendance/AttendancePage'
 
@@ -487,6 +488,7 @@ export default function App() {
   }
 
   return (
+    <SessionContext.Provider value={{ role: authUser?.role ?? '', permissions: authUser?.permissions ?? [] }}>
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
@@ -572,7 +574,10 @@ export default function App() {
           <CustomersPage language={language} />
         ) : active === 'audit' ? (
           <section className="panel">
-            <h2>{t(language, 'audit')}</h2>
+            <div className="section-header">
+              <h2>{t(language, 'audit')}</h2>
+              <ExportButton section="audit" language={language} />
+            </div>
             <table style={{ width: '100%', marginTop: 16 }}>
               <thead>
                 <tr>
@@ -585,7 +590,7 @@ export default function App() {
               <tbody>
                 {audit.map((a: any, i: number) => (
                   <tr key={i}>
-                    <td>{a.createdAt}</td>
+                    <td>{a.createdAt}<RecordId id={a._id} /></td>
                     <td>{a.actorUsername || '-'}</td>
                     <td>{a.action}</td>
                     <td>{a.resource}</td>
@@ -676,5 +681,6 @@ export default function App() {
         </footer>
       </main>
     </div>
+    </SessionContext.Provider>
   )
 }

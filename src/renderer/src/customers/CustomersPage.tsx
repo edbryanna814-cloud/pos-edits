@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ExportButton, RecordId } from '../session'
 import type { Customer } from '../../../shared/customers'
 import type { Language } from '../../../shared/settings'
 
@@ -116,7 +117,10 @@ export default function CustomersPage({ language }: { language: Language }) {
     <section className="panel" aria-labelledby="customers-title">
       <div className="section-header">
         <h2 id="customers-title">{text.title}</h2>
-        <button type="button" className="primary" onClick={() => open('new')}>{text.add}</button>
+        <span className="section-actions">
+          <ExportButton section="customers" language={language} />
+          <button type="button" className="primary" onClick={() => open('new')}>{text.add}</button>
+        </span>
       </div>
       {error ? <p className="error" role="alert">{error}</p> : null}
       {success ? <p className="success" role="status">{success}</p> : null}
@@ -146,7 +150,7 @@ export default function CustomersPage({ language }: { language: Language }) {
           <tbody>
             {shown.map((c) => (
               <tr key={c._id}>
-                <td>{c.name}</td>
+                <td>{c.name}<RecordId id={c._id} /></td>
                 <td>{c.nationalId}</td>
                 <td dir="ltr">{c.phone}</td>
                 <td>{c.discountBasisPoints ? `${c.discountBasisPoints / 100}%` : ''}</td>

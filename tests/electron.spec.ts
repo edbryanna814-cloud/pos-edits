@@ -82,6 +82,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'dbConnectionTest',
         'dbHealth',
         'exportBackup',
+        'exportSection',
         'getSettings',
         'getVersion',
         'importBackup',
@@ -629,6 +630,17 @@ test('receives cartons and sells whole boxes in base units', async () => {
     await expect(window.getByRole('row').filter({ hasText: '2026-11-16' }).first()).toContainText('8h 30m')
     const kpi = await window.evaluate(() => (window as any).api.kpiSellers({ from: '2026-11-16', to: '2026-11-16' }))
     expect(kpi.find((r: any) => r.userNo === 1)).toMatchObject({ daysPresent: 1, workedMinutes: 510, breakMinutes: 30 })
+
+    // Exports (Administrator): Excel and .db, to a stubbed save location.
+    const xlsxOut = join(sheetDir, 'inventory.xlsx')
+    const dbOut = join(sheetDir, 'inventory.db')
+    for (const [format, out] of [['xlsx', xlsxOut], ['db', dbOut]] as const) {
+      await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = (async () => ({ canceled: false, filePath: file })) as any }, out)
+      const r = await window.evaluate((fmt) => (window as any).api.exportSection('inventory', fmt), format)
+      expect(r.count).toBeGreaterThan(3)
+    }
+    expect(readFileSync(xlsxOut).subarray(0, 2).toString()).toBe('PK')
+    expect(JSON.parse(readFileSync(dbOut, 'utf8')).some((p: any) => p.sku === 'ASP-1')).toBe(true)
     rmSync(sheetDir, { recursive: true, force: true })
   } finally {
     await app.close()
@@ -856,6 +868,14 @@ test('shared database: two tills on one server share users (A creates the admin,
       const nav = wb.getByRole('navigation')
       await expect(nav.getByRole('button')).toHaveText([/POS|Point of sale/i, /Inventory/i], { timeout: 10000 })
       await expect(wb.getByRole('heading', { name: 'Dashboard', level: 1 })).toHaveCount(0)
+      await nav.getByRole('button', { name: /Inventory/i }).click()
+      await expect(wb.getByRole('button', { name: 'Import from Excel' })).toHaveCount(0)
+      await expect(wb.getByRole('button', { name: 'Export' })).toHaveCount(0)
+      // Files in or out are for Administrators only: refused for a seller, and the buttons are not shown.
+      for (const call of ['exportSection', 'exportBackup', 'invImportPreview', 'attendanceImport']) {
+        const outcome = await wb.evaluate((c) => (window as any).api[c](c === 'exportSection' ? 'users' : { passphrase: 'x' }, 'xlsx').then(() => 'ok', (e: Error) => e.message), call)
+        expect(outcome).toContain('PERMISSION_DENIED')
+      }
       // Both tills write to one audit chain, which still verifies (seq is unique across devices).
       const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
       await client.connect()

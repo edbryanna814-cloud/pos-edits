@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { ExportButton, RecordId, useCan } from '../session'
 import ImportProducts from './ImportProducts'
 import { derivePackaging, packOf, saleUnits, stockLevel, unitPrice, unitSize, type Packaging, type SaleUnit } from '../../../shared/packaging'
 import { stockText, UNIT_NAMES } from '../units'
@@ -304,6 +305,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
   const [form, setForm] = useState<FormState>(emptyForm)
   const [adjusting, setAdjusting] = useState<Product | null>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
+  const canTransfer = useCan('data.transfer')
   const [adjustUnit, setAdjustUnit] = useState<SaleUnit>('box')
   const [adjustReason, setAdjustReason] = useState('')
   const [query, setQuery] = useState('')
@@ -594,7 +596,12 @@ export default function InventoryPage({ products, language, currency, onChanged 
         </button>
       </div>
 
-      <ImportProducts language={language} currency={currency} onDone={onChanged} />
+      {canTransfer ? (
+        <div className="section-header">
+          <ImportProducts language={language} currency={currency} onDone={onChanged} />
+          <ExportButton section="inventory" language={language} />
+        </div>
+      ) : null}
 
       {formOpen ? (
         <form className="crud-form" onSubmit={handleSubmit}>
@@ -976,6 +983,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
                   <tr key={product._id ?? product.sku} className={`${product.active ? '' : 'row-muted'} level-${level}`}>
                     <td>
                       <strong>{product.name}</strong>
+                      <RecordId id={product._id} />
                       {product.barcode ? <small className="block-muted">{product.barcode}</small> : null}
                       <small className="block-muted">
                         {saleUnits(product).map((unit) => `${UNIT_NAMES[language][unit]} ${formatMoney(unitPrice(product, unit), currency)}`).join(' · ')}

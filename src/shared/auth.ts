@@ -11,6 +11,8 @@ export type Permission =
   | 'audit.view'
   | 'database.manage'
   | 'customers.manage'
+  /** Import or export files (Excel, backups, exports): Administrators only. */
+  | 'data.transfer'
 
 export type Role = {
   name: string
@@ -21,7 +23,7 @@ export type Role = {
 export const ADMIN_ROLE = 'Administrator'
 export const BUILTIN_ROLES: Role[] = [
   // Everything, including where the database lives.
-  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage', 'customers.manage'] },
+  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage', 'customers.manage', 'data.transfer'] },
   // Everything except the database location; Administrator accounts are hidden from managers.
   { name: 'Manager', permissions: ['users.read', 'users.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'customers.manage'] },
   // POS and inventory only.

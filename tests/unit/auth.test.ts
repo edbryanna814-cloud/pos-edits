@@ -214,6 +214,19 @@ describe('with MongoDB', () => {
     await expect(auth.createUser({ username: 'dup', password: 'abc', role: 'Seller', userNo: 50 })).rejects.toThrow('USER_NO_TAKEN')
     await expect(auth.createUser({ username: 'zero', password: 'abc', role: 'Seller', userNo: 0 })).rejects.toThrow('USER_NO_INVALID')
   })
+
+  it('exports: Administrators only; user exports never carry password hashes', async () => {
+    const { exportSection } = await import('../../src/main/exports')
+    const { readSheet } = await import('../../src/main/sheet')
+    const db = await exportSection('users', 'db')
+    expect(String(db.data)).not.toMatch(/passwordHash|argon2/)
+    const rows = readSheet(((await exportSection('users', 'xlsx')).data) as Uint8Array, 'u.xlsx')
+    expect(rows[0]).toEqual(['User ID', 'Username', 'Role', 'Active', 'Created', 'Record ID'])
+    expect(rows.length - 1).toBe(db.count)
+    await expect(exportSection('secrets', 'xlsx')).rejects.toThrow('EXPORT_SECTION_INVALID')
+    await auth.login({ username: 'mgr1', password: 'Manager-Pass-01' }) // gitleaks:allow test-only credential
+    expect(() => auth.requirePermission('data.transfer')).toThrow('PERMISSION_DENIED')
+  })
 })
 
 describe('audit chain in MongoDB (Gate 1 S5)', () => {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ExportButton, RecordId } from '../session'
 import ReturnablePanel, { returnErrorText } from './ReturnablePanel'
 import type { Customer } from '../../../shared/customers'
 import CustomerPicker from './CustomerPicker'
@@ -811,6 +812,7 @@ export default function PosPage({
         <section className="panel">
           <div className="section-header">
             <h3>{text.recentSales}</h3>
+            <ExportButton section="sales" language={language} />
           </div>
           {sales.length === 0 ? (
             <div className="empty-state">
@@ -829,7 +831,7 @@ export default function PosPage({
                 <tbody>
                   {sales.slice(0, 10).map((sale) => (
                     <tr key={sale._id ?? sale.invoiceNo}>
-                      <td>{sale.invoiceNo}</td>
+                      <td>{sale.invoiceNo}<RecordId id={sale._id} /></td>
                       <td>{formatDateTime(sale.createdAt, language)}</td>
                       <td>{formatMoney(sale.totalCents, currency)}</td>
                       <td>{text.status[sale.status]}</td>

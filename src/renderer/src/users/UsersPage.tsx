@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ExportButton, RecordId } from '../session'
 import type { Role, User } from '../../../shared/auth'
 import type { Language } from '../../../shared/settings'
 import { formatDateTime } from '../money'
@@ -193,7 +194,10 @@ export default function UsersPage({ language }: Props) {
           <h2 id="users-title">{text.title}</h2>
           <p className="muted">{text.intro}</p>
         </div>
-        <button type="button" className="primary" onClick={openCreate}>{text.add}</button>
+        <span className="section-actions">
+          <ExportButton section="users" language={language} />
+          <button type="button" className="primary" onClick={openCreate}>{text.add}</button>
+        </span>
       </div>
 
       {error ? <p className="error" role="alert">{error}</p> : null}
@@ -273,6 +277,7 @@ export default function UsersPage({ language }: Props) {
                 <div>
                   <strong>{user.userNo ? `#${user.userNo} ` : ''}{user.username}</strong>
                   <small className="block-muted">{user.role}</small>
+                  <RecordId id={user._id} />
                 </div>
                 <span className={`tag ${user.active === false ? '' : 'ok-tag'}`}>
                   {user.active === false ? text.inactiveLabel : text.activeLabel}

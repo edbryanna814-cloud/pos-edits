@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useCan } from './session'
 import type { CompanySettings, Language, StoredCompanySettings } from '../../shared/settings'
 import { t } from './i18n'
 import DatabaseLocation from './DatabaseLocation'
@@ -68,6 +69,8 @@ export default function SettingsPage({
   canManageDatabase
 }: Props) {
   const [form, setForm] = useState<FormState>(() => toForm(settings))
+  // Backups in or out: Administrators only.
+  const canTransfer = useCan('data.transfer')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -249,6 +252,7 @@ export default function SettingsPage({
           />
         </label>
 
+        {canTransfer ? (
         <label className="wide">
           <span>{t(language, 'backupPassphrase')}</span>
           <input
@@ -258,21 +262,26 @@ export default function SettingsPage({
             onChange={(event) => setPassphrase(event.target.value)}
           />
         </label>
+        ) : null}
 
         <div className="form-actions wide">
           <button type="submit" className="primary" disabled={saving}>
             {saving ? t(language, 'saving') : t(language, 'save')}
           </button>
-          <button type="button" onClick={handleExport}>
-            {t(language, 'backupExport')}
-          </button>
-          <button type="button" onClick={handleImport}>
-            {t(language, 'backupImport')}
-          </button>
+          {canTransfer ? (
+            <>
+              <button type="button" onClick={handleExport}>
+                {t(language, 'backupExport')}
+              </button>
+              <button type="button" onClick={handleImport}>
+                {t(language, 'backupImport')}
+              </button>
+            </>
+          ) : null}
         </div>
       </form>
 
-      <p className="hint">{t(language, 'backupNote')}</p>
+      {canTransfer ? <p className="hint">{t(language, 'backupNote')}</p> : null}
       {message ? (
         <p className="success" role="status">
           {message}

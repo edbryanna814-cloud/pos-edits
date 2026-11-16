@@ -1992,3 +1992,18 @@ tr.level-near td {
   border-color: #fbbf24;
   background: #fffbeb;
 }
+
+.record-id {
+  display: block;
+  color: var(--muted, #64748b);
+  font-size: 11px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.export-button,
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

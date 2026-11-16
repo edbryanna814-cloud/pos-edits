@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ExportButton, useCan } from '../session'
 import type { AttendanceDay, AttendanceImportResult, SellerKpi } from '../../../shared/attendance'
 import type { Language } from '../../../shared/settings'
 import { formatMoney } from '../money'
@@ -88,6 +89,7 @@ export default function AttendancePage({ language }: { language: Language }) {
   const [warning, setWarning] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const canTransfer = useCan('data.transfer')
 
   async function load(): Promise<void> {
     try {
@@ -125,9 +127,14 @@ export default function AttendancePage({ language }: { language: Language }) {
     <section className="panel" aria-labelledby="attendance-title">
       <div className="section-header">
         <h2 id="attendance-title">{text.title}</h2>
-        <button type="button" className="primary" disabled={busy} onClick={() => void importFile()}>{text.import}</button>
+        {canTransfer ? (
+          <span className="section-actions">
+            <ExportButton section="attendance" language={language} />
+            <button type="button" className="primary" disabled={busy} onClick={() => void importFile()}>{text.import}</button>
+          </span>
+        ) : null}
       </div>
-      <p className="hint">{text.hint}</p>
+      {canTransfer ? <p className="hint">{text.hint}</p> : null}
       {message ? <p className="success" role="status">{message}</p> : null}
       {warning ? <p className="warning-text">{warning}</p> : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
