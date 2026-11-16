@@ -52,6 +52,7 @@ const api: PreloadApi = {
   posCheckout: (input) => ipcRenderer.invoke(IPC.PosCheckout, input),
   posSalesList: () => ipcRenderer.invoke(IPC.PosSalesList),
   posReturn: (input) => ipcRenderer.invoke(IPC.PosReturn, input),
+  posReturnable: () => ipcRenderer.invoke(IPC.PosReturnable),
   posCashIn: (amountCents, reason) => ipcRenderer.invoke(IPC.PosCashIn, amountCents, reason),
   posCashOut: (amountCents, reason) => ipcRenderer.invoke(IPC.PosCashOut, amountCents, reason),
   posCashboxList: () => ipcRenderer.invoke(IPC.PosCashboxList),

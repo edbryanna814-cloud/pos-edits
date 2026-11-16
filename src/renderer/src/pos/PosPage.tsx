@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import ReturnablePanel, { returnErrorText } from './ReturnablePanel'
 import type { Customer } from '../../../shared/customers'
 import CustomerPicker from './CustomerPicker'
 import { percentText } from '../customers/CustomersPage'
@@ -449,7 +450,7 @@ export default function PosPage({
       setSuccess(text.returned)
       onChanged()
     } catch (returnError) {
-      setError(`${text.returnError}: ${errorText(returnError)}`)
+      setError(returnErrorText(language, returnError) ?? `${text.returnError}: ${errorText(returnError)}`)
     } finally {
       setReturnBusy(false)
     }
@@ -803,6 +804,8 @@ export default function PosPage({
           </button>
         </section>
       </div>
+
+      <ReturnablePanel language={language} currency={currency} refreshKey={sales} onReturned={onChanged} />
 
       <div className="pos-bottom">
         <section className="panel">

@@ -66,6 +66,7 @@ export const IPC_ARGS: Record<IpcChannel, ArgSpec[]> = {
   [IPC.CustomersUpdate]: ['id', 'object'],
   [IPC.PosSalesList]: none,
   [IPC.PosReturn]: ['object'],
+  [IPC.PosReturnable]: none,
   [IPC.PosCashIn]: ['int', 'string'],
   [IPC.PosCashOut]: ['int', 'string'],
   [IPC.PosCashboxList]: none,

@@ -2,6 +2,7 @@
 import type { Db } from 'mongodb'
 import { packOf, saleUnits, unitPrice, unitSize, type SaleUnit } from '../shared/packaging'
 import { customerForSale } from './customers'
+import { isLineOpen, lineRefund, returnDeadline, type ReturnableLine } from '../shared/returns'
 import { randomUUID } from 'node:crypto'
 import { getClient, getDb } from './db'
 import type { CashboxMovement, CashierShift, Return, Sale, SaleLine } from '../shared/pos'
@@ -114,6 +115,7 @@ async function createSale(db: Db, input: any): Promise<Sale> {
       unitsPerBox,
       unitPriceCents,
       unitCostCents: Math.max(0, Math.trunc(Number(product.purchaseCostCents) || 0)),
+      ...(Number(p.returnDays) > 0 ? { returnDays: Math.trunc(Number(p.returnDays)) } : {}),
       discountCents,
       taxCents: 0,
       lineTotalCents
@@ -250,7 +252,32 @@ export async function listSales(): Promise<Sale[]> {
   return (await db.collection<Sale>(SALES).find({}).sort({ createdAt: -1 }).toArray()).map(withStringId)
 }
 
-export async function posReturn(input: { saleId: string; reason: string }, username?: string): Promise<Return> {
+/** Sale lines that can still be returned, soonest deadline first (a passed period drops off the list). */
+export async function listReturnable(): Promise<ReturnableLine[]> {
+  const db = requireDb()
+  const since = new Date(Date.now() - 366 * 86400000).toISOString()
+  const sales = await db.collection<Sale>(SALES).find({ status: 'completed', createdAt: { $gte: since }, 'lines.returnDays': { $gt: 0 } } as any).sort({ createdAt: -1 }).limit(5000).toArray()
+  const now = Date.now()
+  const out: ReturnableLine[] = []
+  for (const sale of sales) {
+    sale.lines.forEach((line, lineIndex) => {
+      const deadline = returnDeadline(sale, line)
+      if (!deadline || deadline.getTime() < now || !isLineOpen(line)) return
+      out.push({
+        saleId: String(sale._id), invoiceNo: sale.invoiceNo, lineIndex, productName: line.productName, quantity: line.quantity,
+        saleUnit: line.saleUnit, refundCents: lineRefund(sale, lineIndex), soldAt: sale.createdAt, deadline: deadline.toISOString(),
+        ...(sale.customerName ? { customerName: sale.customerName } : {})
+      })
+    })
+  }
+  return out.sort((a, b) => a.deadline.localeCompare(b.deadline))
+}
+
+/**
+ * Returns one line (lineIndex) or every line still open. Only lines whose return period has not ended can
+ * come back; the refund is each line's share of what was paid. The sale is "returned" once nothing is open.
+ */
+export async function posReturn(input: { saleId: string; reason: string; lineIndex?: number }, username?: string): Promise<Return> {
   const db = requireDb()
   const client = requireClient()
   if (!ObjectId.isValid(input.saleId)) throw new Error('Invalid sale')
@@ -265,8 +292,27 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
       if (!sale) throw new Error('Sale not found or already returned')
 
       const now = new Date().toISOString()
-      for (const line of sale.lines) {
-        const baseQuantity = line.baseQuantity ?? line.quantity
+      const single = input.lineIndex !== undefined && input.lineIndex !== null
+      if (single && !(Number.isInteger(input.lineIndex) && sale.lines[input.lineIndex as number])) throw new Error('RETURN_LINE_INVALID')
+      const indexes = sale.lines.map((_, i) => i).filter((i) => (single ? i === input.lineIndex : true) && isLineOpen(sale.lines[i]))
+      if (indexes.length === 0) throw new Error('Sale not found or already returned')
+      for (const i of indexes) {
+        const deadline = returnDeadline(sale, sale.lines[i])
+        if (!deadline) throw new Error(`RETURN_NOT_ALLOWED: ${sale.lines[i].productName}`)
+        if (Date.now() > deadline.getTime()) throw new Error(`RETURN_PERIOD_OVER: ${sale.lines[i].productName}`)
+      }
+      const working = { ...sale, lines: sale.lines.map((l) => ({ ...l })) }
+      const refunds: number[] = []
+      for (const i of indexes) {
+        refunds.push(lineRefund(working, i))
+        working.refundedCents = (working.refundedCents ?? 0) + refunds[refunds.length - 1]
+        working.lines[i].returnedQuantity = working.lines[i].quantity
+      }
+      const refundCents = refunds.reduce((a, b) => a + b, 0)
+
+      for (const i of indexes) {
+        const line = sale.lines[i]
+        const baseQuantity = line.baseQuantity ?? line.quantity // a line always comes back whole
         await db.collection('inv_products').updateOne(
           { _id: new ObjectId(line.productId) } as any,
           { $inc: { stockQuantity: baseQuantity }, $set: { updatedAt: now } },
@@ -286,21 +332,22 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
         )
       }
 
+      const allBack = working.lines.every((l) => !isLineOpen(l))
       await db.collection(SALES).updateOne(
         { _id: new ObjectId(input.saleId) },
-        { $set: { status: 'returned', updatedAt: now } },
+        { $set: { lines: working.lines, refundedCents: working.refundedCents, ...(allBack ? { status: 'returned' } : {}), updatedAt: now } },
         { session }
       )
 
       const ret: Omit<Return, '_id'> = {
         saleId: input.saleId,
         invoiceNo: sale.invoiceNo,
-        lines: sale.lines.map((line) => ({
-          productId: line.productId,
-          quantity: line.baseQuantity ?? line.quantity,
-          amountCents: line.lineTotalCents
+        lines: indexes.map((i, k) => ({
+          productId: sale.lines[i].productId,
+          quantity: sale.lines[i].baseQuantity ?? sale.lines[i].quantity,
+          amountCents: refunds[k]
         })),
-        refundCents: sale.totalCents,
+        refundCents,
         reason: String(input.reason ?? '').trim() || 'Customer return',
         createdAt: now,
         ...(username ? { createdBy: username } : {})
@@ -311,7 +358,7 @@ export async function posReturn(input: { saleId: string; reason: string }, usern
         await db.collection(CASHBOX).insertOne(
           {
             type: 'refund',
-            amountCents: -sale.totalCents,
+            amountCents: -refundCents,
             reason: `Return ${sale.invoiceNo}`,
             reference: input.saleId,
             createdAt: now

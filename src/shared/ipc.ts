@@ -1,4 +1,5 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
+import type { ReturnableLine } from './returns'
 import type { AttendanceDay, AttendanceImportResult, SellerKpi } from './attendance'
 import type { Customer } from './customers'
 import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
@@ -63,6 +64,7 @@ export const IPC = {
   CustomersUpdate: 'customers:update',
   PosSalesList: 'pos:sales:list',
   PosReturn: 'pos:return',
+  PosReturnable: 'pos:returnable',
   PosCashIn: 'pos:cash:in',
   PosCashOut: 'pos:cash:out',
   PosCashboxList: 'pos:cashbox:list',
@@ -161,7 +163,8 @@ export interface PreloadApi {
   customersCreate(input: Partial<Customer>): Promise<Customer>
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
   posSalesList(): Promise<Sale[]>
-  posReturn(input: { saleId: string; reason: string }): Promise<Return>
+  posReturn(input: { saleId: string; reason: string; lineIndex?: number }): Promise<Return>
+  posReturnable(): Promise<ReturnableLine[]>
   posCashIn(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashOut(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashboxList(): Promise<CashboxMovement[]>

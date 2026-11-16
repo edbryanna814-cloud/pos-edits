@@ -12,6 +12,10 @@ export type SaleLine = {
   discountCents: number
   taxCents: number
   lineTotalCents: number
+  /** The product's return period when sold (days); none = cannot be returned. */
+  returnDays?: number
+  /** Returned so far (in this line's unit). */
+  returnedQuantity?: number
 }
 
 export type Sale = {
@@ -32,6 +36,8 @@ export type Sale = {
   customerName?: string
   /** The sale's discount as a percentage (1250 = 12.5%). */
   discountBasisPoints?: number
+  /** Money given back so far by returns. */
+  refundedCents?: number
   createdAt: string
   updatedAt: string
 }

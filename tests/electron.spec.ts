@@ -111,6 +111,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'posCashboxList',
         'posCheckout',
         'posReturn',
+        'posReturnable',
         'posSalesList',
         'posShiftClose',
         'posShiftOpen',
@@ -374,6 +375,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await window.getByLabel('Strip price', { exact: true }).fill('10.00')
       await window.getByLabel('Opening stock').fill('20')
       await window.getByLabel('Minimum stock').fill('5')
+      await window.getByLabel('Customer may return it within (days, optional)').fill('7')
       await window.getByRole('button', { name: 'Save product' }).click()
       await expect(window.locator('.data-table')).toContainText('Paracetamol 500mg')
       await expect(window.locator('.data-table')).toContainText('20')
@@ -398,7 +400,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       expect(sale.status).toBe('completed')
 
       await window.getByRole('button', { name: 'New sale' }).click()
-      await window.getByRole('button', { name: 'Return', exact: true }).click()
+      await window.locator('.pos-bottom').getByRole('button', { name: 'Return', exact: true }).click()
       await window.getByLabel('Return reason').fill('Damaged box')
       await window.getByRole('button', { name: 'Confirm return' }).click()
       await expect(window.locator('.success')).toContainText('Invoice returned.')
@@ -521,7 +523,8 @@ test('receives cartons and sells whole boxes in base units', async () => {
         unitsPerBox: 10,
         boxPriceCents: 1800,
         stockQuantity: 0,
-        minStock: 0
+        minStock: 0,
+        returnDays: 30
       })
       await api.invReceiveCarton({
         productId: product._id,
@@ -566,7 +569,7 @@ test('receives cartons and sells whole boxes in base units', async () => {
       const api = (window as any).api
       const product = await api.invProductsCreate({
         name: 'Pill Box', sku: 'PILL-BOX', packaging: 'box', stripsPerBox: 3, pillsPerStrip: 12,
-        unitPriceCents: 9000, purchaseCostCents: 100, stockQuantity: 5 * 36, minStock: 0
+        unitPriceCents: 9000, purchaseCostCents: 100, stockQuantity: 5 * 36, minStock: 0, returnDays: 7
       })
       const pill = await api.posCheckout({ clientRequestId: 'pill-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'pill' }], paymentMethod: 'cash', paidCents: 250 })
       const strip = await api.posCheckout({ clientRequestId: 'strip-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'strip' }], paymentMethod: 'cash', paidCents: 3000 })
@@ -574,15 +577,26 @@ test('receives cartons and sells whole boxes in base units', async () => {
       // A customer with 10% off: the server works out the discount from the percentage.
       const mona = await api.customersCreate({ name: 'Mona', phone: '0100', discountBasisPoints: 1000 })
       const box = await api.posCheckout({ clientRequestId: 'box-mona', customerId: mona._id, discountBasisPoints: 1000, lines: [{ productId: product._id, quantity: 1, saleUnit: 'box' }], paymentMethod: 'cash', paidCents: 8100 })
-      return { pill: pill.totalCents, strip: strip.totalCents, stock, box: [box.customerName, box.discountCents, box.totalCents] }
+      // Returnable list: the three sold lines, within 7 days. Return the strip on its own.
+      const returnable = await api.posReturnable()
+      const stripLine = returnable.find((r: any) => r.saleId === strip._id)
+      await api.posReturn({ saleId: strip._id, lineIndex: stripLine.lineIndex, reason: 'test' })
+      const afterReturn = (await api.posReturnable()).filter((r: any) => r.productName === 'Pill Box').length
+      // A product with no return period cannot be returned.
+      const plain = await api.invProductsCreate({ name: 'No Return', sku: 'NO-RET', packaging: 'pill', unitPriceCents: 100, stockQuantity: 5, minStock: 0 })
+      const plainSale = await api.posCheckout({ clientRequestId: 'no-ret', lines: [{ productId: plain._id, quantity: 1, saleUnit: 'pill' }], paymentMethod: 'cash', paidCents: 100 })
+      const refused = await api.posReturn({ saleId: plainSale._id, reason: 'x' }).then(() => 'returned', (e: Error) => e.message)
+      const finalStock = (await api.invProductsList()).find((p: any) => p.sku === 'PILL-BOX').stockQuantity
+      return { pill: pill.totalCents, strip: strip.totalCents, stock, box: [box.customerName, box.discountCents, box.totalCents], listed: returnable.filter((r: any) => r.productName === 'Pill Box').length, afterReturn, refused, stripRefund: stripLine.refundCents, finalStock }
     })
-    expect(units).toEqual({ pill: 250, strip: 3000, stock: 180 - 1 - 12, box: ['Mona', 900, 8100] })
+    expect(units).toMatchObject({ pill: 250, strip: 3000, stock: 180 - 1 - 12, box: ['Mona', 900, 8100], listed: 3, afterReturn: 2, stripRefund: 3000, finalStock: 180 - 1 - 36 })
+    expect(units.refused).toContain('RETURN_NOT_ALLOWED')
     // Products made through the API appear after a reload (the session is kept).
     await window.reload()
     await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
     await window.getByRole('button', { name: 'Inventory', exact: true }).click()
-    // 167 - 36 (the box sold to Mona) = 131 pills = 3 boxes (108) + 1 strip (12) + 11 pills.
-    await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('3 boxes · 1 strip · 11 pills')
+    // 180 - 1 pill - 36 (box to Mona) = 143 pills = 3 boxes (108) + 2 strips (24) + 11 pills (the strip came back).
+    await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('3 boxes · 2 strips · 11 pills')
     await window.getByRole('button', { name: 'Customers', exact: true }).click()
     await expect(window.getByRole('row').filter({ hasText: 'Mona' })).toContainText('10%')
 
