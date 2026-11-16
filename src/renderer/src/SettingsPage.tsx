@@ -17,6 +17,7 @@ interface FormState {
   companyName: string
   currencyCode: string
   currencyPrecision: string
+  taxEnabled: boolean
   taxRatePercent: string
   defaultLanguage: Language | ''
   backupDirectory: string
@@ -28,6 +29,7 @@ function toForm(settings: StoredCompanySettings | null): FormState {
       companyName: '',
       currencyCode: '',
       currencyPrecision: '',
+      taxEnabled: false,
       taxRatePercent: '',
       defaultLanguage: '',
       backupDirectory: ''
@@ -38,7 +40,8 @@ function toForm(settings: StoredCompanySettings | null): FormState {
     companyName: settings.companyName,
     currencyCode: settings.currencyCode,
     currencyPrecision: String(settings.currencyPrecision),
-    taxRatePercent: (settings.taxRateBasisPoints / 100).toFixed(2),
+    taxEnabled: settings.taxRateBasisPoints > 0,
+    taxRatePercent: settings.taxRateBasisPoints > 0 ? (settings.taxRateBasisPoints / 100).toFixed(2) : '',
     defaultLanguage: settings.defaultLanguage,
     backupDirectory: settings.backupDirectory
   }
@@ -89,9 +92,9 @@ export default function SettingsPage({
       return
     }
 
-    const taxPercent = Number(form.taxRatePercent)
+    const taxPercent = form.taxEnabled ? Number(form.taxRatePercent) : 0
     if (
-      form.taxRatePercent === '' ||
+      (form.taxEnabled && form.taxRatePercent === '') ||
       !Number.isFinite(taxPercent) ||
       taxPercent < 0 ||
       taxPercent > 100
@@ -205,18 +208,25 @@ export default function SettingsPage({
           />
         </label>
 
-        <label>
-          <span>{t(language, 'taxRate')}</span>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            value={form.taxRatePercent}
-            onChange={(event) => update('taxRatePercent', event.target.value)}
-            required
-          />
+        <label className="checkbox">
+          <input type="checkbox" checked={form.taxEnabled} onChange={(event) => setForm((f) => ({ ...f, taxEnabled: event.target.checked }))} />
+          <span>{t(language, 'chargeTax')}</span>
         </label>
+
+        {form.taxEnabled ? (
+          <label>
+            <span>{t(language, 'taxRate')}</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={form.taxRatePercent}
+              onChange={(event) => update('taxRatePercent', event.target.value)}
+              required
+            />
+          </label>
+        ) : null}
 
         <label>
           <span>{t(language, 'defaultLanguage')}</span>

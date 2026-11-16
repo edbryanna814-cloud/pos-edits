@@ -124,7 +124,12 @@ async function createSale(db: Db, input: any): Promise<Sale> {
 
   const subtotalCents = lines.reduce((sum, line) => sum + line.unitPriceCents * line.quantity, 0)
   const lineDiscounts = lines.reduce((sum, line) => sum + line.discountCents, 0)
-  const requestedDiscount = toCents(input?.discountCents ?? 0, 'Discount')
+  // Discount as a percentage (basis points, 1250 = 12.5%), computed here from the subtotal.
+  const discountBasisPoints = input?.discountBasisPoints === undefined ? null : Number(input.discountBasisPoints)
+  if (discountBasisPoints !== null && !(Number.isInteger(discountBasisPoints) && discountBasisPoints >= 0 && discountBasisPoints <= 10000)) {
+    throw new Error('Discount must be from 0 to 100%')
+  }
+  const requestedDiscount = discountBasisPoints !== null ? Math.round((subtotalCents * discountBasisPoints) / 10000) : toCents(input?.discountCents ?? 0, 'Discount')
   const discountCents = requestedDiscount > 0 ? requestedDiscount : lineDiscounts
   if (discountCents > subtotalCents) throw new Error('Discount exceeds subtotal')
 

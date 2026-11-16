@@ -37,6 +37,7 @@ const copy = {
     remove: 'Remove',
     subtotal: 'Subtotal',
     discount: 'Discount',
+    discountPercent: 'Discount (%)',
     tax: 'Tax',
     total: 'Total',
     paymentMethod: 'Payment method',
@@ -72,7 +73,7 @@ const copy = {
     apply: 'Apply',
     noCashbox: 'No cashbox movements yet.',
     cartEmptyError: 'Add at least one product to the cart.',
-    discountError: 'Enter a valid discount.',
+    discountError: 'Enter a discount from 0 to 100%.',
     discountTooBig: 'Discount cannot exceed the subtotal.',
     paidError: 'Enter a valid paid amount.',
     paidTooLow: 'Paid amount is less than the total.',
@@ -106,6 +107,7 @@ const copy = {
     remove: 'حذف',
     subtotal: 'الإجمالي الفرعي',
     discount: 'الخصم',
+    discountPercent: 'الخصم (%)',
     tax: 'الضريبة',
     total: 'الإجمالي',
     paymentMethod: 'طريقة الدفع',
@@ -141,7 +143,7 @@ const copy = {
     apply: 'تنفيذ',
     noCashbox: 'لا توجد حركات صندوق بعد.',
     cartEmptyError: 'أضف منتجًا واحدًا على الأقل إلى السلة.',
-    discountError: 'أدخل خصمًا صحيحًا.',
+    discountError: 'أدخل خصمًا من 0 إلى 100%.',
     discountTooBig: 'لا يمكن أن يتجاوز الخصم الإجمالي الفرعي.',
     paidError: 'أدخل مبلغًا مدفوعًا صحيحًا.',
     paidTooLow: 'المبلغ المدفوع أقل من الإجمالي.',
@@ -189,6 +191,14 @@ function isExpired(expiryDate: string | undefined): boolean {
 function newRequestId(): string {
   const cryptoApi = globalThis.crypto as Crypto | undefined
   return cryptoApi?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+/** "12.5" → 1250 basis points; null when not a number from 0 to 100 with at most 2 decimals. */
+function percentToBasisPoints(value: string): number | null {
+  const text = value.trim().replace(',', '.')
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(text)) return null
+  const bp = Math.round(Number(text) * 100)
+  return bp <= 10000 ? bp : null
 }
 
 export default function PosPage({
@@ -263,8 +273,9 @@ export default function PosPage({
   )
 
   const subtotalCents = cartLines.reduce((sum, line) => sum + line.lineTotalCents, 0)
-  const discountCents = discountInput.trim() ? parseMoney(discountInput) : 0
-  const safeDiscountCents = Math.min(Math.max(0, discountCents ?? 0), subtotalCents)
+  const discountBasisPoints = discountInput.trim() ? percentToBasisPoints(discountInput) : 0
+  // Same rounding as the server (src/main/pos.ts), which recomputes it.
+  const safeDiscountCents = Math.round((subtotalCents * (discountBasisPoints ?? 0)) / 10000)
   const taxableCents = subtotalCents - safeDiscountCents
   const taxBasisPoints = Math.max(0, Math.min(10000, Math.round(Number(taxRateBasisPoints) || 0)))
   const taxCents = Math.round((taxableCents * taxBasisPoints) / 10000)
@@ -385,8 +396,7 @@ export default function PosPage({
     setError('')
     setSuccess('')
     if (cartLines.length === 0) return setError(text.cartEmptyError)
-    if (discountInput.trim() && discountCents === null) return setError(text.discountError)
-    if ((discountCents ?? 0) > subtotalCents) return setError(text.discountTooBig)
+    if (discountBasisPoints === null) return setError(text.discountError)
     if (paidCents === null) return setError(text.paidError)
     if (paidCents < totalCents) return setError(text.paidTooLow)
 
@@ -400,7 +410,7 @@ export default function PosPage({
           quantity: item.quantity,
           saleUnit: item.unit
         })),
-        discountCents: safeDiscountCents,
+        discountBasisPoints: discountBasisPoints ?? 0,
         taxCents,
         paymentMethod,
         paidCents
@@ -529,12 +539,14 @@ export default function PosPage({
               <dt>{text.discount}</dt>
               <dd>{formatMoney(receipt.discountCents, currency)}</dd>
             </div>
-            <div>
-              <dt>
-                {text.tax} ({taxPercent}%)
-              </dt>
-              <dd>{formatMoney(receipt.taxCents, currency)}</dd>
-            </div>
+            {receipt.taxCents > 0 ? (
+              <div>
+                <dt>
+                  {text.tax} ({taxPercent}%)
+                </dt>
+                <dd>{formatMoney(receipt.taxCents, currency)}</dd>
+              </div>
+            ) : null}
             <div className="total-row">
               <dt>{text.total}</dt>
               <dd>{formatMoney(receipt.totalCents, currency)}</dd>
@@ -703,12 +715,12 @@ export default function PosPage({
           )}
 
           <label className="cart-field">
-            <span>{text.discount}</span>
+            <span>{text.discountPercent}</span>
             <input
               inputMode="decimal"
               value={discountInput}
               onChange={(event) => setDiscountInput(event.target.value)}
-              placeholder="0.00"
+              placeholder="0"
             />
           </label>
 
@@ -721,12 +733,14 @@ export default function PosPage({
               <dt>{text.discount}</dt>
               <dd>{formatMoney(safeDiscountCents, currency)}</dd>
             </div>
-            <div>
-              <dt>
-                {text.tax} ({taxPercent}%)
-              </dt>
-              <dd>{formatMoney(taxCents, currency)}</dd>
-            </div>
+            {taxBasisPoints > 0 ? (
+              <div>
+                <dt>
+                  {text.tax} ({taxPercent}%)
+                </dt>
+                <dd>{formatMoney(taxCents, currency)}</dd>
+              </div>
+            ) : null}
             <div className="total-row">
               <dt>{text.total}</dt>
               <dd>{formatMoney(totalCents, currency)}</dd>
