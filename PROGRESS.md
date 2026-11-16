@@ -222,10 +222,21 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
   and per-seller KPIs on the dashboard. Not built: a live network link to the machine (needs the model).
 - Installer 0.3.0 SHA-256 `10896fb3b3b5c4c9adea20375f24ed50bdd5a2c348302dd6909675c27a81a483` (pre-release `field-test-0.3.0`). Release repo not updated yet (owner: later).
 
+## 0.3.1 (2026-11-16): owner review of 0.3.0 (same branch, PR #4)
+
+- `fba20d5` Settings tick box beside its words; stock colours from each product's minimum (red at/below, yellow within a
+  new per-product warning margin) on Inventory rows and POS cards; stock adjustment in boxes, strips or pills.
+- `dd51ef3` return period per product (days; empty = not returnable), saved on each sold line; POS "Returnable items"
+  list (passed periods drop off); per-line returns refunded their share of what was paid; server refuses the rest.
+- `0bf4b67` permission `data.transfer` (Administrator only): backups, Excel imports, attendance import, exports.
+  Exports per section as Excel or .db (MongoDB Extended JSON, records as stored; no password hashes). Record
+  database IDs (`_id`, always created by MongoDB) shown to Administrators only - never shown before, incl. 3f70318.
+- Installer 0.3.1 SHA-256 `d363e5cd5f9c83cbacb2467845e0551fcd83cfcb241cbb500e3445422f8de78a` (pre-release `field-test-0.3.1`).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-16: 0.3.0 (pharmacy requests 1-9) built; pre-release `field-test-0.3.0`; Anubis-hub/pharmacy-pos-release still at 0.2.6.
+2026-11-16: 0.3.1 (owner review fixes) built; pre-release `field-test-0.3.1`; PR #4 open (not merged); release repo still 0.2.6.
