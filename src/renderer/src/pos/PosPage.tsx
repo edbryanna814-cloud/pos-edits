@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { packOf, saleUnits, unitPrice, unitSize, type SaleUnit } from '../../../shared/packaging'
+import { stockText, UNIT_NAMES } from '../units'
 import type { CashboxMovement, Sale } from '../../../shared/pos'
 import type { Product } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
@@ -162,21 +164,16 @@ const copy = {
 interface CartItem {
   productId: string
   quantity: number
-  unit: 'base' | 'box'
+  unit: SaleUnit
 }
 
-function unitsPerBox(product: Product): number {
-  return Math.max(1, Math.trunc(product.unitsPerBox ?? 1))
-}
-
-function canSellBox(product: Product): boolean {
-  return unitsPerBox(product) > 1 && (product.boxPriceCents ?? 0) > 0
-}
-
+/** Stock units (smallest counted unit) this cart line takes. */
 function baseOf(item: CartItem, product: Product | undefined): number {
-  if (!product) return item.quantity
-  return item.unit === 'box' ? item.quantity * unitsPerBox(product) : item.quantity
+  return product ? item.quantity * unitSize(product, item.unit) : item.quantity
 }
+
+/** A scan or a tap on the product sells its own unit (a box for boxed medicine). */
+const ownUnit = (product: Product): SaleUnit => packOf(product).packaging
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -258,8 +255,7 @@ export default function PosPage({
       cart.flatMap((item) => {
         const product = byId.get(item.productId)
         if (!product) return []
-        const unitPriceCents =
-          item.unit === 'box' ? (product.boxPriceCents ?? 0) : product.sellingPriceCents
+        const unitPriceCents = unitPrice(product, item.unit)
         return [
           {
             ...item,
@@ -305,7 +301,7 @@ export default function PosPage({
         const match = products.find((product) => product.barcode === code)
         if (match) {
           event.preventDefault()
-          addProductRef.current(match, 'base')
+          addProductRef.current(match)
           setQuery('')
         }
         return
@@ -316,18 +312,17 @@ export default function PosPage({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [products])
 
-  function addProduct(product: Product, unit: 'base' | 'box' = 'base'): void {
+  function addProduct(product: Product, unit: SaleUnit = ownUnit(product)): void {
     if (!product._id || product.stockQuantity <= 0) return
     if (isExpired(product.expiryDate)) {
       setError(`${text.expiredError} ${product.name}`)
       return
     }
-    if (unit === 'box' && !canSellBox(product)) {
+    if (!saleUnits(product).includes(unit) || unitPrice(product, unit) <= 0) {
       setError(`${text.boxPriceMissing} ${product.name}`)
       return
     }
-    const pack = unitsPerBox(product)
-    const addBase = unit === 'box' ? pack : 1
+    const addBase = unitSize(product, unit)
     const reserved = cart.reduce(
       (sum, item) =>
         sum + (item.productId === product._id ? baseOf(item, product) : 0),
@@ -359,12 +354,12 @@ export default function PosPage({
   const addProductRef = useRef(addProduct)
   addProductRef.current = addProduct
 
-  function setQuantity(productId: string, unit: 'base' | 'box', value: string): void {
+  function setQuantity(productId: string, unit: SaleUnit, value: string): void {
     const product = byId.get(productId)
     if (!product) return
     const parsed = Number(value)
     const pool = Math.max(1, Math.trunc(parsed) || 1)
-    const pack = unit === 'box' ? unitsPerBox(product) : 1
+    const pack = unitSize(product, unit)
     const reservedElsewhere = cart.reduce(
       (sum, item) =>
         sum +
@@ -380,7 +375,7 @@ export default function PosPage({
     )
   }
 
-  function removeLine(productId: string, unit: 'base' | 'box'): void {
+  function removeLine(productId: string, unit: SaleUnit): void {
     setCart((current) => current.filter((item) => !(item.productId === productId && item.unit === unit)))
   }
 
@@ -523,7 +518,7 @@ export default function PosPage({
                 <tr key={line.productId}>
                   <td>
                     {line.productName} × {line.quantity}
-                    {line.saleUnit === 'box' ? ` ${text.box}` : ''}
+                    {line.saleUnit && line.saleUnit !== 'base' ? ` ${UNIT_NAMES[language][line.saleUnit]}` : ''}
                   </td>
                   <td>{formatMoney(line.lineTotalCents, currency)}</td>
                 </tr>
@@ -639,19 +634,22 @@ export default function PosPage({
                         {product.barcode ? ` · ${product.barcode}` : ''}
                       </span>
                       <span className="product-footer">
-                        <strong>{formatMoney(product.sellingPriceCents, currency)}</strong>
-                        <span className={low ? 'warning-text' : 'muted'}>{product.stockQuantity}</span>
+                        <strong>{UNIT_NAMES[language][ownUnit(product)]} {formatMoney(unitPrice(product, ownUnit(product)), currency)}</strong>
+                        <span className={low ? 'warning-text' : 'muted'}>{stockText(product.stockQuantity, product, language)}</span>
                       </span>
                     </button>
-                    {canSellBox(product) ? (
-                      <button
-                        type="button"
-                        className="product-card-box"
-                        onClick={() => addProduct(product, 'box')}
-                      >
-                        {text.box}: {formatMoney(product.boxPriceCents ?? 0, currency)}
-                      </button>
-                    ) : null}
+                    {saleUnits(product)
+                      .filter((unit) => unit !== ownUnit(product) && unitPrice(product, unit) > 0)
+                      .map((unit) => (
+                        <button
+                          key={unit}
+                          type="button"
+                          className="product-card-box"
+                          onClick={() => addProduct(product, unit)}
+                        >
+                          {UNIT_NAMES[language][unit]}: {formatMoney(unitPrice(product, unit), currency)}
+                        </button>
+                      ))}
                   </div>
                 )
               })}
@@ -681,11 +679,7 @@ export default function PosPage({
                   <div className="cart-line-main">
                     <strong>{line.product.name}</strong>
                     <span className="muted">
-                      {line.unit === 'box'
-                        ? `${text.box} · `
-                        : unitsPerBox(line.product) > 1
-                          ? `${text.strip} · `
-                          : ''}
+                      {`${UNIT_NAMES[language][line.unit]} · `}
                       {formatMoney(line.unitPriceCents, currency)}
                     </span>
                   </div>

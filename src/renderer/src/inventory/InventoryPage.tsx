@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { derivePackaging, packOf, saleUnits, unitPrice, unitSize, type Packaging } from '../../../shared/packaging'
+import { stockText, UNIT_NAMES } from '../units'
 import type { Category, Product, Unit } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
 import { centsToInput, formatMoney, parseMoney } from '../money'
@@ -35,6 +37,15 @@ const copy = {
     purchaseCost: 'Purchase cost',
     sellingPrice: 'Selling price',
     unitsPerBox: 'Strips per box (1 = no box selling)',
+    unitType: 'Unit type',
+    stripsPerBox: 'Strips in one box',
+    pillsPerStrip: 'Pills in one strip (optional)',
+    priceOf: { box: 'Box price', strip: 'Strip price', pill: 'Pill price' },
+    perUnit: { box: 'per box', strip: 'per strip', pill: 'per pill' },
+    inUnits: { box: 'boxes', strip: 'strips', pill: 'pills' },
+    derived: 'Sells at',
+    stripsInvalid: 'Strips in one box must be 1 or more.',
+    pillsInvalid: 'Pills in one strip must be 1 or more, or left empty.',
     perBox: 'per box',
     boxPrice: 'Box selling price',
     cartonTitle: 'Receive carton',
@@ -114,6 +125,15 @@ const copy = {
     purchaseCost: 'سعر الشراء',
     sellingPrice: 'سعر البيع',
     unitsPerBox: 'عدد الشرائط في العلبة (1 = بدون بيع بالعلبة)',
+    unitType: 'نوع الوحدة',
+    stripsPerBox: 'عدد الشرائط في العلبة',
+    pillsPerStrip: 'عدد الأقراص في الشريط (اختياري)',
+    priceOf: { box: 'سعر العلبة', strip: 'سعر الشريط', pill: 'سعر القرص' },
+    perUnit: { box: 'للعلبة', strip: 'للشريط', pill: 'للقرص' },
+    inUnits: { box: 'علب', strip: 'شرائط', pill: 'أقراص' },
+    derived: 'يباع بـ',
+    stripsInvalid: 'عدد الشرائط في العلبة يجب أن يكون 1 أو أكثر.',
+    pillsInvalid: 'عدد الأقراص في الشريط يجب أن يكون 1 أو أكثر، أو اتركه فارغًا.',
     perBox: 'لكل علبة',
     boxPrice: 'سعر بيع العلبة',
     cartonTitle: 'استلام كرتونة',
@@ -192,9 +212,11 @@ interface FormState {
   unitId: string
   expiryDate: string
   purchase: string
+  /** Price of one unit of the product's own type (box, strip or pill). */
   selling: string
-  unitsPerBox: string
-  boxPrice: string
+  packaging: Packaging
+  stripsPerBox: string
+  pillsPerStrip: string
   stock: string
   minStock: string
   active: boolean
@@ -210,8 +232,9 @@ function emptyForm(): FormState {
     expiryDate: '',
     purchase: '0.00',
     selling: '0.00',
-    unitsPerBox: '1',
-    boxPrice: '',
+    packaging: 'box',
+    stripsPerBox: '1',
+    pillsPerStrip: '',
     stock: '0',
     minStock: '0',
     active: true
@@ -219,6 +242,9 @@ function emptyForm(): FormState {
 }
 
 function formFrom(product: Product): FormState {
+  // Stock, minimum and cost are stored per smallest unit; the form shows them per the product's own unit.
+  const k = packOf(product)
+  const size = unitSize(product, k.packaging)
   return {
     name: product.name,
     sku: product.sku,
@@ -226,14 +252,24 @@ function formFrom(product: Product): FormState {
     categoryId: product.categoryId ?? '',
     unitId: product.unitId ?? '',
     expiryDate: product.expiryDate ? product.expiryDate.slice(0, 10) : '',
-    purchase: centsToInput(product.purchaseCostCents),
-    selling: centsToInput(product.sellingPriceCents),
-    unitsPerBox: String(product.unitsPerBox ?? 1),
-    boxPrice: product.boxPriceCents ? centsToInput(product.boxPriceCents) : '',
-    stock: String(product.stockQuantity),
-    minStock: String(product.minStock),
+    purchase: centsToInput(product.purchaseCostCents * size),
+    selling: centsToInput(unitPrice(product, k.packaging)),
+    packaging: k.packaging,
+    stripsPerBox: String(k.stripsPerBox),
+    pillsPerStrip: k.pillsPerStrip > 1 ? String(k.pillsPerStrip) : '',
+    stock: String(Math.floor(product.stockQuantity / size)),
+    minStock: String(Math.ceil(product.minStock / size)),
     active: product.active !== false
   }
+}
+
+/** "Sells at Strip 30.00 · Pill 2.50": what the box (or strip) price divides into, before saving. */
+function derivedPrices(form: FormState, language: Language, currency: string, label: string): string {
+  const price = parseMoney(form.selling)
+  if (price === null || price <= 0) return ''
+  const product = derivePackaging({ packaging: form.packaging, stripsPerBox: Number(form.stripsPerBox) || 1, pillsPerStrip: Number(form.pillsPerStrip) || undefined, priceCents: price })
+  const below = saleUnits(product).filter((unit) => unit !== form.packaging)
+  return below.length ? `${label} ${below.map((unit) => `${UNIT_NAMES[language][unit]} ${formatMoney(unitPrice(product, unit), currency)}`).join(' · ')}` : ''
 }
 
 function message(error: unknown): string {
@@ -346,14 +382,12 @@ export default function InventoryPage({ products, language, currency, onChanged 
     if (minStock === null) return setError(text.minInvalid)
     const openingStock = wholeNumber(form.stock, 0)
     if (openingStock === null) return setError(text.stockInvalid)
-    const unitsPerBox = wholeNumber(form.unitsPerBox, 1)
-    if (unitsPerBox === null) return setError(text.unitsPerBoxInvalid)
-    let boxPriceCents: number | undefined
-    if (unitsPerBox > 1) {
-      const boxPrice = parseMoney(form.boxPrice)
-      if (boxPrice === null || boxPrice <= 0) return setError(text.boxPriceRequired)
-      boxPriceCents = boxPrice
-    }
+    const stripsPerBox = form.packaging === 'box' ? wholeNumber(form.stripsPerBox, 1) : 1
+    if (stripsPerBox === null) return setError(text.stripsInvalid)
+    const pillsPerStrip = form.packaging === 'pill' || !form.pillsPerStrip.trim() ? undefined : wholeNumber(form.pillsPerStrip, 1)
+    if (pillsPerStrip === null) return setError(text.pillsInvalid)
+    if (selling <= 0) return setError(text.priceInvalid)
+    const size = unitSize(derivePackaging({ packaging: form.packaging, stripsPerBox, pillsPerStrip, priceCents: selling }), form.packaging)
 
     const payload: Partial<Product> = {
       name,
@@ -362,14 +396,15 @@ export default function InventoryPage({ products, language, currency, onChanged 
       categoryId: form.categoryId || undefined,
       unitId: form.unitId || undefined,
       expiryDate: form.expiryDate || undefined,
-      purchaseCostCents: purchase,
-      sellingPriceCents: selling,
-      unitsPerBox,
-      minStock,
+      purchaseCostCents: Math.round(purchase / size),
+      packaging: form.packaging,
+      stripsPerBox,
+      pillsPerStrip,
+      unitPriceCents: selling,
+      minStock: minStock * size,
       active: form.active
-    }
-    if (boxPriceCents !== undefined) payload.boxPriceCents = boxPriceCents
-    if (!editing) payload.stockQuantity = openingStock
+    } as Partial<Product>
+    if (!editing) payload.stockQuantity = openingStock * size
 
     setBusy(true)
     try {
@@ -595,16 +630,27 @@ export default function InventoryPage({ products, language, currency, onChanged 
               </select>
             </label>
             <label>
-              <span>{text.unit}</span>
-              <select value={form.unitId} onChange={(event) => update('unitId', event.target.value)}>
-                <option value="">{text.none}</option>
-                {units.map((unit) => (
-                  <option key={unit._id} value={unit._id}>{unit.name} ({unit.abbreviation})</option>
+              <span>{text.unitType}</span>
+              <select value={form.packaging} onChange={(event) => update('packaging', event.target.value as Packaging)}>
+                {(['box', 'strip', 'pill'] as const).map((unit) => (
+                  <option key={unit} value={unit}>{UNIT_NAMES[language][unit]}</option>
                 ))}
               </select>
             </label>
+            {form.packaging === 'box' ? (
+              <label>
+                <span>{text.stripsPerBox}</span>
+                <input type="number" min={1} step={1} value={form.stripsPerBox} onChange={(event) => update('stripsPerBox', event.target.value)} required />
+              </label>
+            ) : null}
+            {form.packaging !== 'pill' ? (
+              <label>
+                <span>{text.pillsPerStrip}</span>
+                <input type="number" min={1} step={1} value={form.pillsPerStrip} onChange={(event) => update('pillsPerStrip', event.target.value)} />
+              </label>
+            ) : null}
             <label>
-              <span>{text.purchaseCost}</span>
+              <span>{text.purchaseCost} ({text.perUnit[form.packaging]})</span>
               <input
                 inputMode="decimal"
                 value={form.purchase}
@@ -613,38 +659,17 @@ export default function InventoryPage({ products, language, currency, onChanged 
               />
             </label>
             <label>
-              <span>{text.sellingPrice}</span>
+              <span>{text.priceOf[form.packaging]}</span>
               <input
                 inputMode="decimal"
                 value={form.selling}
                 onChange={(event) => update('selling', event.target.value)}
                 required
               />
+              <small className="muted">{derivedPrices(form, language, currency, text.derived)}</small>
             </label>
             <label>
-              <span>{text.unitsPerBox}</span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={form.unitsPerBox}
-                onChange={(event) => update('unitsPerBox', event.target.value)}
-                required
-              />
-            </label>
-            {Number(form.unitsPerBox) > 1 ? (
-              <label>
-                <span>{text.boxPrice}</span>
-                <input
-                  inputMode="decimal"
-                  value={form.boxPrice}
-                  onChange={(event) => update('boxPrice', event.target.value)}
-                  required
-                />
-              </label>
-            ) : null}
-            <label>
-              <span>{text.stock}</span>
+              <span>{text.stock} ({text.inUnits[form.packaging]})</span>
               <input
                 type="number"
                 min={0}
@@ -656,7 +681,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
               />
             </label>
             <label>
-              <span>{text.minStock}</span>
+              <span>{text.minStock} ({text.inUnits[form.packaging]})</span>
               <input
                 type="number"
                 min={0}
@@ -911,16 +936,14 @@ export default function InventoryPage({ products, language, currency, onChanged 
                     <td>
                       <strong>{product.name}</strong>
                       {product.barcode ? <small className="block-muted">{product.barcode}</small> : null}
-                      {(product.unitsPerBox ?? 1) > 1 ? (
-                        <small className="block-muted">
-                          {text.boxPrice}: {formatMoney(product.boxPriceCents ?? 0, currency)} ({product.unitsPerBox} {text.perBox})
-                        </small>
-                      ) : null}
+                      <small className="block-muted">
+                        {saleUnits(product).map((unit) => `${UNIT_NAMES[language][unit]} ${formatMoney(unitPrice(product, unit), currency)}`).join(' · ')}
+                      </small>
                     </td>
                     <td>{product.sku}</td>
-                    <td>{formatMoney(product.sellingPriceCents, currency)}</td>
-                    <td className={critical || expired ? 'danger-text' : low ? 'warning-text' : ''}>{product.stockQuantity}</td>
-                    <td>{product.minStock}</td>
+                    <td>{formatMoney(unitPrice(product, packOf(product).packaging), currency)} <small className="muted">{text.perUnit[packOf(product).packaging]}</small></td>
+                    <td className={critical || expired ? 'danger-text' : low ? 'warning-text' : ''}>{stockText(product.stockQuantity, product, language)}</td>
+                    <td>{stockText(product.minStock, product, language)}</td>
                     <td>
                       {product.expiryDate ? (
                         <span className={`tag ${expired ? 'danger-tag' : expiresSoon ? 'warning-tag' : 'ok-tag'}`}>

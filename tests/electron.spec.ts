@@ -361,8 +361,9 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await window.getByLabel('Product name').fill('Paracetamol 500mg')
       await window.getByLabel('SKU', { exact: true }).fill('PARA-500')
       await window.getByLabel('Barcode (optional)').fill('1234567890')
+      await window.getByLabel('Unit type').selectOption('strip')
       await window.getByLabel('Purchase cost').fill('5.00')
-      await window.getByLabel('Selling price').fill('10.00')
+      await window.getByLabel('Strip price', { exact: true }).fill('10.00')
       await window.getByLabel('Opening stock').fill('20')
       await window.getByLabel('Minimum stock').fill('5')
       await window.getByRole('button', { name: 'Save product' }).click()
@@ -551,6 +552,26 @@ test('receives cartons and sells whole boxes in base units', async () => {
     expect(result.line.saleUnit).toBe('box')
     expect(result.line.baseQuantity).toBe(20)
     expect(result.totalCents).toBe(3600)
+
+    // 0.3.0 units: a box of 3 strips x 12 pills for 90.00; 5 boxes in stock, one pill and one strip sold.
+    const units = await window.evaluate(async () => {
+      const api = (window as any).api
+      const product = await api.invProductsCreate({
+        name: 'Pill Box', sku: 'PILL-BOX', packaging: 'box', stripsPerBox: 3, pillsPerStrip: 12,
+        unitPriceCents: 9000, purchaseCostCents: 100, stockQuantity: 5 * 36, minStock: 0
+      })
+      const pill = await api.posCheckout({ clientRequestId: 'pill-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'pill' }], paymentMethod: 'cash', paidCents: 250 })
+      const strip = await api.posCheckout({ clientRequestId: 'strip-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'strip' }], paymentMethod: 'cash', paidCents: 3000 })
+      const stock = (await api.invProductsList()).find((p: any) => p.sku === 'PILL-BOX').stockQuantity
+      return { pill: pill.totalCents, strip: strip.totalCents, stock }
+    })
+    expect(units).toEqual({ pill: 250, strip: 3000, stock: 180 - 1 - 12 })
+    // Products made through the API appear after a reload (the session is kept).
+    await window.reload()
+    await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+    await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+    // 167 pills = 4 boxes (144) + 1 strip (12) + 11 pills.
+    await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('4 boxes · 1 strip · 11 pills')
   } finally {
     await app.close()
   }

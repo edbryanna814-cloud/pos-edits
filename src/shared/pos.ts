@@ -3,7 +3,8 @@ export type SaleLine = {
   productName: string
   sku: string
   quantity: number
-  saleUnit?: 'base' | 'box'
+  /** 'base' on sales before 0.3.0 (= strip). */
+  saleUnit?: 'base' | 'box' | 'strip' | 'pill'
   baseQuantity?: number
   unitsPerBox?: number
   unitPriceCents: number

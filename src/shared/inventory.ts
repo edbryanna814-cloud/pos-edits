@@ -25,6 +25,12 @@ export type Product = {
   sellingPriceCents: number
   unitsPerBox?: number
   boxPriceCents?: number
+  /** 0.3.0: the product's own unit, and how it splits (see src/shared/packaging.ts). */
+  packaging?: 'box' | 'strip' | 'pill'
+  stripsPerBox?: number
+  pillsPerStrip?: number
+  stripPriceCents?: number
+  /** In the smallest counted unit (pill when pills per strip is set, else strip). */
   stockQuantity: number
   minStock: number
   expiryDate?: string

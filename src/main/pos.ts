@@ -1,5 +1,6 @@
 ﻿import { ObjectId } from 'mongodb'
 import type { Db } from 'mongodb'
+import { packOf, saleUnits, unitPrice, unitSize, type SaleUnit } from '../shared/packaging'
 import { randomUUID } from 'node:crypto'
 import { getClient, getDb } from './db'
 import type { CashboxMovement, CashierShift, Return, Sale, SaleLine } from '../shared/pos'
@@ -88,19 +89,15 @@ async function createSale(db: Db, input: any): Promise<Sale> {
       }
     }
 
-    const saleUnit = raw?.saleUnit === 'box' ? 'box' : 'base'
-    const unitsPerBox = Math.max(1, Math.trunc(Number((product as any).unitsPerBox) || 1))
-    let unitPriceCents: number
-    let baseQuantity: number
-    if (saleUnit === 'box') {
-      if (unitsPerBox <= 1) throw new Error(`${product.name} is not sold by box`)
-      unitPriceCents = Math.max(0, Math.trunc(Number((product as any).boxPriceCents) || 0))
-      if (unitPriceCents <= 0) throw new Error(`Box price is not set for ${product.name}`)
-      baseQuantity = quantity * unitsPerBox
-    } else {
-      unitPriceCents = serverPrice(product)
-      baseQuantity = quantity
-    }
+    // Box, strip or pill (src/shared/packaging.ts); 'base' from an older till means the strip.
+    const p = product as any
+    const requested = raw?.saleUnit === 'base' || raw?.saleUnit === undefined ? (packOf(p).countsPills ? 'pill' : 'strip') : raw.saleUnit
+    if (!saleUnits(p).includes(requested)) throw new Error(`${product.name} is not sold by ${String(requested)}`)
+    const saleUnit = requested as SaleUnit
+    const unitsPerBox = unitSize(p, 'box')
+    const unitPriceCents = unitPrice(p, saleUnit)
+    if (unitPriceCents <= 0) throw new Error(`The ${saleUnit} price is not set for ${product.name}`)
+    const baseQuantity = quantity * unitSize(p, saleUnit)
 
     const discountCents = toCents(raw?.discountCents ?? 0, 'Line discount')
     const lineTotalCents = unitPriceCents * quantity - discountCents

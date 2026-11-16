@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from 'mongodb'
+import { derivePackaging } from '../shared/packaging'
 import { getClient, getDb } from './db'
 import type { Category, Product, PurchaseOrder, PurchaseOrderLine, PurchaseReceipt, StockMovement, Supplier, Unit } from '../shared/inventory'
 import { logAudit } from './auth'
@@ -79,6 +80,21 @@ export async function listProducts(): Promise<Product[]> {
   const db = requireDb()
   return (await db.collection<Product>(PRODUCTS).find({}).toArray()).map(withStringId)
 }
+const PACKAGINGS = ['box', 'strip', 'pill'] as const
+
+/** 0.3.0 form: the unit type, how it splits, and the price of one such unit; prices below it are derived. */
+function packagingFields(input: any): Partial<Product> | null {
+  if (input?.packaging === undefined) return null
+  if (!PACKAGINGS.includes(input.packaging)) throw new Error('Unit must be box, strip or pill')
+  const optional = (value: unknown, label: string) => (value === undefined || value === null || value === '' ? undefined : toInteger(value, label, 1))
+  return derivePackaging({
+    packaging: input.packaging,
+    stripsPerBox: input.packaging === 'box' ? toInteger(input.stripsPerBox, 'Strips per box', 1) : undefined,
+    pillsPerStrip: optional(input.pillsPerStrip, 'Pills per strip'),
+    priceCents: toInteger(input.unitPriceCents ?? 0, 'Price')
+  })
+}
+
 export async function createProduct(input: Partial<Product>): Promise<Product> {
   const db = requireDb(); const now = new Date().toISOString()
   const product: any = {
@@ -97,7 +113,8 @@ export async function createProduct(input: Partial<Product>): Promise<Product> {
     expiryDate: input.expiryDate ? String(input.expiryDate).trim() : undefined,
     active: input.active !== false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    ...packagingFields(input)
   }
   let insertedId: ObjectId
   try {
@@ -128,6 +145,8 @@ export async function updateProduct(id: string, input: Partial<Product>): Promis
   if (input.expiryDate !== undefined)
     update.expiryDate = input.expiryDate ? String(input.expiryDate).trim() : undefined
   if (input.active !== undefined) update.active = Boolean(input.active)
+  const pack = packagingFields(input)
+  if (pack) Object.assign(update, pack)
   if (Object.keys(update).length === 0) throw new Error('No product changes supplied')
 
   let updated: any
