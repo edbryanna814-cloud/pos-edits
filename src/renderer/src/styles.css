@@ -1934,3 +1934,14 @@ h3 {
   word-break: break-all;
   user-select: all;
 }
+
+.customer-picker,
+.customer-chosen {
+  display: grid;
+  gap: 4px;
+}
+
+.customer-add {
+  display: grid;
+  gap: 6px;
+}

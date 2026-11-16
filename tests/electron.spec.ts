@@ -72,6 +72,9 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'authSetup',
         'authSetupRequired',
         'authState',
+        'customersCreate',
+        'customersList',
+        'customersUpdate',
         'dbConnectionGet',
         'dbConnectionSave',
         'dbConnectionTest',
@@ -563,15 +566,20 @@ test('receives cartons and sells whole boxes in base units', async () => {
       const pill = await api.posCheckout({ clientRequestId: 'pill-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'pill' }], paymentMethod: 'cash', paidCents: 250 })
       const strip = await api.posCheckout({ clientRequestId: 'strip-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'strip' }], paymentMethod: 'cash', paidCents: 3000 })
       const stock = (await api.invProductsList()).find((p: any) => p.sku === 'PILL-BOX').stockQuantity
-      return { pill: pill.totalCents, strip: strip.totalCents, stock }
+      // A customer with 10% off: the server works out the discount from the percentage.
+      const mona = await api.customersCreate({ name: 'Mona', phone: '0100', discountBasisPoints: 1000 })
+      const box = await api.posCheckout({ clientRequestId: 'box-mona', customerId: mona._id, discountBasisPoints: 1000, lines: [{ productId: product._id, quantity: 1, saleUnit: 'box' }], paymentMethod: 'cash', paidCents: 8100 })
+      return { pill: pill.totalCents, strip: strip.totalCents, stock, box: [box.customerName, box.discountCents, box.totalCents] }
     })
-    expect(units).toEqual({ pill: 250, strip: 3000, stock: 180 - 1 - 12 })
+    expect(units).toEqual({ pill: 250, strip: 3000, stock: 180 - 1 - 12, box: ['Mona', 900, 8100] })
     // Products made through the API appear after a reload (the session is kept).
     await window.reload()
     await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
     await window.getByRole('button', { name: 'Inventory', exact: true }).click()
-    // 167 pills = 4 boxes (144) + 1 strip (12) + 11 pills.
-    await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('4 boxes · 1 strip · 11 pills')
+    // 167 - 36 (the box sold to Mona) = 131 pills = 3 boxes (108) + 1 strip (12) + 11 pills.
+    await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('3 boxes · 1 strip · 11 pills')
+    await window.getByRole('button', { name: 'Customers', exact: true }).click()
+    await expect(window.getByRole('row').filter({ hasText: 'Mona' })).toContainText('10%')
   } finally {
     await app.close()
   }

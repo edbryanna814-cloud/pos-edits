@@ -1,6 +1,7 @@
 ﻿import { ObjectId } from 'mongodb'
 import type { Db } from 'mongodb'
 import { packOf, saleUnits, unitPrice, unitSize, type SaleUnit } from '../shared/packaging'
+import { customerForSale } from './customers'
 import { randomUUID } from 'node:crypto'
 import { getClient, getDb } from './db'
 import type { CashboxMovement, CashierShift, Return, Sale, SaleLine } from '../shared/pos'
@@ -161,10 +162,13 @@ async function createSale(db: Db, input: any): Promise<Sale> {
   const clientRequestId = typeof input?.clientRequestId === 'string' ? input.clientRequestId.trim() : ''
   const cashierUsername =
     typeof input?.cashierUsername === 'string' ? input.cashierUsername.trim() : ''
+  const customer = await customerForSale(db, input?.customerId, input.session)
   const sale: Omit<Sale, '_id'> = {
     invoiceNo: genInvoice(),
     ...(clientRequestId ? { clientRequestId } : {}),
     ...(cashierUsername ? { cashierUsername } : {}),
+    ...(customer ?? {}),
+    ...(discountBasisPoints !== null ? { discountBasisPoints } : {}),
     lines,
     subtotalCents,
     discountCents,

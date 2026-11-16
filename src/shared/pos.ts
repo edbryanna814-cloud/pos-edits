@@ -28,6 +28,10 @@ export type Sale = {
   changeCents: number
   status: 'completed' | 'returned' | 'void'
   cashierUsername?: string
+  customerId?: string
+  customerName?: string
+  /** The sale's discount as a percentage (1250 = 12.5%). */
+  discountBasisPoints?: number
   createdAt: string
   updatedAt: string
 }

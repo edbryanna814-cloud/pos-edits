@@ -1,4 +1,5 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
+import type { Customer } from './customers'
 import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
 import type { CashboxMovement, CashierShift, Payment, Return, Sale } from './pos'
@@ -44,6 +45,9 @@ export const IPC = {
   InvPOCreate: 'inv:po:create',
   InvPOReceive: 'inv:po:receive',
   PosCheckout: 'pos:checkout',
+  CustomersList: 'customers:list',
+  CustomersCreate: 'customers:create',
+  CustomersUpdate: 'customers:update',
   PosSalesList: 'pos:sales:list',
   PosReturn: 'pos:return',
   PosCashIn: 'pos:cash:in',
@@ -135,6 +139,9 @@ export interface PreloadApi {
   invPOCreate(input: Partial<PurchaseOrder>): Promise<PurchaseOrder>
   invPOReceive(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt>
   posCheckout(input: any): Promise<Sale>
+  customersList(): Promise<Customer[]>
+  customersCreate(input: Partial<Customer>): Promise<Customer>
+  customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
   posSalesList(): Promise<Sale[]>
   posReturn(input: { saleId: string; reason: string }): Promise<Return>
   posCashIn(amountCents: number, reason: string): Promise<CashboxMovement>

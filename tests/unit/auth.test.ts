@@ -201,6 +201,19 @@ describe('with MongoDB', () => {
     expect(r.mustChangePassword).toBe(false)
     expect((await audit()).map((e) => e.action)).toContain('password.recovered')
   })
+
+  it('user IDs: existing users numbered 1..n in creation order; automatic or typed by hand, never twice', async () => {
+    await auth.migrateRoles()
+    const numbered = await users().find({}).sort({ createdAt: 1 }).toArray()
+    expect(numbered.every((u) => Number.isInteger(u.userNo))).toBe(true)
+    expect(new Set(numbered.map((u) => u.userNo)).size).toBe(numbered.length)
+    expect(numbered[0].userNo).toBe(1) // the first administrator (setup)
+    const typed = await auth.createUser({ username: 'byhand', password: 'abc', role: 'Seller', userNo: 50 })
+    expect(typed.userNo).toBe(50)
+    expect((await auth.createUser({ username: 'next', password: 'abc', role: 'Seller' })).userNo).toBe(51)
+    await expect(auth.createUser({ username: 'dup', password: 'abc', role: 'Seller', userNo: 50 })).rejects.toThrow('USER_NO_TAKEN')
+    await expect(auth.createUser({ username: 'zero', password: 'abc', role: 'Seller', userNo: 0 })).rejects.toThrow('USER_NO_INVALID')
+  })
 })
 
 describe('audit chain in MongoDB (Gate 1 S5)', () => {

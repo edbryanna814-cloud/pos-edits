@@ -19,8 +19,9 @@ import ShiftPanel from './pos/ShiftPanel'
 import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
 import UsersPage from './users/UsersPage'
+import CustomersPage from './customers/CustomersPage'
 
-type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit'
+type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit' | 'customers'
 
 interface Section {
   id: SectionId
@@ -58,6 +59,13 @@ const sections: Section[] = [
     titleKey: 'reportsTitle',
     descriptionKey: 'reportsDesc',
     permission: 'reports.view'
+  },
+  {
+    id: 'customers',
+    labelKey: 'customers',
+    titleKey: 'customers',
+    descriptionKey: 'customersDesc',
+    permission: 'customers.manage'
   },
   {
     id: 'users',
@@ -550,7 +558,9 @@ export default function App() {
             canManageDatabase={(authUser?.permissions ?? []).includes('database.manage')}
           />
         ) : active === 'users' ? (
-          <UsersPage language={language} />        ) : active === 'audit' ? (
+          <UsersPage language={language} />        ) : active === 'customers' ? (
+          <CustomersPage language={language} />
+        ) : active === 'audit' ? (
           <section className="panel">
             <h2>{t(language, 'audit')}</h2>
             <table style={{ width: '100%', marginTop: 16 }}>

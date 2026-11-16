@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { Customer } from '../../../shared/customers'
+import CustomerPicker from './CustomerPicker'
+import { percentText } from '../customers/CustomersPage'
 import { packOf, saleUnits, unitPrice, unitSize, type SaleUnit } from '../../../shared/packaging'
 import { stockText, UNIT_NAMES } from '../units'
 import type { CashboxMovement, Sale } from '../../../shared/pos'
@@ -213,6 +216,12 @@ export default function PosPage({
   const [query, setQuery] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [discountInput, setDiscountInput] = useState('')
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  /** Choosing a customer fills in their discount; the seller may still change it. */
+  function chooseCustomer(next: Customer | null): void {
+    setCustomer(next)
+    setDiscountInput(next ? percentText(next.discountBasisPoints) : '')
+  }
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash')
   const [paidInput, setPaidInput] = useState('')
   const [receipt, setReceipt] = useState<Sale | null>(null)
@@ -381,6 +390,7 @@ export default function PosPage({
 
   function clearCart(): void {
     setCart([])
+    setCustomer(null)
     setDiscountInput('')
     setPaidInput('')
     setError('')
@@ -406,12 +416,14 @@ export default function PosPage({
           saleUnit: item.unit
         })),
         discountBasisPoints: discountBasisPoints ?? 0,
+        ...(customer?._id ? { customerId: customer._id } : {}),
         taxCents,
         paymentMethod,
         paidCents
       })
       setReceipt(sale)
       setCart([])
+      setCustomer(null)
       setDiscountInput('')
       setPaidInput('')
       requestIdRef.current = null
@@ -497,6 +509,12 @@ export default function PosPage({
               <span>{text.invoice}</span>
               <strong>{receipt.invoiceNo}</strong>
             </div>
+            {receipt.customerName ? (
+              <div>
+                <span>{language === 'ar' ? 'العميل' : 'Customer'}</span>
+                <strong>{receipt.customerName}</strong>
+              </div>
+            ) : null}
             <div>
               <span>{text.date}</span>
               <strong>{formatDateTime(receipt.createdAt, language)}</strong>
@@ -707,6 +725,8 @@ export default function PosPage({
               ))}
             </div>
           )}
+
+          <CustomerPicker language={language} selected={customer} onSelect={chooseCustomer} />
 
           <label className="cart-field">
             <span>{text.discountPercent}</span>

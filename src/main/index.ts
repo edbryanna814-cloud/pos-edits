@@ -18,6 +18,7 @@ import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
 import { PANEL_KEYS } from './panelKeys'
 import { RESET_ERRORS, verifyResetCode } from './recovery'
+import { createCustomer, listCustomers, updateCustomer } from './customers'
 import { licenseRequired } from './licenseGate'
 import { publicError, validateIpcArgs } from './ipcSchema'
 import { rotateIfLarge } from './logRotate'
@@ -68,6 +69,10 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvSuppliersList]: 'authenticated',
   [IPC.InvPOList]: 'authenticated',
   [IPC.PosCheckout]: ['pos.use'],
+  // Sellers pick and add customers at the till; changing one is for managers.
+  [IPC.CustomersList]: ['pos.use'],
+  [IPC.CustomersCreate]: ['pos.use'],
+  [IPC.CustomersUpdate]: ['customers.manage'],
   [IPC.PosReturn]: ['pos.use'],
   [IPC.PosCashIn]: ['pos.use'],
   [IPC.PosCashOut]: ['pos.use'],
@@ -357,6 +362,9 @@ function registerIpc(): void {
   handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, notes?: string) => { assertTrusted(event); return receivePO(purchaseOrderId, notes) })
 
   handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input, requireSession().username) })
+  handle(IPC.CustomersList, async () => listCustomers())
+  handle(IPC.CustomersCreate, async (_event, input: unknown) => createCustomer(input, requireSession().username))
+  handle(IPC.CustomersUpdate, async (_event, id: unknown, input: unknown) => updateCustomer(id, input, requireSession().username))
   handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
   handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input, requireSession().username) })
   handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason, requireSession().username) })
