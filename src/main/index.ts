@@ -1,4 +1,8 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
+import { readFile, stat } from 'node:fs/promises'
+import { basename } from 'node:path'
+import { MAX_FILE_BYTES, readSheet } from './sheet'
+import { checkProductRows, holdImport, takeImport } from './productImport'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -62,6 +66,8 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvSuppliersCreate]: ['inventory.manage'],
   [IPC.InvPOCreate]: ['inventory.manage'],
   [IPC.InvPOReceive]: ['inventory.manage'],
+  [IPC.InvImportPreview]: ['inventory.manage'],
+  [IPC.InvImportConfirm]: ['inventory.manage'],
   [IPC.InvCategoriesList]: 'authenticated',
   [IPC.InvUnitsList]: 'authenticated',
   [IPC.InvProductsList]: 'authenticated',
@@ -360,6 +366,37 @@ function registerIpc(): void {
   handle(IPC.InvPOList, async (event) => { assertTrusted(event); return listPO() })
   handle(IPC.InvPOCreate, async (event, input: any) => { assertTrusted(event); return createPO(input) })
   handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, notes?: string) => { assertTrusted(event); return receivePO(purchaseOrderId, notes) })
+
+  // Products from Excel/CSV: check and show every row first; add only on confirmation.
+  handle(IPC.InvImportPreview, async (event) => {
+    const picked = await dialog.showOpenDialog(senderWindow(event), {
+      title: 'Import products',
+      properties: ['openFile'],
+      filters: [{ name: 'Excel or CSV', extensions: ['xlsx', 'csv', 'txt'] }]
+    })
+    if (picked.canceled || picked.filePaths.length === 0) return null
+    const file = picked.filePaths[0]
+    if ((await stat(file)).size > MAX_FILE_BYTES) throw new Error('SHEET_TOO_LARGE')
+    const existing = new Set((await listProducts()).map((p) => p.sku.toLowerCase()))
+    const rows = checkProductRows(readSheet(await readFile(file), file), existing)
+    return { batchId: holdImport(rows), fileName: basename(file), rows: rows.map(({ input: _input, ...shown }) => shown) }
+  })
+
+  handle(IPC.InvImportConfirm, async (_event, batchId: string) => {
+    let added = 0
+    let skipped = 0
+    for (const row of takeImport(batchId)) {
+      if (!row.input) { skipped++; continue }
+      try {
+        await createProduct(row.input as any)
+        added++
+      } catch {
+        skipped++ // e.g. the same SKU added on another till since the preview
+      }
+    }
+    await logAudit({ actorUsername: requireSession().username, action: 'inventory.import', resource: 'inv_products', details: { added, skipped } })
+    return { added, skipped }
+  })
 
   handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input, requireSession().username) })
   handle(IPC.CustomersList, async () => listCustomers())

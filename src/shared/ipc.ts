@@ -4,6 +4,13 @@ import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permissio
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
 import type { CashboxMovement, CashierShift, Payment, Return, Sale } from './pos'
 
+/** A checked sheet: every row with its problems; nothing is added before the user confirms. */
+export type ProductImportPreview = {
+  batchId: string
+  fileName: string
+  rows: { line: number; name: string; sku: string; packaging: 'box' | 'strip' | 'pill'; unitPriceCents: number; stock: number; errors: string[] }[]
+}
+
 export const IPC = {
   Ping: 'app:ping',
   GetVersion: 'app:get-version',
@@ -44,6 +51,8 @@ export const IPC = {
   InvPOList: 'inv:po:list',
   InvPOCreate: 'inv:po:create',
   InvPOReceive: 'inv:po:receive',
+  InvImportPreview: 'inv:import:preview',
+  InvImportConfirm: 'inv:import:confirm',
   PosCheckout: 'pos:checkout',
   CustomersList: 'customers:list',
   CustomersCreate: 'customers:create',
@@ -139,6 +148,8 @@ export interface PreloadApi {
   invPOCreate(input: Partial<PurchaseOrder>): Promise<PurchaseOrder>
   invPOReceive(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt>
   posCheckout(input: any): Promise<Sale>
+  invImportPreview(): Promise<ProductImportPreview | null>
+  invImportConfirm(batchId: string): Promise<{ added: number; skipped: number }>
   customersList(): Promise<Customer[]>
   customersCreate(input: Partial<Customer>): Promise<Customer>
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import ImportProducts from './ImportProducts'
 import { derivePackaging, packOf, saleUnits, unitPrice, unitSize, type Packaging } from '../../../shared/packaging'
 import { stockText, UNIT_NAMES } from '../units'
 import type { Category, Product, Unit } from '../../../shared/inventory'
@@ -569,6 +570,8 @@ export default function InventoryPage({ products, language, currency, onChanged 
           {text.addProduct}
         </button>
       </div>
+
+      <ImportProducts language={language} currency={currency} onDone={onChanged} />
 
       {formOpen ? (
         <form className="crud-form" onSubmit={handleSubmit}>

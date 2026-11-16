@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import { MongoClient } from 'mongodb'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -85,6 +85,8 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'importBackup',
         'invCategoriesCreate',
         'invCategoriesList',
+        'invImportConfirm',
+        'invImportPreview',
         'invPOCreate',
         'invPOList',
         'invPOReceive',
@@ -580,6 +582,19 @@ test('receives cartons and sells whole boxes in base units', async () => {
     await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('3 boxes · 1 strip · 11 pills')
     await window.getByRole('button', { name: 'Customers', exact: true }).click()
     await expect(window.getByRole('row').filter({ hasText: 'Mona' })).toContainText('10%')
+
+    // Import from Excel/CSV: the file picker is stubbed with a sheet of 3 rows, one of them bad.
+    const sheetDir = mkdtempSync(join(tmpdir(), 'import-'))
+    const sheet = join(sheetDir, 'products.csv')
+    writeFileSync(sheet, ['Name,SKU,Unit,Strips per box,Pills per strip,Price,Stock', 'Aspirin,ASP-1,box,2,10,40,3', 'Vitamin C,VIT-C,strip,,,12.5,7', 'Broken,PILL-BOX,box,1,,9,1'].join('\n'))
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as any }, sheet)
+    await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+    await window.getByRole('button', { name: 'Import from Excel' }).click()
+    await expect(window.getByRole('row').filter({ hasText: 'Broken' })).toContainText('SKU already in the pharmacy')
+    await window.getByRole('button', { name: 'Add 2 products' }).click()
+    await expect(window.getByRole('status').filter({ hasText: 'Added 2 products' })).toBeVisible()
+    await expect(window.getByRole('row').filter({ hasText: 'Aspirin' })).toContainText('3 boxes')
+    rmSync(sheetDir, { recursive: true, force: true })
   } finally {
     await app.close()
   }

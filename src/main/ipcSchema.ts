@@ -55,6 +55,8 @@ export const IPC_ARGS: Record<IpcChannel, ArgSpec[]> = {
   [IPC.InvPOList]: none,
   [IPC.InvPOCreate]: ['object'],
   [IPC.InvPOReceive]: ['id', 'optString'],
+  [IPC.InvImportPreview]: none,
+  [IPC.InvImportConfirm]: ['string'],
   [IPC.PosCheckout]: ['object'],
   [IPC.CustomersList]: none,
   [IPC.CustomersCreate]: ['object'],
