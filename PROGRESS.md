@@ -262,3 +262,5 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 - Disk encryption itself is Windows' job: WHAT-TO-INSTALL.txt and the owner manuscripts ask to turn on Device encryption / BitLocker.
 - Tills that joined before this version must re-join (Settings → Database location) once the main computer runs it.
 - Signing scan (`scripts/scan-signing.mjs`): owner approved one narrow exception, `src/main/lanTls.ts` only (key generation + signing for the TLS certificate). That file fails the scan if it mentions anything licence-related (licen*, lease, ANB/PHM/RST codes, panelKey, issu*); key blocks are still refused everywhere. Tests in `tests/unit/scanSigning.test.ts`.
+
+2026-11-17: release 0.3.3 (staff manuscripts, admin hidden from reports, folder lock, LAN TLS). Installer `Pharmacy-POS-Setup-0.3.3.exe` 157562956 bytes, SHA-256 `879624cb5dae7d1a74df67130dd4a921b63429837abb80bb9f0cfdf24e2524f2`; packaged check re-run on this build (folder ACL, TLS only, pin, join code, stop on quit). Pre-release `field-test-0.3.3`; release repo `Anubis-hub/pharmacy-pos-release` v0.3.3.
