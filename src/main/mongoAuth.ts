@@ -23,8 +23,9 @@ export function newJoinCode(): string {
 export const normalizeJoinCode = (value: unknown) => String(value ?? '').trim().toUpperCase()
 
 /** What a joining till uses: direct to the main PC (its replica-set member name is 127.0.0.1). */
-export const lanUri = (ip: string, port: number, code: string) =>
-  `mongodb://${LAN_USER}:${encodeURIComponent(normalizeJoinCode(code))}@${ip}:${port}/?directConnection=true&authSource=admin`
+/** caFile: the main computer's certificate pinned on this till (see lanTls.ts). */
+export const lanUri = (ip: string, port: number, code: string, caFile: string) =>
+  `mongodb://${LAN_USER}:${encodeURIComponent(normalizeJoinCode(code))}@${ip}:${port}/?directConnection=true&authSource=admin${tlsQuery(caFile)}`
 
 export type MongoSecrets = { adminPassword: string; appPassword: string; keyFile: string }
 
@@ -42,15 +43,18 @@ export function isSecrets(value: unknown): value is MongoSecrets {
   return !!v && [v.adminPassword, v.appPassword, v.keyFile].every((s) => typeof s === 'string' && s.length >= 32)
 }
 
-export type Endpoint = { host: string; port: number; replicaSet: string }
+/** tlsCAFile: set while this PC hosts the other tills; its database then accepts TLS only. */
+export type Endpoint = { host: string; port: number; replicaSet: string; tlsCAFile?: string }
 
+// Hostnames are not checked: the main computer's IP can change; the pinned certificate is the check.
+const tlsQuery = (caFile?: string) => (caFile ? `&tls=true&tlsAllowInvalidHostnames=true&tlsCAFile=${encodeURIComponent(caFile)}` : '')
 const base = (e: Endpoint) => `${e.host}:${e.port}`
-export const directUri = (e: Endpoint) => `mongodb://${base(e)}/?directConnection=true`
+export const directUri = (e: Endpoint) => `mongodb://${base(e)}/?directConnection=true${tlsQuery(e.tlsCAFile)}`
 export const adminUri = (e: Endpoint, s: MongoSecrets) =>
-  `mongodb://${ADMIN_USER}:${encodeURIComponent(s.adminPassword)}@${base(e)}/?directConnection=true&authSource=admin`
+  `mongodb://${ADMIN_USER}:${encodeURIComponent(s.adminPassword)}@${base(e)}/?directConnection=true&authSource=admin${tlsQuery(e.tlsCAFile)}`
 /** The only URI the application uses. */
 export const appUri = (e: Endpoint, s: MongoSecrets) =>
-  `mongodb://${APP_USER}:${encodeURIComponent(s.appPassword)}@${base(e)}/?replicaSet=${e.replicaSet}&authSource=admin`
+  `mongodb://${APP_USER}:${encodeURIComponent(s.appPassword)}@${base(e)}/?replicaSet=${e.replicaSet}&authSource=admin${tlsQuery(e.tlsCAFile)}`
 
 async function withClient<T>(uri: string, fn: (client: MongoClient) => Promise<T>): Promise<T> {
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 3000 })

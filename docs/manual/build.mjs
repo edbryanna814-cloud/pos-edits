@@ -40,10 +40,10 @@ const pagesEn = [
     'Tick this only if you charge tax; then type the tax rate.',
     'The language the program opens in (English or Arabic).',
     'Press <b>Save settings</b>.']],
-  ['04-backup', 'Backups, devices and language', 'Only the administrator sees the backup buttons.', [
+  ['04-backup', 'Backups, devices and language', 'Only the administrator sees the backup buttons. The program’s data can be opened only by this Windows account, and between computers on the Wi-Fi it is encrypted. Also turn on disk encryption once: Windows Settings → Privacy & security → Device encryption (or BitLocker), so a stolen computer cannot be read.', [
     '<b>Export backup</b> saves a copy of everything to a file. Type a backup passphrase first and keep it safe: without it the backup cannot be opened.',
     '<b>Import backup</b> brings a backup back (it replaces the current data).',
-    '<b>Database location</b>: several computers on the same Wi-Fi can share one database. On the main computer choose “host”, then on the others choose “join” and type the join code it shows.',
+    '<b>Database location</b>: several computers on the same Wi-Fi can share one database. On the main computer choose “host”, then on the others choose “join” and type the join code it shows. Before saving, check that both computers show the same <b>security code</b>.',
     'Press <b>AR</b> or <b>EN</b> at any time to switch the language.']],
   ['05-users', 'Users and roles', 'Open <b>Users</b>, press <b>Add user</b>. <b>Administrator</b>: everything. <b>Manager</b>: everything except the database settings and the administrator accounts. <b>Seller</b>: only POS and Inventory.', [
     'Username for the new person.',

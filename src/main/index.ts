@@ -14,7 +14,8 @@ import type { Permission } from '../shared/auth'
 import { closeDb, connectDb, dbHealth, getDb } from './db'
 import { describeDbMode, loadDbMode, saveDbMode } from './dbConfig'
 import { DB_ERRORS, isPrivateLanIp, testSharedUri } from './dbConnection'
-import { LAN_PORT, lanAddresses, startBundledMongo, stopBundledMongo } from './localDb'
+import { LAN_PORT, hostSecurityCode, lanAddresses, lockAppFolder, startBundledMongo, stopBundledMongo } from './localDb'
+import { fetchCertificate, securityCode } from './lanTls'
 import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
@@ -206,11 +207,23 @@ function registerIpc(): void {
     }
   }
 
-  /** Joining the main PC on the local network: its IP and join code become a connection string. */
-  function joinUri(input: { ip?: unknown; code?: unknown }): string {
+  /**
+   * Joining the main PC on the local network: its IP and join code become a connection string, and
+   * the certificate it presents is pinned (the user compares the security code on both screens).
+   * expectedCode: when saving, the certificate must still be the one shown at "Test connection".
+   */
+  async function joinUri(input: { ip?: unknown; code?: unknown }, expectedCode?: unknown): Promise<{ uri: string; securityCode: string }> {
     if (!isPrivateLanIp(input?.ip)) throw new Error(DB_ERRORS.lanAddress)
     if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalizeJoinCode(input?.code))) throw new Error(DB_ERRORS.joinCode)
-    return lanUri(String(input.ip).trim(), LAN_PORT, String(input.code))
+    const ip = String(input.ip).trim()
+    const cert = await fetchCertificate(ip, LAN_PORT).catch(() => {
+      throw new Error(DB_ERRORS.unreachable)
+    })
+    const code = securityCode(cert)
+    if (expectedCode !== undefined && expectedCode !== code) throw new Error(DB_ERRORS.securityCode)
+    const caFile = join(app.getPath('userData'), 'lan-host-cert.pem')
+    await writeFile(caFile, cert)
+    return { uri: lanUri(ip, LAN_PORT, String(input.code), caFile), securityCode: code }
   }
 
   handle(IPC.DbConnectionGet, async () => {
@@ -225,22 +238,24 @@ function registerIpc(): void {
     } catch {
       joinCode = undefined
     }
-    return { ...state, ips: lanAddresses(), port: LAN_PORT, joinCode }
+    return { ...state, ips: lanAddresses(), port: LAN_PORT, joinCode, securityCode: joinCode ? (hostSecurityCode() ?? undefined) : undefined }
   })
 
   handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown; ip?: unknown; code?: unknown }) => {
     await mayChangeDatabase()
-    return testSharedUri(input?.ip !== undefined ? joinUri(input) : input?.uri)
+    if (input?.ip === undefined) return testSharedUri(input?.uri)
+    const joined = await joinUri(input)
+    return { ...(await testSharedUri(joined.uri)), securityCode: joined.securityCode }
   })
 
-  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown; ip?: unknown; code?: unknown }) => {
+  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown; ip?: unknown; code?: unknown; securityCode?: unknown }) => {
     await mayChangeDatabase()
     let hosts = ''
     if (input?.mode === 'shared') {
       hosts = (await testSharedUri(input.uri)).hosts
       await saveDbMode({ mode: 'shared', uri: String(input.uri).trim() })
     } else if (input?.mode === 'join') {
-      const uri = joinUri(input)
+      const { uri } = await joinUri(input, typeof input.securityCode === 'string' ? input.securityCode : '')
       hosts = (await testSharedUri(uri)).hosts
       await saveDbMode({ mode: 'shared', uri })
     } else if (input?.mode === 'host') {
@@ -504,6 +519,11 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch (error) {
       console.error('[main] database setting unreadable; using this PC only', error instanceof Error ? error.message : error)
+    }
+    try {
+      await lockAppFolder()
+    } catch (error) {
+      console.error('[main] could not restrict the app folder to this Windows account', error instanceof Error ? error.message : error)
     }
     if (!shared) {
       try {

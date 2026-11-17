@@ -133,14 +133,14 @@ describe.skipIf(!MONGOD)('bundled MongoDB access control (Gate 1 S4)', () => {
 
     // Hosting for the Wi-Fi: the join code signs in with app rights only; hosting off removes it.
     const code = newJoinCode()
-    const lan = lanUri('127.0.0.1', e.port, code)
+    const lan = lanUri('127.0.0.1', e.port, code, '') // test server without TLS (lanTls.test.ts covers TLS)
     expect(await outcome(lan, (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
     await secureBundledMongo(e, s, 'pharmacy_pos', code)
     expect(await outcome(lan, (c) => c.db('pharmacy_pos').collection('items').insertOne({ name: 'from till 2' }))).toBe('ok')
     expect(await outcome(lan, (c) => c.db('admin').command({ shutdown: 1 }))).toBe('Unauthorized')
     // What 'Test connection' on the joining till checks: a replica set (transactions), reached directly.
     expect((await testSharedUri(lan, 5000)).topology).toBe('replicaSet:rs0')
-    expect(await outcome(lanUri('127.0.0.1', e.port, newJoinCode()), (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
+    expect(await outcome(lanUri('127.0.0.1', e.port, newJoinCode(), ''), (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
     await secureBundledMongo(e, s, 'pharmacy_pos')
     expect(await outcome(lan, (c) => c.db('pharmacy_pos').collection('items').findOne({}))).toBe('AuthenticationFailed')
 

@@ -5,7 +5,7 @@ import type { Language } from '../../shared/settings'
 // Wi-Fi; a till that joins the main computer by its IP; or one shared server over the internet.
 
 type Mode = 'local' | 'host' | 'join' | 'shared'
-type State = { mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string }
+type State = { mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string; securityCode?: string }
 
 const strings = {
   en: {
@@ -21,6 +21,9 @@ const strings = {
     noIp: 'not connected to a network',
     hostInfo: 'On each other device choose “Connect to the main computer” and enter:',
     joinCode: 'Join code',
+    securityCode: 'Security code',
+    securityCheck: 'Check that the main computer shows the same security code (Settings → Database location) before you save. If it does not match, do not save: another device may be pretending to be the main computer.',
+    encrypted: 'Everything sent over the Wi-Fi is encrypted.',
     hostHint: 'After the restart the other devices on the same Wi-Fi use this computer’s database, so it must stay on. If Windows asks to allow “mongod”, choose Private networks and Allow. Ask the router admin to keep this computer’s IP address fixed.',
     hostIp: 'Main computer’s IP address',
     joinHint: 'Shown on the main computer in Settings → Database location.',
@@ -38,6 +41,7 @@ const strings = {
       DB_LOGIN_REQUIRED: 'The connection string must include the database user name and password.',
       DB_LAN_ADDRESS_INVALID: 'Enter the main computer’s Wi-Fi IP address, for example 192.168.1.10.',
       DB_JOIN_CODE_INVALID: 'Enter the join code as shown on the main computer, for example ABCD-EFGH-JKMN.',
+      DB_SECURITY_CODE_CHANGED: 'The main computer’s security code changed since the test. Test the connection again and compare the code.',
       DB_UNREACHABLE: 'Could not reach it. Check that both devices are on the same Wi-Fi, the main computer is on, and the address is right.',
       DB_AUTH_FAILED: 'The join code (or the user name and password) was refused.',
       DB_NO_TRANSACTIONS: 'This server cannot be shared safely (it is not a replica set). Use MongoDB Atlas or a replica set.',
@@ -58,6 +62,9 @@ const strings = {
     noIp: 'غير متصل بشبكة',
     hostInfo: 'على كل جهاز آخر اختر «الاتصال بالجهاز الرئيسي» وأدخل:',
     joinCode: 'رمز الانضمام',
+    securityCode: 'رمز الأمان',
+    securityCheck: 'تأكد أن الجهاز الرئيسي يعرض نفس رمز الأمان (الإعدادات ← مكان قاعدة البيانات) قبل الحفظ. إذا لم يتطابق فلا تحفظ: قد يكون جهاز آخر يتظاهر بأنه الجهاز الرئيسي.',
+    encrypted: 'كل ما يُرسل عبر الواي فاي مشفّر.',
     hostHint: 'بعد إعادة التشغيل تستخدم باقي الأجهزة على نفس الواي فاي قاعدة بيانات هذا الجهاز، لذا يجب أن يبقى يعمل. إذا طلب ويندوز السماح لـ «mongod» اختر الشبكات الخاصة ثم سماح. اطلب تثبيت عنوان IP لهذا الجهاز من الراوتر.',
     hostIp: 'عنوان IP للجهاز الرئيسي',
     joinHint: 'يظهر على الجهاز الرئيسي في الإعدادات ← مكان قاعدة البيانات.',
@@ -75,6 +82,7 @@ const strings = {
       DB_LOGIN_REQUIRED: 'يجب أن يحتوي الرابط على اسم مستخدم قاعدة البيانات وكلمة المرور.',
       DB_LAN_ADDRESS_INVALID: 'أدخل عنوان IP للجهاز الرئيسي على الواي فاي، مثل 192.168.1.10.',
       DB_JOIN_CODE_INVALID: 'أدخل رمز الانضمام كما يظهر على الجهاز الرئيسي، مثل ABCD-EFGH-JKMN.',
+      DB_SECURITY_CODE_CHANGED: 'تغيّر رمز الأمان للجهاز الرئيسي منذ الاختبار. اختبر الاتصال مرة أخرى وقارن الرمز.',
       DB_UNREACHABLE: 'تعذّر الوصول. تأكد أن الجهازين على نفس الواي فاي وأن الجهاز الرئيسي يعمل وأن العنوان صحيح.',
       DB_AUTH_FAILED: 'تم رفض رمز الانضمام (أو اسم المستخدم وكلمة المرور).',
       DB_NO_TRANSACTIONS: 'لا يمكن مشاركة هذا الخادم بأمان (ليس replica set). استخدم MongoDB Atlas أو replica set.',
@@ -94,6 +102,7 @@ export default function DatabaseLocation({ language }: { language: Language }) {
   const [ip, setIp] = useState('')
   const [code, setCode] = useState('')
   const [tested, setTested] = useState<string>('')
+  const [hostCode, setHostCode] = useState('')
   const [busy, setBusy] = useState<'' | 'test' | 'save'>('')
   const [error, setError] = useState('')
 
@@ -122,10 +131,12 @@ export default function DatabaseLocation({ language }: { language: Language }) {
   async function test(): Promise<void> {
     setError('')
     setTested('')
+    setHostCode('')
     setBusy('test')
     try {
       const result = await window.api.dbConnectionTest(choice === 'join' ? { ip, code } : { uri })
       setTested(`${text.connected}: ${result.hosts} · MongoDB ${result.serverVersion}`)
+      setHostCode(result.securityCode ?? '')
     } catch (err) {
       setError(errorText(err))
     } finally {
@@ -138,7 +149,7 @@ export default function DatabaseLocation({ language }: { language: Language }) {
     setBusy('save')
     try {
       await window.api.dbConnectionSave(
-        choice === 'shared' ? { mode: 'shared', uri } : choice === 'join' ? { mode: 'join', ip, code } : { mode: choice }
+        choice === 'shared' ? { mode: 'shared', uri } : choice === 'join' ? { mode: 'join', ip, code, securityCode: hostCode } : { mode: choice }
       )
     } catch (err) {
       setError(errorText(err))
@@ -165,7 +176,14 @@ export default function DatabaseLocation({ language }: { language: Language }) {
             {text.hostIp}: <strong dir="ltr">{ips}</strong>
             <br />
             {text.joinCode}: <strong dir="ltr" className="mono">{current.joinCode}</strong>
+            {current.securityCode ? (
+              <>
+                <br />
+                {text.securityCode}: <strong dir="ltr" className="mono">{current.securityCode}</strong>
+              </>
+            ) : null}
           </p>
+          <p className="muted">{text.encrypted}</p>
         </div>
       ) : null}
       <div className="db-location-choice" role="radiogroup" aria-label={text.title}>
@@ -212,6 +230,13 @@ export default function DatabaseLocation({ language }: { language: Language }) {
       ) : null}
       {error ? <p className="error" role="alert">{error}</p> : null}
       {tested ? <p className="success" role="status">{tested}</p> : null}
+      {tested && hostCode ? (
+        <p className="hint" role="status">
+          {text.securityCode}: <strong dir="ltr" className="mono">{hostCode}</strong>
+          <br />
+          {text.securityCheck}
+        </p>
+      ) : null}
       <div className="form-actions">
         {needsTest ? (
           <button type="button" onClick={() => void test()} disabled={busy !== '' || (choice === 'join' ? !ip.trim() || !code.trim() : !uri.trim())}>

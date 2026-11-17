@@ -122,9 +122,9 @@ export interface PreloadApi {
   authLogin(input: LoginInput): Promise<LoginResult>
   authLogout(token: string): Promise<{ success: boolean }>
   authState(token?: string): Promise<AuthState>
-  dbConnectionGet(): Promise<{ mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string }>
-  dbConnectionTest(input: { uri: string } | { ip: string; code: string }): Promise<{ ok: true; serverVersion: string; topology: string; hosts: string }>
-  dbConnectionSave(input: { mode: 'local' } | { mode: 'host' } | { mode: 'shared'; uri: string } | { mode: 'join'; ip: string; code: string }): Promise<{ ok: true; restarting: true }>
+  dbConnectionGet(): Promise<{ mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string; securityCode?: string }>
+  dbConnectionTest(input: { uri: string } | { ip: string; code: string }): Promise<{ ok: true; serverVersion: string; topology: string; hosts: string; securityCode?: string }>
+  dbConnectionSave(input: { mode: 'local' } | { mode: 'host' } | { mode: 'shared'; uri: string } | { mode: 'join'; ip: string; code: string; securityCode: string }): Promise<{ ok: true; restarting: true }>
   authSetupRequired(): Promise<boolean>
   authSetup(input: LoginInput): Promise<LoginResult>
   authChangePassword(input: ChangePasswordInput): Promise<{ success: true }>
