@@ -2,8 +2,8 @@ import type { Language } from '../../shared/settings'
 
 const translations = {
   en: {
-    appName: 'Pharmacy',
-    appSubtitle: 'POS & Management',
+    appName: 'Anubis Pharmacy',
+    appSubtitle: 'Pharmacy Management System',
     mainNavigation: 'Main navigation',
     dashboard: 'Dashboard',
     pos: 'POS',
@@ -112,8 +112,8 @@ const translations = {
     time: 'Time'
   },
   ar: {
-    appName: 'الصيدلية',
-    appSubtitle: 'نقاط البيع والإدارة',
+    appName: 'Anubis Pharmacy',
+    appSubtitle: 'نظام إدارة الصيدليات',
     mainNavigation: 'التنقل الرئيسي',
     dashboard: 'لوحة التحكم',
     pos: 'نقاط البيع',

@@ -2198,3 +2198,18 @@ tr.level-near td {
     padding: 2px 3px;
   }
 }
+
+/* Logo images (Anubis Pharmacy by default) instead of the old letter marks. */
+img.brand-mark,
+img.login-logo {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  object-fit: contain;
+}
+
+img.invoice-logo {
+  object-fit: contain;
+}

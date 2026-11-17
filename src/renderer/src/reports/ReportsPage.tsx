@@ -3,6 +3,7 @@ import type { Language } from '../../../shared/settings'
 import type { Sale } from '../../../shared/pos'
 import type { Product } from '../../../shared/inventory'
 import { formatMoney, isToday } from '../money'
+import ReportDownloads from './ReportDownloads'
 
 interface Props {
   language: Language
@@ -235,6 +236,8 @@ export default function ReportsPage({
           <p className="muted">{text.intro}</p>
         </div>
       </div>
+
+      <ReportDownloads language={language} />
 
       <div className="kpi-grid">
         <div className="kpi-card">

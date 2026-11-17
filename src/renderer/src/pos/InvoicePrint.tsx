@@ -1,5 +1,6 @@
 import type { Sale } from '../../../shared/pos'
 import { UNIT_NAMES } from '../units'
+import logo from '../assets/logo.png'
 
 // The printed invoice, in the pharmacy's Arabic template: logo, "صيدلية" + the pharmacy's name, invoice
 // number and date, customer, seller, items, totals with the paid amount and the change, thank-you lines.
@@ -17,17 +18,9 @@ export function pharmacyTitle(name: string): string {
   return n.startsWith('صيدلية') ? n : `صيدلية ${n}`.trim()
 }
 
-/** Bowl of Hygieia (cup and serpent) inside a crescent, as in the template. */
+/** The default logo (Anubis Pharmacy) until the pharmacy asks for its own. */
 function Logo() {
-  return (
-    <svg className="invoice-logo" viewBox="0 0 100 100" aria-hidden="true">
-      <path d="M78 14 A44 44 0 1 0 86 80" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
-      <path d="M26 40 H74 A24 22 0 0 1 26 40 Z" fill="currentColor" />
-      <path d="M50 62 V84 M40 86 H60" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-      <path d="M54 22 C66 24 64 32 56 34 C46 36 44 44 54 46 C62 48 60 56 50 58 C42 60 42 68 50 70 C58 72 58 78 50 80" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" />
-      <circle cx="52" cy="20" r="3.5" fill="currentColor" />
-    </svg>
-  )
+  return <img className="invoice-logo" src={logo} alt="" />
 }
 
 export default function InvoicePrint({ sale, companyName, companyPhone, cashier }: { sale: Sale; companyName: string; companyPhone: string; cashier: string }) {

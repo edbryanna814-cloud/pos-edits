@@ -5,7 +5,7 @@ import { MAX_FILE_BYTES, readSheet } from './sheet'
 import { checkProductRows, holdImport, takeImport } from './productImport'
 import { parsePunches } from './attendanceRules'
 import { attendanceDays, importPunches, sellerKpis } from './attendance'
-import { exportSection } from './exports'
+import { exportReport, exportSection } from './exports'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -76,6 +76,8 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   // Attendance belongs with staff (users.manage: Administrator and Manager); KPIs with reports.
   [IPC.AttendanceImport]: ['data.transfer'],
   [IPC.ExportSection]: ['data.transfer'],
+  // Sales and purchasing reports as Excel: Manager and Administrator (raw exports stay administrator-only).
+  [IPC.ReportExport]: ['reports.view'],
   [IPC.InvCategoriesDelete]: ['catalog.delete'],
   [IPC.InvProductsDelete]: ['catalog.delete'],
   [IPC.InvSuppliersDelete]: ['catalog.delete'],
@@ -141,7 +143,7 @@ function createWindow(): BrowserWindow {
     minHeight: 700,
     show: false,
     backgroundColor: '#0f172a',
-    title: 'Pharmacy POS & Management',
+    title: 'Anubis Pharmacy',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -444,6 +446,18 @@ function registerIpc(): void {
     return { fileName: basename(picked.filePath), count: out.count }
   })
   handle(IPC.KpiSellers, async (_event, range: unknown) => sellerKpis(range))
+  handle(IPC.ReportExport, async (event, kind: string, range: unknown) => {
+    const out = await exportReport(kind, range)
+    const picked = await dialog.showSaveDialog(senderWindow(event), {
+      title: 'Report',
+      defaultPath: `${out.name}.xlsx`,
+      filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+    })
+    if (picked.canceled || !picked.filePath) return null
+    await writeFile(picked.filePath, out.data)
+    await logAudit({ actorUsername: requireSession().username, action: 'report.export', resource: kind, details: { range, count: out.count } })
+    return { fileName: basename(picked.filePath), count: out.count }
+  })
 
   handle(IPC.InvImportConfirm, async (_event, batchId: string) => {
     let added = 0

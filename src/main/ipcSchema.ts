@@ -61,6 +61,7 @@ export const IPC_ARGS: Record<IpcChannel, ArgSpec[]> = {
   [IPC.AttendanceDays]: ['object'],
   [IPC.KpiSellers]: ['object'],
   [IPC.ExportSection]: ['string', 'string'],
+  [IPC.ReportExport]: ['string', 'object'],
   [IPC.InvCategoriesDelete]: ['id'],
   [IPC.InvProductsDelete]: ['id'],
   [IPC.InvSuppliersDelete]: ['id'],

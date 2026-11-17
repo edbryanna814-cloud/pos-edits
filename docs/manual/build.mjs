@@ -104,7 +104,10 @@ const pagesEn = [
   ['15-attendance', 'Attendance (fingerprint machine)', 'Open <b>Attendance</b>. Each person’s User ID must match their number on the machine.', [
     'Save the records from the fingerprint machine (Excel file or attlog.dat on a USB stick), then press this button and choose the file. Records already imported are skipped.',
     'From date…', '…to date. You see clock-in, clock-out, breaks and hours worked per person, and each seller’s sales on the dashboard.']],
-  ['16-reports', 'Reports', 'Sales totals, profit, best-selling products and sales per seller. Use <b>Export</b> on any list to save it as Excel or .db (administrator).', []],
+  ['16-reports', 'Reports', 'Sales totals, profit, best-selling products and sales per seller. Managers can download sales and purchasing reports here; <b>Export</b> on other lists saves Excel or .db (administrator).', [
+    'First day of the period…', '…last day (at most one year).',
+    '<b>Sales report</b>: every invoice in the period with seller, customer, items, discount, tax and total, plus a totals row. Choose where to save the Excel file.',
+    '<b>Purchasing report</b>: every purchase order in the period with supplier, products, quantities and costs, plus a totals row.']],
   ['18-audit', 'Audit log', 'Every important action is recorded here: who did it and when (sales, returns, price changes, deletes, sign-ins).', []]
 ]
 
@@ -114,12 +117,12 @@ const ar = AR && !STAFF ? await import('./pages-ar.mjs') : null
 const pages = staff ? staff.pages[lang] : ar ? ar.pages : pagesEn
 const model = staff ? staff.pages.en : pagesEn
 if (pages.map((p) => p[0]).join() !== model.map((p) => p[0]).join()) throw new Error('Arabic pages differ from English')
-const cover = staff ? staff.cover[lang] : ar ? ar.cover : { title: 'Pharmacy POS', sub: 'User guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.', contents: 'Contents' }
-const html = `<!doctype html><html lang="${AR ? 'ar' : 'en'}" dir="${AR ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>Pharmacy POS — User Guide</title><style>
+const cover = staff ? staff.cover[lang] : ar ? ar.cover : { title: 'Anubis Pharmacy', sub: 'User guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.', contents: 'Contents' }
+const html = `<!doctype html><html lang="${AR ? 'ar' : 'en'}" dir="${AR ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>Anubis Pharmacy — User Guide</title><style>
 @page { size: A4; margin: 14mm 14mm 16mm }
 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #111; font-size: 12.5pt; line-height: 1.45 }
 .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; text-align: center }
-.cover h1 { font-size: 34pt; margin: 0 0 8px; color: #0f766e } .cover p { font-size: 15pt; color: #444 }
+.cover .logo { width: 70mm; border: 0; margin: 0 auto 10mm } .cover h1 { font-size: 34pt; margin: 0 0 8px; color: #0f766e } .cover p { font-size: 15pt; color: #444 }
 section { page-break-before: always }
 h2 { color: #0f766e; font-size: 20pt; margin: 0 0 4px } .intro { margin: 0 0 10px; color: #333 }
 img { width: 100%; border: 1px solid #ccc; border-radius: 6px }
@@ -129,7 +132,7 @@ li::before { content: counter(n); position: absolute; inset-inline-start: 0; top
 .red { color: #b91c1c; font-weight: 700 } .yellow { color: #a16207; font-weight: 700 }
 .toc li::before { background: #0f766e }
 </style></head><body>
-<div class="cover"><h1>${cover.title}</h1><p>${cover.sub} ${version}</p><p style="margin-top:40px">${cover.arrows}</p></div>
+<div class="cover"><img class="logo" src="../../src/renderer/src/assets/logo.png" alt=""><h1>${cover.title}</h1><p>${cover.sub} ${version}</p><p style="margin-top:40px">${cover.arrows}</p></div>
 <section><h2>${cover.contents}</h2><ol class="toc">${pages.map((p) => `<li>${p[1]}</li>`).join('')}</ol></section>
 ${pages.map(([shot, title, intro, steps]) => {
   if (!existsSync(join(here, SHOTS, `${shot}.png`))) throw new Error(`missing shot ${shot}`)

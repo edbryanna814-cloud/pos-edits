@@ -266,3 +266,9 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 2026-11-17: release 0.3.3 (staff manuscripts, admin hidden from reports, folder lock, LAN TLS). Installer `Pharmacy-POS-Setup-0.3.3.exe` 157562956 bytes, SHA-256 `879624cb5dae7d1a74df67130dd4a921b63429837abb80bb9f0cfdf24e2524f2`; packaged check re-run on this build (folder ACL, TLS only, pin, join code, stop on quit). Pre-release `field-test-0.3.3`; release repo `Anubis-hub/pharmacy-pos-release` v0.3.3.
 - 2026-11-17: PR #4 merged into main (owner request), merge commit 5aa1030; CI green on main.
 - 2026-11-17: owner asked for the staff manuscripts (EN/AR) on the release download; added to `Anubis-hub/pharmacy-pos-release` v0.3.3 (owner manuscripts stay out).
+
+2026-11-17 (branch `feat/branding-reports`): default branding and manager reports.
+- App name **Anubis Pharmacy** (window title, sign-in, license screen, sidebar; installer `Anubis-Pharmacy-Setup-<v>.exe`, `productName`). The internal package name stays `pharmacy-pos-management`, so the data folder (database, license, keys) does not move on update; appId unchanged.
+- Logo from the owner's JPG (`G:\Mahmoud\Under Deployment\Logos\Pharmacy\`), corners made transparent: `build/icon.png` (Windows icon), `src/renderer/src/assets/logo.png` (sidebar, sign-in, license screen, printed invoice). Default until a buyer asks for their own (swap those two files).
+- Reports page: "Download a report (Excel)" with a date range (at most a year): sales report (each invoice + totals) and purchasing report (each purchase-order line, supplier, received date + totals). Permission `reports.view` (Manager, Administrator); no record IDs; administrator cashier names left empty for non-admins; audited `report.export`. E2E: both files saved, bad range refused, seller refused.
+- Manuscripts rebuilt (new name/logo on covers and screens, report buttons explained).

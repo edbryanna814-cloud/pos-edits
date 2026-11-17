@@ -3,6 +3,8 @@ import { getDb } from './db'
 import { packOf, unitPrice, unitSize } from '../shared/packaging'
 import { breakdown } from '../shared/packaging'
 import type { Cell } from './sheetWrite'
+import { isAdminViewer, listAdminUsernames } from './auth'
+import { checkRange } from './attendance'
 
 // Exports for Administrators: each section as Excel (readable, one row per record) or as a .db file
 // (the records exactly as stored: MongoDB Extended JSON, the same format the backups use inside).
@@ -73,4 +75,51 @@ export async function exportSection(section: unknown, format: unknown): Promise<
   if (format === 'db') return { data: BSON.EJSON.stringify(docs, undefined, 1, { relaxed: false }), ext: 'db', count: docs.length }
   const { writeXlsx } = await import('./sheetWrite')
   return { data: writeXlsx(sheetRows(s, docs), s), ext: 'xlsx', count: docs.length }
+}
+
+export const REPORT_KINDS = ['sales', 'purchasing'] as const
+export type ReportKind = (typeof REPORT_KINDS)[number]
+
+/**
+ * Managers' reports (reports.view): one Excel sheet for a date range of at most a year, with a totals
+ * row. No record IDs, and administrator accounts stay hidden from everyone else (cashier left empty).
+ */
+export async function exportReport(kind: unknown, range: unknown): Promise<{ data: Uint8Array; count: number; name: string }> {
+  if (!REPORT_KINDS.includes(kind as ReportKind)) throw new Error('EXPORT_SECTION_INVALID')
+  const { from, to, fromIso, toIso } = checkRange(range)
+  const db = requireDb()
+  const when = { createdAt: { $gte: fromIso, $lt: toIso } }
+  const { writeXlsx } = await import('./sheetWrite')
+  const name = `${kind}-report-${from}-to-${to}`
+  const sum = (rows: Cell[][], col: number) => Math.round(rows.reduce((t, r) => t + (Number(r[col]) || 0), 0) * 100) / 100
+
+  if (kind === 'sales') {
+    const hidden = isAdminViewer() ? new Set<string>() : new Set(await listAdminUsernames())
+    const docs = (await db.collection('pos_sales').find(when).sort({ createdAt: 1 }).toArray())
+      .map((s) => (hidden.has(s.cashierUsername) ? { ...s, cashierUsername: '' } : s))
+    const [head, ...rows] = sheetRows('sales', docs).map((r) => r.slice(0, -1)) // drop Record ID
+    const totals: Cell[] = ['Total', '', '', '', '', sum(rows, 5), sum(rows, 6), sum(rows, 7), sum(rows, 8), sum(rows, 9), '', '']
+    return { data: writeXlsx([head, ...rows, totals], 'sales'), count: rows.length, name }
+  }
+
+  const orders = await db.collection('inv_purchase_orders').find(when).sort({ createdAt: 1 }).toArray()
+  const supplierIds = [...new Set(orders.map((o) => o.supplierId))]
+  const productIds = [...new Set(orders.flatMap((o) => (o.lines ?? []).map((l: any) => l.productId)))]
+  const asIds = (ids: string[]) => ids.filter((x) => BSON.ObjectId.isValid(x)).map((x) => new BSON.ObjectId(x))
+  const suppliers = new Map((await db.collection('inv_suppliers').find({ _id: { $in: asIds(supplierIds) } }).toArray()).map((s) => [String(s._id), s.name]))
+  const products = new Map((await db.collection('inv_products').find({ _id: { $in: asIds(productIds) } }).toArray()).map((p) => [String(p._id), p]))
+  const receipts = await db.collection('inv_purchase_receipts').find({ purchaseOrderId: { $in: orders.map((o) => String(o._id)) } }).toArray()
+  const receivedAt = new Map(receipts.map((r) => [String(r.purchaseOrderId), r.receivedAt ?? r.createdAt]))
+  const rows: Cell[][] = orders.flatMap((o) =>
+    (o.lines ?? []).map((l: any) => {
+      const p = products.get(l.productId)
+      return [
+        String(o.createdAt).slice(0, 10), o.status, suppliers.get(o.supplierId) ?? '', p?.name ?? '', p?.sku ?? '',
+        l.quantity, money(l.unitCostCents), money(l.quantity * l.unitCostCents), receivedAt.get(String(o._id)) ?? '', o.notes ?? ''
+      ]
+    })
+  )
+  const head: Cell[] = ['Order date', 'Status', 'Supplier', 'Product', 'SKU', 'Quantity', 'Unit cost', 'Line total', 'Received', 'Notes']
+  const totals: Cell[] = ['Total', '', '', '', '', sum(rows, 5), '', sum(rows, 7), '', '']
+  return { data: writeXlsx([head, ...rows, totals], 'purchasing'), count: orders.length, name }
 }
