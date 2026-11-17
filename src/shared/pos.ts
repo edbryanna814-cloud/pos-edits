@@ -3,7 +3,8 @@ export type SaleLine = {
   productName: string
   sku: string
   quantity: number
-  saleUnit?: 'base' | 'box'
+  /** 'base' on sales before 0.3.0 (= strip). */
+  saleUnit?: 'base' | 'box' | 'strip' | 'pill'
   baseQuantity?: number
   unitsPerBox?: number
   unitPriceCents: number
@@ -11,6 +12,10 @@ export type SaleLine = {
   discountCents: number
   taxCents: number
   lineTotalCents: number
+  /** The product's return period when sold (days); none = cannot be returned. */
+  returnDays?: number
+  /** Returned so far (in this line's unit). */
+  returnedQuantity?: number
 }
 
 export type Sale = {
@@ -27,6 +32,13 @@ export type Sale = {
   changeCents: number
   status: 'completed' | 'returned' | 'void'
   cashierUsername?: string
+  customerId?: string
+  customerName?: string
+  customerPhone?: string
+  /** The sale's discount as a percentage (1250 = 12.5%). */
+  discountBasisPoints?: number
+  /** Money given back so far by returns. */
+  refundedCents?: number
   createdAt: string
   updatedAt: string
 }

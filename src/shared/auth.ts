@@ -10,6 +10,11 @@ export type Permission =
   | 'settings.manage'
   | 'audit.view'
   | 'database.manage'
+  | 'customers.manage'
+  /** Import or export files (Excel, backups, exports): Administrators only. */
+  | 'data.transfer'
+  /** Delete categories, products and suppliers: Administrator and Manager (a Seller can add stock, not delete). */
+  | 'catalog.delete'
 
 export type Role = {
   name: string
@@ -20,9 +25,9 @@ export type Role = {
 export const ADMIN_ROLE = 'Administrator'
 export const BUILTIN_ROLES: Role[] = [
   // Everything, including where the database lives.
-  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage'] },
+  { name: 'Administrator', permissions: ['users.read', 'users.manage', 'roles.manage', 'permissions.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'database.manage', 'customers.manage', 'data.transfer', 'catalog.delete'] },
   // Everything except the database location; Administrator accounts are hidden from managers.
-  { name: 'Manager', permissions: ['users.read', 'users.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view'] },
+  { name: 'Manager', permissions: ['users.read', 'users.manage', 'pos.use', 'inventory.manage', 'reports.view', 'cashbox.manage', 'settings.manage', 'audit.view', 'customers.manage', 'catalog.delete'] },
   // POS and inventory only.
   { name: 'Seller', permissions: ['pos.use', 'inventory.manage'] }
 ]
@@ -32,6 +37,8 @@ export const LEGACY_ROLES: Record<string, string> = { Cashier: 'Seller', 'Invent
 
 export type User = {
   _id?: string
+  /** User ID: 1, 2, 3… (or set by hand). The fingerprint machine's user number. */
+  userNo?: number
   username: string
   passwordHash: string
   role: string

@@ -1,4 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import InvoicePrint from './InvoicePrint'
+import { ExportButton, RecordId } from '../session'
+import ReturnablePanel, { returnErrorText } from './ReturnablePanel'
+import type { Customer } from '../../../shared/customers'
+import CustomerPicker from './CustomerPicker'
+import { percentText } from '../customers/CustomersPage'
+import { packOf, saleUnits, stockLevel, unitPrice, unitSize, type SaleUnit } from '../../../shared/packaging'
+import { stockText, UNIT_NAMES } from '../units'
 import type { CashboxMovement, Sale } from '../../../shared/pos'
 import type { Product } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
@@ -13,6 +21,7 @@ interface Props {
   taxRateBasisPoints: number
   cashier: string
   companyName: string
+  companyPhone: string
   onChanged: () => void
 }
 
@@ -37,6 +46,7 @@ const copy = {
     remove: 'Remove',
     subtotal: 'Subtotal',
     discount: 'Discount',
+    discountPercent: 'Discount (%)',
     tax: 'Tax',
     total: 'Total',
     paymentMethod: 'Payment method',
@@ -72,7 +82,7 @@ const copy = {
     apply: 'Apply',
     noCashbox: 'No cashbox movements yet.',
     cartEmptyError: 'Add at least one product to the cart.',
-    discountError: 'Enter a valid discount.',
+    discountError: 'Enter a discount from 0 to 100%.',
     discountTooBig: 'Discount cannot exceed the subtotal.',
     paidError: 'Enter a valid paid amount.',
     paidTooLow: 'Paid amount is less than the total.',
@@ -106,6 +116,7 @@ const copy = {
     remove: 'حذف',
     subtotal: 'الإجمالي الفرعي',
     discount: 'الخصم',
+    discountPercent: 'الخصم (%)',
     tax: 'الضريبة',
     total: 'الإجمالي',
     paymentMethod: 'طريقة الدفع',
@@ -141,7 +152,7 @@ const copy = {
     apply: 'تنفيذ',
     noCashbox: 'لا توجد حركات صندوق بعد.',
     cartEmptyError: 'أضف منتجًا واحدًا على الأقل إلى السلة.',
-    discountError: 'أدخل خصمًا صحيحًا.',
+    discountError: 'أدخل خصمًا من 0 إلى 100%.',
     discountTooBig: 'لا يمكن أن يتجاوز الخصم الإجمالي الفرعي.',
     paidError: 'أدخل مبلغًا مدفوعًا صحيحًا.',
     paidTooLow: 'المبلغ المدفوع أقل من الإجمالي.',
@@ -160,21 +171,16 @@ const copy = {
 interface CartItem {
   productId: string
   quantity: number
-  unit: 'base' | 'box'
+  unit: SaleUnit
 }
 
-function unitsPerBox(product: Product): number {
-  return Math.max(1, Math.trunc(product.unitsPerBox ?? 1))
-}
-
-function canSellBox(product: Product): boolean {
-  return unitsPerBox(product) > 1 && (product.boxPriceCents ?? 0) > 0
-}
-
+/** Stock units (smallest counted unit) this cart line takes. */
 function baseOf(item: CartItem, product: Product | undefined): number {
-  if (!product) return item.quantity
-  return item.unit === 'box' ? item.quantity * unitsPerBox(product) : item.quantity
+  return product ? item.quantity * unitSize(product, item.unit) : item.quantity
 }
+
+/** A scan or a tap on the product sells its own unit (a box for boxed medicine). */
+const ownUnit = (product: Product): SaleUnit => packOf(product).packaging
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -191,6 +197,14 @@ function newRequestId(): string {
   return cryptoApi?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+/** "12.5" → 1250 basis points; null when not a number from 0 to 100 with at most 2 decimals. */
+function percentToBasisPoints(value: string): number | null {
+  const text = value.trim().replace(',', '.')
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(text)) return null
+  const bp = Math.round(Number(text) * 100)
+  return bp <= 10000 ? bp : null
+}
+
 export default function PosPage({
   products,
   sales,
@@ -200,12 +214,19 @@ export default function PosPage({
   taxRateBasisPoints,
   cashier,
   companyName,
+  companyPhone,
   onChanged
 }: Props) {
   const text = copy[language]
   const [query, setQuery] = useState('')
   const [cart, setCart] = useState<CartItem[]>([])
   const [discountInput, setDiscountInput] = useState('')
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  /** Choosing a customer fills in their discount; the seller may still change it. */
+  function chooseCustomer(next: Customer | null): void {
+    setCustomer(next)
+    setDiscountInput(next ? percentText(next.discountBasisPoints) : '')
+  }
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'other'>('cash')
   const [paidInput, setPaidInput] = useState('')
   const [receipt, setReceipt] = useState<Sale | null>(null)
@@ -248,8 +269,7 @@ export default function PosPage({
       cart.flatMap((item) => {
         const product = byId.get(item.productId)
         if (!product) return []
-        const unitPriceCents =
-          item.unit === 'box' ? (product.boxPriceCents ?? 0) : product.sellingPriceCents
+        const unitPriceCents = unitPrice(product, item.unit)
         return [
           {
             ...item,
@@ -263,8 +283,9 @@ export default function PosPage({
   )
 
   const subtotalCents = cartLines.reduce((sum, line) => sum + line.lineTotalCents, 0)
-  const discountCents = discountInput.trim() ? parseMoney(discountInput) : 0
-  const safeDiscountCents = Math.min(Math.max(0, discountCents ?? 0), subtotalCents)
+  const discountBasisPoints = discountInput.trim() ? percentToBasisPoints(discountInput) : 0
+  // Same rounding as the server (src/main/pos.ts), which recomputes it.
+  const safeDiscountCents = Math.round((subtotalCents * (discountBasisPoints ?? 0)) / 10000)
   const taxableCents = subtotalCents - safeDiscountCents
   const taxBasisPoints = Math.max(0, Math.min(10000, Math.round(Number(taxRateBasisPoints) || 0)))
   const taxCents = Math.round((taxableCents * taxBasisPoints) / 10000)
@@ -294,7 +315,7 @@ export default function PosPage({
         const match = products.find((product) => product.barcode === code)
         if (match) {
           event.preventDefault()
-          addProductRef.current(match, 'base')
+          addProductRef.current(match)
           setQuery('')
         }
         return
@@ -305,18 +326,17 @@ export default function PosPage({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [products])
 
-  function addProduct(product: Product, unit: 'base' | 'box' = 'base'): void {
+  function addProduct(product: Product, unit: SaleUnit = ownUnit(product)): void {
     if (!product._id || product.stockQuantity <= 0) return
     if (isExpired(product.expiryDate)) {
       setError(`${text.expiredError} ${product.name}`)
       return
     }
-    if (unit === 'box' && !canSellBox(product)) {
+    if (!saleUnits(product).includes(unit) || unitPrice(product, unit) <= 0) {
       setError(`${text.boxPriceMissing} ${product.name}`)
       return
     }
-    const pack = unitsPerBox(product)
-    const addBase = unit === 'box' ? pack : 1
+    const addBase = unitSize(product, unit)
     const reserved = cart.reduce(
       (sum, item) =>
         sum + (item.productId === product._id ? baseOf(item, product) : 0),
@@ -348,12 +368,12 @@ export default function PosPage({
   const addProductRef = useRef(addProduct)
   addProductRef.current = addProduct
 
-  function setQuantity(productId: string, unit: 'base' | 'box', value: string): void {
+  function setQuantity(productId: string, unit: SaleUnit, value: string): void {
     const product = byId.get(productId)
     if (!product) return
     const parsed = Number(value)
     const pool = Math.max(1, Math.trunc(parsed) || 1)
-    const pack = unit === 'box' ? unitsPerBox(product) : 1
+    const pack = unitSize(product, unit)
     const reservedElsewhere = cart.reduce(
       (sum, item) =>
         sum +
@@ -369,12 +389,13 @@ export default function PosPage({
     )
   }
 
-  function removeLine(productId: string, unit: 'base' | 'box'): void {
+  function removeLine(productId: string, unit: SaleUnit): void {
     setCart((current) => current.filter((item) => !(item.productId === productId && item.unit === unit)))
   }
 
   function clearCart(): void {
     setCart([])
+    setCustomer(null)
     setDiscountInput('')
     setPaidInput('')
     setError('')
@@ -385,8 +406,7 @@ export default function PosPage({
     setError('')
     setSuccess('')
     if (cartLines.length === 0) return setError(text.cartEmptyError)
-    if (discountInput.trim() && discountCents === null) return setError(text.discountError)
-    if ((discountCents ?? 0) > subtotalCents) return setError(text.discountTooBig)
+    if (discountBasisPoints === null) return setError(text.discountError)
     if (paidCents === null) return setError(text.paidError)
     if (paidCents < totalCents) return setError(text.paidTooLow)
 
@@ -400,13 +420,15 @@ export default function PosPage({
           quantity: item.quantity,
           saleUnit: item.unit
         })),
-        discountCents: safeDiscountCents,
+        discountBasisPoints: discountBasisPoints ?? 0,
+        ...(customer?._id ? { customerId: customer._id } : {}),
         taxCents,
         paymentMethod,
         paidCents
       })
       setReceipt(sale)
       setCart([])
+      setCustomer(null)
       setDiscountInput('')
       setPaidInput('')
       requestIdRef.current = null
@@ -432,7 +454,7 @@ export default function PosPage({
       setSuccess(text.returned)
       onChanged()
     } catch (returnError) {
-      setError(`${text.returnError}: ${errorText(returnError)}`)
+      setError(returnErrorText(language, returnError) ?? `${text.returnError}: ${errorText(returnError)}`)
     } finally {
       setReturnBusy(false)
     }
@@ -484,70 +506,7 @@ export default function PosPage({
               </button>
             </div>
           </div>
-          <div className="receipt-brand">
-            <strong>{companyName}</strong>
-          </div>
-          <div className="receipt-meta">
-            <div>
-              <span>{text.invoice}</span>
-              <strong>{receipt.invoiceNo}</strong>
-            </div>
-            <div>
-              <span>{text.date}</span>
-              <strong>{formatDateTime(receipt.createdAt, language)}</strong>
-            </div>
-            <div>
-              <span>{text.cashierLabel}</span>
-              <strong>{receipt.cashierUsername ?? cashier}</strong>
-            </div>
-          </div>
-          <table className="data-table compact">
-            <thead>
-              <tr>
-                <th>{text.quantity}</th>
-                <th>{text.total}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receipt.lines.map((line) => (
-                <tr key={line.productId}>
-                  <td>
-                    {line.productName} × {line.quantity}
-                    {line.saleUnit === 'box' ? ` ${text.box}` : ''}
-                  </td>
-                  <td>{formatMoney(line.lineTotalCents, currency)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <dl className="totals-list">
-            <div>
-              <dt>{text.subtotal}</dt>
-              <dd>{formatMoney(receipt.subtotalCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.discount}</dt>
-              <dd>{formatMoney(receipt.discountCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>
-                {text.tax} ({taxPercent}%)
-              </dt>
-              <dd>{formatMoney(receipt.taxCents, currency)}</dd>
-            </div>
-            <div className="total-row">
-              <dt>{text.total}</dt>
-              <dd>{formatMoney(receipt.totalCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.paidReceipt}</dt>
-              <dd>{formatMoney(receipt.paidCents, currency)}</dd>
-            </div>
-            <div>
-              <dt>{text.change}</dt>
-              <dd>{formatMoney(receipt.changeCents, currency)}</dd>
-            </div>
-          </dl>
+          <InvoicePrint sale={receipt} companyName={companyName} companyPhone={companyPhone} cashier={cashier} />
         </section>
       ) : null}
 
@@ -613,9 +572,10 @@ export default function PosPage({
           ) : (
             <div className="product-grid">
               {visibleProducts.map((product) => {
-                const low = product.stockQuantity <= product.minStock
+                const level = stockLevel(product)
+                const low = level !== 'ok'
                 return (
-                  <div key={product._id ?? product.sku} className="product-card">
+                  <div key={product._id ?? product.sku} className={`product-card level-${level}`}>
                     <button
                       type="button"
                       className="product-card-main"
@@ -627,19 +587,22 @@ export default function PosPage({
                         {product.barcode ? ` · ${product.barcode}` : ''}
                       </span>
                       <span className="product-footer">
-                        <strong>{formatMoney(product.sellingPriceCents, currency)}</strong>
-                        <span className={low ? 'warning-text' : 'muted'}>{product.stockQuantity}</span>
+                        <strong>{UNIT_NAMES[language][ownUnit(product)]} {formatMoney(unitPrice(product, ownUnit(product)), currency)}</strong>
+                        <span className={low ? 'warning-text' : 'muted'}>{stockText(product.stockQuantity, product, language)}</span>
                       </span>
                     </button>
-                    {canSellBox(product) ? (
-                      <button
-                        type="button"
-                        className="product-card-box"
-                        onClick={() => addProduct(product, 'box')}
-                      >
-                        {text.box}: {formatMoney(product.boxPriceCents ?? 0, currency)}
-                      </button>
-                    ) : null}
+                    {saleUnits(product)
+                      .filter((unit) => unit !== ownUnit(product) && unitPrice(product, unit) > 0)
+                      .map((unit) => (
+                        <button
+                          key={unit}
+                          type="button"
+                          className="product-card-box"
+                          onClick={() => addProduct(product, unit)}
+                        >
+                          {UNIT_NAMES[language][unit]}: {formatMoney(unitPrice(product, unit), currency)}
+                        </button>
+                      ))}
                   </div>
                 )
               })}
@@ -669,11 +632,7 @@ export default function PosPage({
                   <div className="cart-line-main">
                     <strong>{line.product.name}</strong>
                     <span className="muted">
-                      {line.unit === 'box'
-                        ? `${text.box} · `
-                        : unitsPerBox(line.product) > 1
-                          ? `${text.strip} · `
-                          : ''}
+                      {`${UNIT_NAMES[language][line.unit]} · `}
                       {formatMoney(line.unitPriceCents, currency)}
                     </span>
                   </div>
@@ -702,13 +661,15 @@ export default function PosPage({
             </div>
           )}
 
+          <CustomerPicker language={language} selected={customer} onSelect={chooseCustomer} />
+
           <label className="cart-field">
-            <span>{text.discount}</span>
+            <span>{text.discountPercent}</span>
             <input
               inputMode="decimal"
               value={discountInput}
               onChange={(event) => setDiscountInput(event.target.value)}
-              placeholder="0.00"
+              placeholder="0"
             />
           </label>
 
@@ -721,12 +682,14 @@ export default function PosPage({
               <dt>{text.discount}</dt>
               <dd>{formatMoney(safeDiscountCents, currency)}</dd>
             </div>
-            <div>
-              <dt>
-                {text.tax} ({taxPercent}%)
-              </dt>
-              <dd>{formatMoney(taxCents, currency)}</dd>
-            </div>
+            {taxBasisPoints > 0 ? (
+              <div>
+                <dt>
+                  {text.tax} ({taxPercent}%)
+                </dt>
+                <dd>{formatMoney(taxCents, currency)}</dd>
+              </div>
+            ) : null}
             <div className="total-row">
               <dt>{text.total}</dt>
               <dd>{formatMoney(totalCents, currency)}</dd>
@@ -775,10 +738,13 @@ export default function PosPage({
         </section>
       </div>
 
+      <ReturnablePanel language={language} currency={currency} refreshKey={sales} onReturned={onChanged} />
+
       <div className="pos-bottom">
         <section className="panel">
           <div className="section-header">
             <h3>{text.recentSales}</h3>
+            <ExportButton section="sales" language={language} />
           </div>
           {sales.length === 0 ? (
             <div className="empty-state">
@@ -797,7 +763,7 @@ export default function PosPage({
                 <tbody>
                   {sales.slice(0, 10).map((sale) => (
                     <tr key={sale._id ?? sale.invoiceNo}>
-                      <td>{sale.invoiceNo}</td>
+                      <td>{sale.invoiceNo}<RecordId id={sale._id} /></td>
                       <td>{formatDateTime(sale.createdAt, language)}</td>
                       <td>{formatMoney(sale.totalCents, currency)}</td>
                       <td>{text.status[sale.status]}</td>

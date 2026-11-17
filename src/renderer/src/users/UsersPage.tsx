@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { ExportButton, RecordId } from '../session'
 import type { Role, User } from '../../../shared/auth'
 import type { Language } from '../../../shared/settings'
 import { formatDateTime } from '../money'
@@ -27,7 +28,10 @@ const copy = {
     noUsers: 'No users yet.',
     roles: 'Built-in roles',
     usernameRequired: 'Username is required.',
-    passwordRequired: 'Password must be at least 12 characters.',
+    passwordRequired: 'Password must be at least 3 characters.',
+    userNo: 'User ID (empty = next number)',
+    userNoTaken: 'That user ID is already used.',
+    userNoInvalid: 'The user ID must be a whole number from 1.',
     error: 'Could not save user',
     saved: 'Saved successfully.',
     columns: ['Username', 'Role', 'Status', 'Created', ''],
@@ -59,7 +63,10 @@ const copy = {
     noUsers: 'لا يوجد مستخدمون بعد.',
     roles: 'الأدوار المضمنة',
     usernameRequired: 'اسم المستخدم مطلوب.',
-    passwordRequired: 'كلمة المرور يجب أن تكون 12 حرفًا على الأقل.',
+    passwordRequired: 'كلمة المرور يجب أن تكون 3 أحرف على الأقل.',
+    userNo: 'رقم المستخدم (فارغ = الرقم التالي)',
+    userNoTaken: 'رقم المستخدم هذا مستخدم بالفعل.',
+    userNoInvalid: 'رقم المستخدم يجب أن يكون عددًا صحيحًا من 1.',
     error: 'تعذر حفظ المستخدم',
     saved: 'تم الحفظ بنجاح.',
     columns: ['اسم المستخدم', 'الدور', 'الحالة', 'تاريخ الإنشاء', ''],
@@ -86,6 +93,7 @@ export default function UsersPage({ language }: Props) {
   const [editing, setEditing] = useState<User | null>(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [userNo, setUserNo] = useState('')
   const [role, setRole] = useState('Seller')
   const [active, setActive] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -122,6 +130,7 @@ export default function UsersPage({ language }: Props) {
     setEditing(null)
     setUsername('')
     setPassword('')
+    setUserNo('')
     setRole('Seller')
     setActive(true)
   }
@@ -148,8 +157,8 @@ export default function UsersPage({ language }: Props) {
     resetMessages()
     const trimmed = username.trim()
     if (!trimmed) return setError(text.usernameRequired)
-    if (!editing && password.length < 12) return setError(text.passwordRequired)
-    if (editing && password && password.length < 12) return setError(text.passwordRequired)
+    if (!editing && password.length < 3) return setError(text.passwordRequired)
+    if (editing && password && password.length < 3) return setError(text.passwordRequired)
     setBusy(true)
     try {
       if (editing?._id) {
@@ -163,14 +172,16 @@ export default function UsersPage({ language }: Props) {
           username: trimmed,
           password,
           role,
-          active
+          active,
+          ...(userNo.trim() ? { userNo: Number(userNo) } : {})
         })
       }
       closeForm()
       await load()
       setSuccess(text.saved)
     } catch (saveError) {
-      setError(`${text.error}: ${message(saveError)}`)
+      const code = message(saveError)
+      setError(code.includes('USER_NO_TAKEN') ? text.userNoTaken : code.includes('USER_NO_INVALID') ? text.userNoInvalid : `${text.error}: ${code}`)
     } finally {
       setBusy(false)
     }
@@ -183,7 +194,10 @@ export default function UsersPage({ language }: Props) {
           <h2 id="users-title">{text.title}</h2>
           <p className="muted">{text.intro}</p>
         </div>
-        <button type="button" className="primary" onClick={openCreate}>{text.add}</button>
+        <span className="section-actions">
+          <ExportButton section="users" language={language} />
+          <button type="button" className="primary" onClick={openCreate}>{text.add}</button>
+        </span>
       </div>
 
       {error ? <p className="error" role="alert">{error}</p> : null}
@@ -200,6 +214,12 @@ export default function UsersPage({ language }: Props) {
               <span>{text.username}</span>
               <input value={username} onChange={(event) => setUsername(event.target.value)} disabled={Boolean(editing)} required maxLength={60} />
             </label>
+            {editing ? null : (
+              <label>
+                <span>{text.userNo}</span>
+                <input type="number" min={1} step={1} value={userNo} onChange={(event) => setUserNo(event.target.value)} />
+              </label>
+            )}
             <label>
               <span>{editing ? text.newPassword : text.password}</span>
               <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required={!editing} maxLength={120} />
@@ -255,8 +275,9 @@ export default function UsersPage({ language }: Props) {
               <div className="user-card-head">
                 <span className="user-avatar">{(user.username || '?').slice(0, 1).toUpperCase()}</span>
                 <div>
-                  <strong>{user.username}</strong>
+                  <strong>{user.userNo ? `#${user.userNo} ` : ''}{user.username}</strong>
                   <small className="block-muted">{user.role}</small>
+                  <RecordId id={user._id} />
                 </div>
                 <span className={`tag ${user.active === false ? '' : 'ok-tag'}`}>
                   {user.active === false ? text.inactiveLabel : text.activeLabel}

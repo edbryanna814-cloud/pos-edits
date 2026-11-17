@@ -2,6 +2,8 @@ export type Language = 'en' | 'ar'
 
 export interface CompanySettings {
   companyName: string
+  /** Printed on invoices; optional. */
+  companyPhone: string
   currencyCode: string
   currencyPrecision: number
   taxRateBasisPoints: number
@@ -23,6 +25,11 @@ export function validateSettings(input: unknown): CompanySettings {
   const companyName = typeof raw.companyName === 'string' ? raw.companyName.trim() : ''
   if (companyName.length < 1 || companyName.length > 120) {
     throw new Error('Company name is required and must be 1-120 characters')
+  }
+
+  const companyPhone = typeof raw.companyPhone === 'string' ? raw.companyPhone.trim() : ''
+  if (companyPhone && !/^[+\d][\d\s-]{2,29}$/.test(companyPhone)) {
+    throw new Error('Pharmacy phone: digits, spaces and dashes only')
   }
 
   const currencyCode =
@@ -60,6 +67,7 @@ export function validateSettings(input: unknown): CompanySettings {
 
   return {
     companyName,
+    companyPhone,
     currencyCode,
     currencyPrecision,
     taxRateBasisPoints,

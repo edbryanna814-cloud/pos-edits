@@ -1535,9 +1535,10 @@ h3 {
 }
 
 @media print {
+  /* The printer's own paper: an 80 mm roll, A5 or A4; the invoice fills its width. */
   @page {
-    size: 80mm auto;
-    margin: 4mm;
+    size: auto;
+    margin: 6mm;
   }
 
   .receipt-brand strong {
@@ -1933,4 +1934,267 @@ h3 {
   font-weight: 600;
   word-break: break-all;
   user-select: all;
+}
+
+.customer-picker,
+.customer-chosen {
+  display: grid;
+  gap: 4px;
+}
+
+.customer-add {
+  display: grid;
+  gap: 6px;
+}
+
+.range-inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.range-inputs label {
+  display: grid;
+  gap: 4px;
+}
+
+/* A tick box sits right next to its words, on one line. */
+.settings-form label.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  padding-bottom: 10px;
+}
+
+.settings-form label.checkbox input {
+  width: auto;
+  margin: 0;
+}
+
+/* Stock against the product's minimum: red at or below it (or empty), yellow within the warning margin. */
+tr.level-min td,
+tr.level-out td {
+  background: #fef2f2;
+}
+
+tr.level-near td {
+  background: #fffbeb;
+}
+
+.product-card.level-min,
+.product-card.level-out {
+  border-color: #f87171;
+  background: #fef2f2;
+}
+
+.product-card.level-near {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.record-id {
+  display: block;
+  color: var(--muted, #64748b);
+  font-size: 11px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.export-button,
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Printed invoice (Arabic template). Black on white, framed, right-to-left. */
+.invoice {
+  max-width: 720px;
+  margin: 12px auto 0;
+  padding: 18px 20px;
+  border: 2px solid #111;
+  border-radius: 18px;
+  background: #fff;
+  color: #111;
+  font-family: Tahoma, 'Segoe UI', Arial, sans-serif;
+}
+
+.invoice hr {
+  border: 0;
+  border-top: 2px solid #111;
+  margin: 12px 0;
+}
+
+.invoice-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.invoice-logo {
+  width: 96px;
+  height: 96px;
+  flex: none;
+}
+
+.invoice-title {
+  flex: 1;
+  text-align: center;
+}
+
+.invoice-title h1 {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.invoice-slogan,
+.invoice-thanks {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.invoice-slogan span,
+.invoice-thanks span {
+  flex: 1;
+  border-top: 2px solid #111;
+}
+
+.invoice-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 24px;
+  font-size: 15px;
+}
+
+.invoice-meta div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.invoice-meta span {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.invoice-box {
+  padding: 4px 12px;
+  border: 1.5px solid #111;
+  border-radius: 6px;
+  font-weight: 700;
+}
+
+.invoice-items,
+.invoice-totals {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+}
+
+.invoice-items th,
+.invoice-items td,
+.invoice-totals th,
+.invoice-totals td {
+  border: 1.5px solid #111;
+  padding: 6px 8px;
+  text-align: center;
+}
+
+.invoice-items th,
+.invoice-totals th {
+  background: #e5e7eb;
+  font-weight: 700;
+}
+
+.invoice-items td.invoice-name {
+  text-align: start;
+}
+
+.invoice-totals {
+  width: 60%;
+  margin-top: 14px;
+  margin-inline-end: auto;
+}
+
+.invoice-grand th,
+.invoice-grand td {
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.invoice-change th,
+.invoice-change td {
+  font-weight: 900;
+}
+
+.invoice-foot {
+  margin-top: 18px;
+  text-align: center;
+}
+
+.invoice-foot p {
+  margin: 6px 0 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.invoice-thanks {
+  font-size: 22px;
+}
+
+@media print {
+  .receipt-panel-header {
+    display: none !important;
+  }
+
+  .invoice {
+    max-width: none;
+    margin: 0;
+    border-radius: 12px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* A narrow roll: smaller type, totals full width. */
+@media print and (max-width: 90mm) {
+  .invoice {
+    padding: 8px;
+    border-width: 1px;
+  }
+
+  .invoice-logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .invoice-title h1 {
+    font-size: 20px;
+  }
+
+  .invoice-meta {
+    grid-template-columns: 1fr;
+    font-size: 10px;
+  }
+
+  .invoice-items,
+  .invoice-totals {
+    font-size: 10px;
+    width: 100%;
+  }
+
+  .invoice-items th,
+  .invoice-items td,
+  .invoice-totals th,
+  .invoice-totals td {
+    padding: 2px 3px;
+  }
 }

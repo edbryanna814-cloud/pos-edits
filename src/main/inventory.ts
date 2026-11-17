@@ -1,4 +1,5 @@
 import { ObjectId, type Db } from 'mongodb'
+import { derivePackaging } from '../shared/packaging'
 import { getClient, getDb } from './db'
 import type { Category, Product, PurchaseOrder, PurchaseOrderLine, PurchaseReceipt, StockMovement, Supplier, Unit } from '../shared/inventory'
 import { logAudit } from './auth'
@@ -79,6 +80,33 @@ export async function listProducts(): Promise<Product[]> {
   const db = requireDb()
   return (await db.collection<Product>(PRODUCTS).find({}).toArray()).map(withStringId)
 }
+const PACKAGINGS = ['box', 'strip', 'pill'] as const
+
+/** 0.3.0 form: the unit type, how it splits, and the price of one such unit; prices below it are derived. */
+function packagingFields(input: any): Partial<Product> | null {
+  if (input?.packaging === undefined) return null
+  if (!PACKAGINGS.includes(input.packaging)) throw new Error('Unit must be box, strip or pill')
+  const optional = (value: unknown, label: string) => (value === undefined || value === null || value === '' ? undefined : toInteger(value, label, 1))
+  return derivePackaging({
+    packaging: input.packaging,
+    stripsPerBox: input.packaging === 'box' ? toInteger(input.stripsPerBox, 'Strips per box', 1) : undefined,
+    pillsPerStrip: optional(input.pillsPerStrip, 'Pills per strip'),
+    priceCents: toInteger(input.unitPriceCents ?? 0, 'Price')
+  })
+}
+
+/** Warning margin (smallest unit) and return period (days, at most a year); null or '' clears them. */
+function optionalCounts(input: any): Partial<Product> {
+  const out: any = {}
+  if (input?.stockWarnMargin !== undefined) out.stockWarnMargin = input.stockWarnMargin === null || input.stockWarnMargin === '' ? 0 : toInteger(input.stockWarnMargin, 'Warning margin')
+  if (input?.returnDays !== undefined) {
+    const days = input.returnDays === null || input.returnDays === '' ? 0 : toInteger(input.returnDays, 'Return days')
+    if (days > 365) throw new Error('Return days must be 365 or fewer')
+    out.returnDays = days
+  }
+  return out
+}
+
 export async function createProduct(input: Partial<Product>): Promise<Product> {
   const db = requireDb(); const now = new Date().toISOString()
   const product: any = {
@@ -97,7 +125,9 @@ export async function createProduct(input: Partial<Product>): Promise<Product> {
     expiryDate: input.expiryDate ? String(input.expiryDate).trim() : undefined,
     active: input.active !== false,
     createdAt: now,
-    updatedAt: now
+    updatedAt: now,
+    ...packagingFields(input),
+    ...optionalCounts(input)
   }
   let insertedId: ObjectId
   try {
@@ -128,6 +158,9 @@ export async function updateProduct(id: string, input: Partial<Product>): Promis
   if (input.expiryDate !== undefined)
     update.expiryDate = input.expiryDate ? String(input.expiryDate).trim() : undefined
   if (input.active !== undefined) update.active = Boolean(input.active)
+  const pack = packagingFields(input)
+  if (pack) Object.assign(update, pack)
+  Object.assign(update, optionalCounts(input))
   if (Object.keys(update).length === 0) throw new Error('No product changes supplied')
 
   let updated: any
@@ -361,4 +394,47 @@ export async function receivePO(purchaseOrderId: string, notes?: string): Promis
     notes: notes ? String(notes).trim() : undefined,
     createdAt: now
   }
+}
+
+// Deleting. Sales, returns and receipts keep their own copy of names, so history stays readable.
+
+function objectId(id: unknown, what: string): ObjectId {
+  if (typeof id !== 'string' || !ObjectId.isValid(id)) throw new Error(`${what} not found`)
+  return new ObjectId(id)
+}
+
+/** Products in it simply lose the category. */
+export async function deleteCategory(id: unknown): Promise<{ ok: true }> {
+  const db = requireDb()
+  const _id = objectId(id, 'Category')
+  const category = await db.collection(CATEGORIES).findOne({ _id })
+  if (!category) throw new Error('Category not found')
+  await db.collection(PRODUCTS).updateMany({ categoryId: String(id) }, { $unset: { categoryId: '' } })
+  await db.collection(CATEGORIES).deleteOne({ _id })
+  await logAudit({ action: 'inventory.category.delete', resource: CATEGORIES, resourceId: String(id), details: { name: category.name } })
+  return { ok: true }
+}
+
+/** Refused while the product is on a purchase order that has not been received or cancelled. */
+export async function deleteProduct(id: unknown): Promise<{ ok: true }> {
+  const db = requireDb()
+  const _id = objectId(id, 'Product')
+  const product = await db.collection(PRODUCTS).findOne({ _id })
+  if (!product) throw new Error('Product not found')
+  if (await db.collection(PO).findOne({ status: { $in: ['draft', 'ordered'] }, 'lines.productId': String(id) })) throw new Error('PRODUCT_ON_OPEN_ORDER')
+  await db.collection(PRODUCTS).deleteOne({ _id })
+  await logAudit({ action: 'inventory.product.delete', resource: PRODUCTS, resourceId: String(id), details: { name: product.name, sku: product.sku, stockQuantity: product.stockQuantity } })
+  return { ok: true }
+}
+
+/** Refused while any purchase order names the supplier (deactivate it instead). */
+export async function deleteSupplier(id: unknown): Promise<{ ok: true }> {
+  const db = requireDb()
+  const _id = objectId(id, 'Supplier')
+  const supplier = await db.collection(SUPPLIERS).findOne({ _id })
+  if (!supplier) throw new Error('Supplier not found')
+  if (await db.collection(PO).findOne({ supplierId: String(id) })) throw new Error('SUPPLIER_HAS_ORDERS')
+  await db.collection(SUPPLIERS).deleteOne({ _id })
+  await logAudit({ action: 'inventory.supplier.delete', resource: SUPPLIERS, resourceId: String(id), details: { name: supplier.name } })
+  return { ok: true }
 }

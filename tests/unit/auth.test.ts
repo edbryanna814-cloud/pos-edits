@@ -71,7 +71,7 @@ describe('with MongoDB', () => {
     expect(await users().countDocuments()).toBe(0)
     expect(await auth.isSetupRequired()).toBe(true)
     await expect(auth.login({ username: 'admin', password: 'admin' })).rejects.toThrow('LOGIN_FAILED')
-    await expect(auth.setupFirstAdmin({ username: 'owner', password: 'short' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.setupFirstAdmin({ username: 'owner', password: 'ab' })).rejects.toThrow('PASSWORD_TOO_SHORT')
     expect(await users().countDocuments()).toBe(0)
   })
 
@@ -133,7 +133,7 @@ describe('with MongoDB', () => {
     expect(() => auth.requirePermission('pos.use')).toThrow('PASSWORD_CHANGE_REQUIRED')
     expect(await auth.getAuthState(result.token)).toEqual({ authenticated: false })
 
-    await expect(auth.changePassword({ currentPassword: 'Legacy-Pass-2024', newPassword: 'short' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.changePassword({ currentPassword: 'Legacy-Pass-2024', newPassword: 'ab' })).rejects.toThrow('PASSWORD_TOO_SHORT')
     await expect(auth.changePassword({ currentPassword: 'wrong-current-pw', newPassword: 'Brand-New-Pass-1' })).rejects.toThrow('LOGIN_FAILED')
     await expect(auth.changePassword({ currentPassword: 'Legacy-Pass-2024', newPassword: 'Legacy-Pass-2024' })).rejects.toThrow('PASSWORD_REUSED')
     await auth.changePassword({ currentPassword: 'Legacy-Pass-2024', newPassword: 'Brand-New-Pass-1' })
@@ -152,14 +152,14 @@ describe('with MongoDB', () => {
     const result = await auth.login({ username: 'admin', password: 'admin' })
     expect(result.mustChangePassword).toBe(true)
     expect(() => auth.requirePermission('users.manage')).toThrow('PASSWORD_CHANGE_REQUIRED')
-    await expect(auth.changePassword({ currentPassword: 'admin', newPassword: 'admin' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.changePassword({ currentPassword: 'admin', newPassword: 'ad' })).rejects.toThrow('PASSWORD_TOO_SHORT')
   })
 
   it('user create and admin reset enforce 12 characters; an admin reset forces a change', async () => {
-    await expect(auth.createUser({ username: 'cashier1', password: 'abcd', role: 'Seller' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.createUser({ username: 'cashier1', password: 'ab', role: 'Seller' })).rejects.toThrow('PASSWORD_TOO_SHORT')
     const created = await auth.createUser({ username: 'cashier1', password: 'Cashier-Pass-01', role: 'Seller' }) // gitleaks:allow test-only credential
     expect(created).not.toHaveProperty('passwordHash')
-    await expect(auth.updateUser(String(created._id), { password: 'short' })).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.updateUser(String(created._id), { password: 'ab' })).rejects.toThrow('PASSWORD_TOO_SHORT')
     await auth.updateUser(String(created._id), { password: 'Temp-Reset-Pass-1' })
     expect((await auth.login({ username: 'cashier1', password: 'Temp-Reset-Pass-1' })).mustChangePassword).toBe(true)
   })
@@ -194,12 +194,38 @@ describe('with MongoDB', () => {
   it('recovery: lists administrator names and resets only an administrator (unlocked, active, audited)', async () => {
     expect(await auth.listAdminUsernames()).toEqual(['admin', 'owner'])
     await users().updateOne({ username: 'owner' }, { $set: { lockedUntil: new Date(Date.now() + 1e6).toISOString(), failedLoginCount: 5, active: false } })
-    await expect(auth.recoverAdminPassword('owner', 'short')).rejects.toThrow('PASSWORD_TOO_SHORT')
+    await expect(auth.recoverAdminPassword('owner', 'ab')).rejects.toThrow('PASSWORD_TOO_SHORT')
     await expect(auth.recoverAdminPassword('seller1', 'Recovered-Pass-01')).rejects.toThrow('User not found')
     await auth.recoverAdminPassword('owner', 'Recovered-Pass-01') // gitleaks:allow test-only credential
     const r = await auth.login({ username: 'owner', password: 'Recovered-Pass-01' }) // gitleaks:allow test-only credential
     expect(r.mustChangePassword).toBe(false)
     expect((await audit()).map((e) => e.action)).toContain('password.recovered')
+  })
+
+  it('user IDs: existing users numbered 1..n in creation order; automatic or typed by hand, never twice', async () => {
+    await auth.migrateRoles()
+    const numbered = await users().find({}).sort({ createdAt: 1 }).toArray()
+    expect(numbered.every((u) => Number.isInteger(u.userNo))).toBe(true)
+    expect(new Set(numbered.map((u) => u.userNo)).size).toBe(numbered.length)
+    expect(numbered[0].userNo).toBe(1) // the first administrator (setup)
+    const typed = await auth.createUser({ username: 'byhand', password: 'abc', role: 'Seller', userNo: 50 })
+    expect(typed.userNo).toBe(50)
+    expect((await auth.createUser({ username: 'next', password: 'abc', role: 'Seller' })).userNo).toBe(51)
+    await expect(auth.createUser({ username: 'dup', password: 'abc', role: 'Seller', userNo: 50 })).rejects.toThrow('USER_NO_TAKEN')
+    await expect(auth.createUser({ username: 'zero', password: 'abc', role: 'Seller', userNo: 0 })).rejects.toThrow('USER_NO_INVALID')
+  })
+
+  it('exports: Administrators only; user exports never carry password hashes', async () => {
+    const { exportSection } = await import('../../src/main/exports')
+    const { readSheet } = await import('../../src/main/sheet')
+    const db = await exportSection('users', 'db')
+    expect(String(db.data)).not.toMatch(/passwordHash|argon2/)
+    const rows = readSheet(((await exportSection('users', 'xlsx')).data) as Uint8Array, 'u.xlsx')
+    expect(rows[0]).toEqual(['User ID', 'Username', 'Role', 'Active', 'Created', 'Record ID'])
+    expect(rows.length - 1).toBe(db.count)
+    await expect(exportSection('secrets', 'xlsx')).rejects.toThrow('EXPORT_SECTION_INVALID')
+    await auth.login({ username: 'mgr1', password: 'Manager-Pass-01' }) // gitleaks:allow test-only credential
+    expect(() => auth.requirePermission('data.transfer')).toThrow('PERMISSION_DENIED')
   })
 })
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useCan } from './session'
 import type { CompanySettings, Language, StoredCompanySettings } from '../../shared/settings'
 import { t } from './i18n'
 import DatabaseLocation from './DatabaseLocation'
@@ -15,8 +16,10 @@ interface Props {
 
 interface FormState {
   companyName: string
+  companyPhone: string
   currencyCode: string
   currencyPrecision: string
+  taxEnabled: boolean
   taxRatePercent: string
   defaultLanguage: Language | ''
   backupDirectory: string
@@ -26,8 +29,10 @@ function toForm(settings: StoredCompanySettings | null): FormState {
   if (!settings) {
     return {
       companyName: '',
+      companyPhone: '',
       currencyCode: '',
       currencyPrecision: '',
+      taxEnabled: false,
       taxRatePercent: '',
       defaultLanguage: '',
       backupDirectory: ''
@@ -36,9 +41,11 @@ function toForm(settings: StoredCompanySettings | null): FormState {
 
   return {
     companyName: settings.companyName,
+    companyPhone: settings.companyPhone ?? '',
     currencyCode: settings.currencyCode,
     currencyPrecision: String(settings.currencyPrecision),
-    taxRatePercent: (settings.taxRateBasisPoints / 100).toFixed(2),
+    taxEnabled: settings.taxRateBasisPoints > 0,
+    taxRatePercent: settings.taxRateBasisPoints > 0 ? (settings.taxRateBasisPoints / 100).toFixed(2) : '',
     defaultLanguage: settings.defaultLanguage,
     backupDirectory: settings.backupDirectory
   }
@@ -65,6 +72,8 @@ export default function SettingsPage({
   canManageDatabase
 }: Props) {
   const [form, setForm] = useState<FormState>(() => toForm(settings))
+  // Backups in or out: Administrators only.
+  const canTransfer = useCan('data.transfer')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -89,9 +98,9 @@ export default function SettingsPage({
       return
     }
 
-    const taxPercent = Number(form.taxRatePercent)
+    const taxPercent = form.taxEnabled ? Number(form.taxRatePercent) : 0
     if (
-      form.taxRatePercent === '' ||
+      (form.taxEnabled && form.taxRatePercent === '') ||
       !Number.isFinite(taxPercent) ||
       taxPercent < 0 ||
       taxPercent > 100
@@ -110,6 +119,7 @@ export default function SettingsPage({
       currencyCode: form.currencyCode,
       currencyPrecision: precision,
       taxRateBasisPoints: Math.round(taxPercent * 100),
+      companyPhone: form.companyPhone,
       defaultLanguage: form.defaultLanguage,
       backupDirectory: form.backupDirectory
     }
@@ -206,17 +216,29 @@ export default function SettingsPage({
         </label>
 
         <label>
-          <span>{t(language, 'taxRate')}</span>
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step="0.01"
-            value={form.taxRatePercent}
-            onChange={(event) => update('taxRatePercent', event.target.value)}
-            required
-          />
+          <span>{t(language, 'companyPhone')}</span>
+          <input dir="ltr" inputMode="tel" maxLength={30} value={form.companyPhone} onChange={(event) => update('companyPhone', event.target.value)} />
         </label>
+
+        <label className="checkbox">
+          <input type="checkbox" checked={form.taxEnabled} onChange={(event) => setForm((f) => ({ ...f, taxEnabled: event.target.checked }))} />
+          <span>{t(language, 'chargeTax')}</span>
+        </label>
+
+        {form.taxEnabled ? (
+          <label>
+            <span>{t(language, 'taxRate')}</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.01"
+              value={form.taxRatePercent}
+              onChange={(event) => update('taxRatePercent', event.target.value)}
+              required
+            />
+          </label>
+        ) : null}
 
         <label>
           <span>{t(language, 'defaultLanguage')}</span>
@@ -239,6 +261,7 @@ export default function SettingsPage({
           />
         </label>
 
+        {canTransfer ? (
         <label className="wide">
           <span>{t(language, 'backupPassphrase')}</span>
           <input
@@ -248,21 +271,26 @@ export default function SettingsPage({
             onChange={(event) => setPassphrase(event.target.value)}
           />
         </label>
+        ) : null}
 
         <div className="form-actions wide">
           <button type="submit" className="primary" disabled={saving}>
             {saving ? t(language, 'saving') : t(language, 'save')}
           </button>
-          <button type="button" onClick={handleExport}>
-            {t(language, 'backupExport')}
-          </button>
-          <button type="button" onClick={handleImport}>
-            {t(language, 'backupImport')}
-          </button>
+          {canTransfer ? (
+            <>
+              <button type="button" onClick={handleExport}>
+                {t(language, 'backupExport')}
+              </button>
+              <button type="button" onClick={handleImport}>
+                {t(language, 'backupImport')}
+              </button>
+            </>
+          ) : null}
         </div>
       </form>
 
-      <p className="hint">{t(language, 'backupNote')}</p>
+      {canTransfer ? <p className="hint">{t(language, 'backupNote')}</p> : null}
       {message ? (
         <p className="success" role="status">
           {message}

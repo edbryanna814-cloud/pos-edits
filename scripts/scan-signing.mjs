@@ -18,6 +18,10 @@ const SIGNING_CALL = new RegExp(
 )
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/i
 const ISSUANCE_SCRIPT = /^scripts\/license-[^/]*\.mjs$/
+// The one exception (owner decision 2026-11-17): the Wi-Fi TLS certificate the main computer makes for
+// itself needs key generation and signing. It must stay unrelated to licensing: no licence words at all.
+const TLS_CERT_FILE = /(?:^|\/)src\/main\/lanTls\.ts$/
+const LICENCE_WORDS = /licen[cs]|\blease|\b(?:ANB|PHM|RST)\d|panelKey|issu/i
 
 const args = process.argv.slice(2)
 const files = args.length
@@ -35,6 +39,10 @@ for (const file of files) {
     continue
   }
   if (KEY_BLOCK.test(text)) problems.push(`${path}: private key block with key material`)
+  if (TLS_CERT_FILE.test(path)) {
+    if (LICENCE_WORDS.test(text)) problems.push(`${path}: TLS certificate code must not touch licensing`)
+    continue
+  }
   if (CODE_FILE.test(path) && ISSUANCE_CALL.test(text)) problems.push(`${path}: key generation / private key loading in code`)
   if (CODE_FILE.test(path) && SIGNING_CALL.test(text)) problems.push(`${path}: signing call in code`)
 }

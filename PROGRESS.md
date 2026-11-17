@@ -207,10 +207,60 @@ Installer built locally from `e7d56c5` (not distributed, SSPL hold): `release/Ph
 - Still open: PR #2 (Gate 1) and `field-test/0.2.0` not merged to main; panel default period still 'hour'
   (set to month after testing); MongoDB SSPL legal opinion before any sale.
 
+## 0.3.0 (2026-11-16): pharmacy requests (branch feat/pharmacy-requests)
+
+- TD catch-up: no Pharmacy changes since the merge; panel (`Anubis-hub/anubis-switcher`) gained the Factory field-test key + FAC
+  subscription (`6502d98`) and explained refusals (`b216177`, `98dfcd1`).
+- `4472324` passwords: minimum 3 characters (lockout still 5 tries); backup passphrase stays 12.
+- `058522c` tax optional ("Charge tax on sales" switch); POS discount in percent (server computes the amount).
+- `8c8d7df` units box / strip / pill (`src/shared/packaging.ts`): box price divided into strip and pill prices; stock in
+  the smallest counted unit, shown as boxes · strips · pills; POS sells any unit; pre-0.3.0 products unchanged.
+- `f176608` customers (name, ID number, phone, discount %; at least one) + POS picker; user ID numbers (counter from 1
+  or typed, unique; existing users numbered on start).
+- `fe6bb24` product import from Excel/CSV with a checked preview; own .xlsx reader on fflate 0.8.3 (no deps).
+- `f746319` fingerprint attendance import (Excel export or ZKTeco attlog.dat, matched by user ID; in/out/breaks; hours)
+  and per-seller KPIs on the dashboard. Not built: a live network link to the machine (needs the model).
+- Installer 0.3.0 SHA-256 `10896fb3b3b5c4c9adea20375f24ed50bdd5a2c348302dd6909675c27a81a483` (pre-release `field-test-0.3.0`). Release repo not updated yet (owner: later).
+
+## 0.3.1 (2026-11-16): owner review of 0.3.0 (same branch, PR #4)
+
+- `fba20d5` Settings tick box beside its words; stock colours from each product's minimum (red at/below, yellow within a
+  new per-product warning margin) on Inventory rows and POS cards; stock adjustment in boxes, strips or pills.
+- `dd51ef3` return period per product (days; empty = not returnable), saved on each sold line; POS "Returnable items"
+  list (passed periods drop off); per-line returns refunded their share of what was paid; server refuses the rest.
+- `0bf4b67` permission `data.transfer` (Administrator only): backups, Excel imports, attendance import, exports.
+  Exports per section as Excel or .db (MongoDB Extended JSON, records as stored; no password hashes). Record
+  database IDs (`_id`, always created by MongoDB) shown to Administrators only - never shown before, incl. 3f70318.
+- Installer 0.3.1 SHA-256 `d363e5cd5f9c83cbacb2467845e0551fcd83cfcb241cbb500e3445422f8de78a` (pre-release `field-test-0.3.1`).
+
+## 0.3.2 (2026-11-17): delete options and the pharmacy's invoice template (PR #4)
+
+- `6089be0` delete categories, products, suppliers, customers (permission `catalog.delete`: Administrator, Manager;
+  customers: `customers.manage`); asked first, audited with the name; refused while a product is on an open PO or a
+  supplier has orders. Users are not deleted (deactivate keeps the audit trail readable). The free-text Units list
+  (unused since 0.3.0) is hidden behind a note.
+- Printed invoice = owner's Arabic template (`src/renderer/src/pos/InvoicePrint.tsx`): "صيدلية" + pharmacy name,
+  customer name/phone, seller, pharmacy phone (new Settings field `companyPhone`), totals with paid and الباقي.
+  Page size follows the printer (80 mm / A5 / A4).
+- Installer 0.3.2 SHA-256 `9a934fdd1313c909abfba707a500c77b8c7ffe5f16ba539bd28c72781da86d12` (pre-release `field-test-0.3.2`).
+
 ## Next
 
 Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is verified. No Gate 2 and no sale before TD confirmation. No build is distributed until the owner has an SSPL legal opinion or a commercial licence.
 
 ## Last completed step
 
-2026-11-13: field test closed; 0.2.6 published in private repo Anubis-hub/pharmacy-pos-release (tag v0.2.6).
+2026-11-17: 0.3.2 (deletes, invoice template) built; pre-release `field-test-0.3.2`; PR #4 open (not merged). Release repo `Anubis-hub/pharmacy-pos-release` updated to v0.3.2 (commit 2301789, same installer SHA-256 9a934fdd…). User guide PDF added (renamed `docs/manual/Manuscript EN.pdf`) (21 pages of screenshots with numbered arrows; rebuild: `npm run build && npx playwright test -c docs/manual && node docs/manual/build.mjs`). Arabic guide `docs/manual/Manuscript AR.pdf` (same pages, Arabic screens; `MANUAL_LANG=ar` for both commands).
+
+2026-11-17: staff guide `docs/manual/Manuscript Staff EN.pdf` / `Manuscript Staff AR.pdf` (screens as a Manager; no administrator, backups, files or database; `MANUAL_GUIDE=staff`). Administrator hidden from non-admins in the Reports per-cashier totals too (Users, Audit, Attendance, KPIs already); denial messages no longer name the administrator; Users and Audit pages had the Settings subtitle, fixed. Owner chose "lock files + LAN TLS" (below).
+
+2026-11-17: data protection (owner choice: lock files + LAN TLS).
+- App folder (database files, logs, keys) restricted at every start to the Windows account running the app + SYSTEM (`lockAppFolder`, icacls; Administrators group removed — a Windows admin can still take ownership).
+- LAN host mode: mongod `requireTLS` with a self-signed RSA-2048 certificate made by the app (`src/main/lanTls.ts`, no new dependency), kept DPAPI-encrypted (`lan-tls.bin`); the key PEM exists only while mongod starts. The host app itself connects over TLS too.
+- Joining tills pin the host certificate on "Test connection" (`lan-host-cert.pem`); both screens show a security code to compare; Save refuses if the certificate changed (`DB_SECURITY_CODE_CHANGED`).
+- Verified on a packaged build (throw-away profile): folder ACL, plain connections refused (Wi-Fi and local), wrong pin refused, pinned join reads data, wrong join code refused, mongod stops on quit. Unit tests: certificate + pinned TLS (`tests/unit/lanTls.test.ts`).
+- Disk encryption itself is Windows' job: WHAT-TO-INSTALL.txt and the owner manuscripts ask to turn on Device encryption / BitLocker.
+- Tills that joined before this version must re-join (Settings → Database location) once the main computer runs it.
+- Signing scan (`scripts/scan-signing.mjs`): owner approved one narrow exception, `src/main/lanTls.ts` only (key generation + signing for the TLS certificate). That file fails the scan if it mentions anything licence-related (licen*, lease, ANB/PHM/RST codes, panelKey, issu*); key blocks are still refused everywhere. Tests in `tests/unit/scanSigning.test.ts`.
+
+2026-11-17: release 0.3.3 (staff manuscripts, admin hidden from reports, folder lock, LAN TLS). Installer `Pharmacy-POS-Setup-0.3.3.exe` 157562956 bytes, SHA-256 `879624cb5dae7d1a74df67130dd4a921b63429837abb80bb9f0cfdf24e2524f2`; packaged check re-run on this build (folder ACL, TLS only, pin, join code, stop on quit). Pre-release `field-test-0.3.3`; release repo `Anubis-hub/pharmacy-pos-release` v0.3.3.

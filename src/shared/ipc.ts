@@ -1,7 +1,17 @@
 import type { CompanySettings, StoredCompanySettings } from './settings'
+import type { ReturnableLine } from './returns'
+import type { AttendanceDay, AttendanceImportResult, SellerKpi } from './attendance'
+import type { Customer } from './customers'
 import type { AuthState, ChangePasswordInput, LoginInput, LoginResult, Permission, User } from './auth'
 import type { Category, Product, PurchaseOrder, PurchaseReceipt, StockMovement, Supplier, Unit } from './inventory'
 import type { CashboxMovement, CashierShift, Payment, Return, Sale } from './pos'
+
+/** A checked sheet: every row with its problems; nothing is added before the user confirms. */
+export type ProductImportPreview = {
+  batchId: string
+  fileName: string
+  rows: { line: number; name: string; sku: string; packaging: 'box' | 'strip' | 'pill'; unitPriceCents: number; stock: number; errors: string[] }[]
+}
 
 export const IPC = {
   Ping: 'app:ping',
@@ -43,9 +53,23 @@ export const IPC = {
   InvPOList: 'inv:po:list',
   InvPOCreate: 'inv:po:create',
   InvPOReceive: 'inv:po:receive',
+  InvImportPreview: 'inv:import:preview',
+  InvImportConfirm: 'inv:import:confirm',
+  AttendanceImport: 'attendance:import',
+  AttendanceDays: 'attendance:days',
+  KpiSellers: 'kpi:sellers',
+  ExportSection: 'export:section',
+  InvCategoriesDelete: 'inv:categories:delete',
+  InvProductsDelete: 'inv:products:delete',
+  InvSuppliersDelete: 'inv:suppliers:delete',
+  CustomersDelete: 'customers:delete',
   PosCheckout: 'pos:checkout',
+  CustomersList: 'customers:list',
+  CustomersCreate: 'customers:create',
+  CustomersUpdate: 'customers:update',
   PosSalesList: 'pos:sales:list',
   PosReturn: 'pos:return',
+  PosReturnable: 'pos:returnable',
   PosCashIn: 'pos:cash:in',
   PosCashOut: 'pos:cash:out',
   PosCashboxList: 'pos:cashbox:list',
@@ -98,9 +122,9 @@ export interface PreloadApi {
   authLogin(input: LoginInput): Promise<LoginResult>
   authLogout(token: string): Promise<{ success: boolean }>
   authState(token?: string): Promise<AuthState>
-  dbConnectionGet(): Promise<{ mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string }>
-  dbConnectionTest(input: { uri: string } | { ip: string; code: string }): Promise<{ ok: true; serverVersion: string; topology: string; hosts: string }>
-  dbConnectionSave(input: { mode: 'local' } | { mode: 'host' } | { mode: 'shared'; uri: string } | { mode: 'join'; ip: string; code: string }): Promise<{ ok: true; restarting: true }>
+  dbConnectionGet(): Promise<{ mode: 'local' | 'shared' | 'host'; hosts?: string; ips: string[]; port: number; joinCode?: string; securityCode?: string }>
+  dbConnectionTest(input: { uri: string } | { ip: string; code: string }): Promise<{ ok: true; serverVersion: string; topology: string; hosts: string; securityCode?: string }>
+  dbConnectionSave(input: { mode: 'local' } | { mode: 'host' } | { mode: 'shared'; uri: string } | { mode: 'join'; ip: string; code: string; securityCode: string }): Promise<{ ok: true; restarting: true }>
   authSetupRequired(): Promise<boolean>
   authSetup(input: LoginInput): Promise<LoginResult>
   authChangePassword(input: ChangePasswordInput): Promise<{ success: true }>
@@ -135,8 +159,22 @@ export interface PreloadApi {
   invPOCreate(input: Partial<PurchaseOrder>): Promise<PurchaseOrder>
   invPOReceive(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt>
   posCheckout(input: any): Promise<Sale>
+  invImportPreview(): Promise<ProductImportPreview | null>
+  invImportConfirm(batchId: string): Promise<{ added: number; skipped: number }>
+  attendanceImport(): Promise<AttendanceImportResult | null>
+  attendanceDays(range: { from: string; to: string }): Promise<AttendanceDay[]>
+  kpiSellers(range: { from: string; to: string }): Promise<SellerKpi[]>
+  exportSection(section: string, format: 'xlsx' | 'db'): Promise<{ fileName: string; count: number } | null>
+  invCategoriesDelete(id: string): Promise<{ ok: true }>
+  invProductsDelete(id: string): Promise<{ ok: true }>
+  invSuppliersDelete(id: string): Promise<{ ok: true }>
+  customersDelete(id: string): Promise<{ ok: true }>
+  customersList(): Promise<Customer[]>
+  customersCreate(input: Partial<Customer>): Promise<Customer>
+  customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
   posSalesList(): Promise<Sale[]>
-  posReturn(input: { saleId: string; reason: string }): Promise<Return>
+  posReturn(input: { saleId: string; reason: string; lineIndex?: number }): Promise<Return>
+  posReturnable(): Promise<ReturnableLine[]>
   posCashIn(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashOut(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashboxList(): Promise<CashboxMovement[]>

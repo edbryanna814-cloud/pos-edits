@@ -1,4 +1,11 @@
-import { app, BrowserWindow, ipcMain, session } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, session } from 'electron'
+import { readFile, stat, writeFile } from 'node:fs/promises'
+import { basename } from 'node:path'
+import { MAX_FILE_BYTES, readSheet } from './sheet'
+import { checkProductRows, holdImport, takeImport } from './productImport'
+import { parsePunches } from './attendanceRules'
+import { attendanceDays, importPunches, sellerKpis } from './attendance'
+import { exportSection } from './exports'
 import type { IpcMainInvokeEvent } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -7,17 +14,19 @@ import type { Permission } from '../shared/auth'
 import { closeDb, connectDb, dbHealth, getDb } from './db'
 import { describeDbMode, loadDbMode, saveDbMode } from './dbConfig'
 import { DB_ERRORS, isPrivateLanIp, testSharedUri } from './dbConnection'
-import { LAN_PORT, lanAddresses, startBundledMongo, stopBundledMongo } from './localDb'
+import { LAN_PORT, hostSecurityCode, lanAddresses, lockAppFolder, startBundledMongo, stopBundledMongo } from './localDb'
+import { fetchCertificate, securityCode } from './lanTls'
 import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { changePassword, createUser, ensureAuthSchema, listAdminUsernames, migrateRoles, recoverAdminPassword, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
-import { createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
-import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn } from './pos'
+import { deleteCategory, deleteProduct, deleteSupplier, createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
+import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn, listReturnable } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
 import { PANEL_KEYS } from './panelKeys'
 import { RESET_ERRORS, verifyResetCode } from './recovery'
+import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers'
 import { licenseRequired } from './licenseGate'
 import { publicError, validateIpcArgs } from './ipcSchema'
 import { rotateIfLarge } from './logRotate'
@@ -45,8 +54,9 @@ type ChannelGuard = Permission[] | 'authenticated'
 
 const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.SettingsSave]: ['settings.manage'],
-  [IPC.BackupExport]: ['settings.manage'],
-  [IPC.BackupImport]: ['settings.manage'],
+  // Files in or out (backups, Excel imports, exports): Administrators only.
+  [IPC.BackupExport]: ['data.transfer'],
+  [IPC.BackupImport]: ['data.transfer'],
   [IPC.UsersList]: ['users.read'],
   [IPC.UsersCreate]: ['users.manage'],
   [IPC.UsersUpdate]: ['users.manage'],
@@ -61,6 +71,17 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvSuppliersCreate]: ['inventory.manage'],
   [IPC.InvPOCreate]: ['inventory.manage'],
   [IPC.InvPOReceive]: ['inventory.manage'],
+  [IPC.InvImportPreview]: ['data.transfer'],
+  [IPC.InvImportConfirm]: ['data.transfer'],
+  // Attendance belongs with staff (users.manage: Administrator and Manager); KPIs with reports.
+  [IPC.AttendanceImport]: ['data.transfer'],
+  [IPC.ExportSection]: ['data.transfer'],
+  [IPC.InvCategoriesDelete]: ['catalog.delete'],
+  [IPC.InvProductsDelete]: ['catalog.delete'],
+  [IPC.InvSuppliersDelete]: ['catalog.delete'],
+  [IPC.CustomersDelete]: ['customers.manage'],
+  [IPC.AttendanceDays]: ['users.manage'],
+  [IPC.KpiSellers]: ['reports.view'],
   [IPC.InvCategoriesList]: 'authenticated',
   [IPC.InvUnitsList]: 'authenticated',
   [IPC.InvProductsList]: 'authenticated',
@@ -68,7 +89,12 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvSuppliersList]: 'authenticated',
   [IPC.InvPOList]: 'authenticated',
   [IPC.PosCheckout]: ['pos.use'],
+  // Sellers pick and add customers at the till; changing one is for managers.
+  [IPC.CustomersList]: ['pos.use'],
+  [IPC.CustomersCreate]: ['pos.use'],
+  [IPC.CustomersUpdate]: ['customers.manage'],
   [IPC.PosReturn]: ['pos.use'],
+  [IPC.PosReturnable]: ['pos.use'],
   [IPC.PosCashIn]: ['pos.use'],
   [IPC.PosCashOut]: ['pos.use'],
   [IPC.PosShiftOpen]: ['pos.use'],
@@ -181,11 +207,23 @@ function registerIpc(): void {
     }
   }
 
-  /** Joining the main PC on the local network: its IP and join code become a connection string. */
-  function joinUri(input: { ip?: unknown; code?: unknown }): string {
+  /**
+   * Joining the main PC on the local network: its IP and join code become a connection string, and
+   * the certificate it presents is pinned (the user compares the security code on both screens).
+   * expectedCode: when saving, the certificate must still be the one shown at "Test connection".
+   */
+  async function joinUri(input: { ip?: unknown; code?: unknown }, expectedCode?: unknown): Promise<{ uri: string; securityCode: string }> {
     if (!isPrivateLanIp(input?.ip)) throw new Error(DB_ERRORS.lanAddress)
     if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(normalizeJoinCode(input?.code))) throw new Error(DB_ERRORS.joinCode)
-    return lanUri(String(input.ip).trim(), LAN_PORT, String(input.code))
+    const ip = String(input.ip).trim()
+    const cert = await fetchCertificate(ip, LAN_PORT).catch(() => {
+      throw new Error(DB_ERRORS.unreachable)
+    })
+    const code = securityCode(cert)
+    if (expectedCode !== undefined && expectedCode !== code) throw new Error(DB_ERRORS.securityCode)
+    const caFile = join(app.getPath('userData'), 'lan-host-cert.pem')
+    await writeFile(caFile, cert)
+    return { uri: lanUri(ip, LAN_PORT, String(input.code), caFile), securityCode: code }
   }
 
   handle(IPC.DbConnectionGet, async () => {
@@ -200,22 +238,24 @@ function registerIpc(): void {
     } catch {
       joinCode = undefined
     }
-    return { ...state, ips: lanAddresses(), port: LAN_PORT, joinCode }
+    return { ...state, ips: lanAddresses(), port: LAN_PORT, joinCode, securityCode: joinCode ? (hostSecurityCode() ?? undefined) : undefined }
   })
 
   handle(IPC.DbConnectionTest, async (_event, input: { uri?: unknown; ip?: unknown; code?: unknown }) => {
     await mayChangeDatabase()
-    return testSharedUri(input?.ip !== undefined ? joinUri(input) : input?.uri)
+    if (input?.ip === undefined) return testSharedUri(input?.uri)
+    const joined = await joinUri(input)
+    return { ...(await testSharedUri(joined.uri)), securityCode: joined.securityCode }
   })
 
-  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown; ip?: unknown; code?: unknown }) => {
+  handle(IPC.DbConnectionSave, async (_event, input: { mode?: unknown; uri?: unknown; ip?: unknown; code?: unknown; securityCode?: unknown }) => {
     await mayChangeDatabase()
     let hosts = ''
     if (input?.mode === 'shared') {
       hosts = (await testSharedUri(input.uri)).hosts
       await saveDbMode({ mode: 'shared', uri: String(input.uri).trim() })
     } else if (input?.mode === 'join') {
-      const uri = joinUri(input)
+      const { uri } = await joinUri(input, typeof input.securityCode === 'string' ? input.securityCode : '')
       hosts = (await testSharedUri(uri)).hosts
       await saveDbMode({ mode: 'shared', uri })
     } else if (input?.mode === 'host') {
@@ -356,9 +396,78 @@ function registerIpc(): void {
   handle(IPC.InvPOCreate, async (event, input: any) => { assertTrusted(event); return createPO(input) })
   handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, notes?: string) => { assertTrusted(event); return receivePO(purchaseOrderId, notes) })
 
+  // Products from Excel/CSV: check and show every row first; add only on confirmation.
+  handle(IPC.InvImportPreview, async (event) => {
+    const picked = await dialog.showOpenDialog(senderWindow(event), {
+      title: 'Import products',
+      properties: ['openFile'],
+      filters: [{ name: 'Excel or CSV', extensions: ['xlsx', 'csv', 'txt'] }]
+    })
+    if (picked.canceled || picked.filePaths.length === 0) return null
+    const file = picked.filePaths[0]
+    if ((await stat(file)).size > MAX_FILE_BYTES) throw new Error('SHEET_TOO_LARGE')
+    const existing = new Set((await listProducts()).map((p) => p.sku.toLowerCase()))
+    const rows = checkProductRows(readSheet(await readFile(file), file), existing)
+    return { batchId: holdImport(rows), fileName: basename(file), rows: rows.map(({ input: _input, ...shown }) => shown) }
+  })
+
+  // Fingerprint machine: its exported attendance log (Excel or attlog.dat), matched by user ID.
+  handle(IPC.AttendanceImport, async (event) => {
+    const picked = await dialog.showOpenDialog(senderWindow(event), {
+      title: 'Import attendance',
+      properties: ['openFile'],
+      filters: [{ name: 'Attendance export', extensions: ['xlsx', 'csv', 'txt', 'dat'] }]
+    })
+    if (picked.canceled || picked.filePaths.length === 0) return null
+    const file = picked.filePaths[0]
+    if ((await stat(file)).size > MAX_FILE_BYTES) throw new Error('SHEET_TOO_LARGE')
+    const { punches, skipped } = parsePunches(readSheet(await readFile(file), file))
+    return { ...(await importPunches(punches, requireSession().username)), skipped }
+  })
+  handle(IPC.AttendanceDays, async (_event, range: unknown) => attendanceDays(range))
+  handle(IPC.InvCategoriesDelete, async (_event, id: string) => deleteCategory(id))
+  handle(IPC.InvProductsDelete, async (_event, id: string) => deleteProduct(id))
+  handle(IPC.InvSuppliersDelete, async (_event, id: string) => deleteSupplier(id))
+  handle(IPC.CustomersDelete, async (_event, id: string) => deleteCustomer(id, requireSession().username))
+
+  handle(IPC.ExportSection, async (event, section: string, format: string) => {
+    const out = await exportSection(section, format)
+    const day = new Date().toISOString().slice(0, 10)
+    const picked = await dialog.showSaveDialog(senderWindow(event), {
+      title: 'Export',
+      defaultPath: `${section}-${day}.${out.ext}`,
+      filters: [out.ext === 'xlsx' ? { name: 'Excel', extensions: ['xlsx'] } : { name: 'Database records', extensions: ['db'] }]
+    })
+    if (picked.canceled || !picked.filePath) return null
+    await writeFile(picked.filePath, out.data)
+    await logAudit({ actorUsername: requireSession().username, action: 'data.export', resource: section, details: { format: out.ext, count: out.count } })
+    return { fileName: basename(picked.filePath), count: out.count }
+  })
+  handle(IPC.KpiSellers, async (_event, range: unknown) => sellerKpis(range))
+
+  handle(IPC.InvImportConfirm, async (_event, batchId: string) => {
+    let added = 0
+    let skipped = 0
+    for (const row of takeImport(batchId)) {
+      if (!row.input) { skipped++; continue }
+      try {
+        await createProduct(row.input as any)
+        added++
+      } catch {
+        skipped++ // e.g. the same SKU added on another till since the preview
+      }
+    }
+    await logAudit({ actorUsername: requireSession().username, action: 'inventory.import', resource: 'inv_products', details: { added, skipped } })
+    return { added, skipped }
+  })
+
   handle(IPC.PosCheckout, async (event, input: any) => { assertTrusted(event); return checkout(input, requireSession().username) })
+  handle(IPC.CustomersList, async () => listCustomers())
+  handle(IPC.CustomersCreate, async (_event, input: unknown) => createCustomer(input, requireSession().username))
+  handle(IPC.CustomersUpdate, async (_event, id: unknown, input: unknown) => updateCustomer(id, input, requireSession().username))
   handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
   handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input, requireSession().username) })
+  handle(IPC.PosReturnable, async () => listReturnable())
   handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason, requireSession().username) })
   handle(IPC.PosCashOut, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashOut(amountCents, reason, requireSession().username) })
   handle(IPC.PosCashboxList, async (event) => { assertTrusted(event); return listCashbox() })
@@ -410,6 +519,11 @@ if (!app.requestSingleInstanceLock()) {
       }
     } catch (error) {
       console.error('[main] database setting unreadable; using this PC only', error instanceof Error ? error.message : error)
+    }
+    try {
+      await lockAppFolder()
+    } catch (error) {
+      console.error('[main] could not restrict the app folder to this Windows account', error instanceof Error ? error.message : error)
     }
     if (!shared) {
       try {

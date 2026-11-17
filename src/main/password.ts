@@ -10,7 +10,7 @@ const PARALLELISM = 1
 const TAG_LENGTH = 32
 const SALT_BYTES = 16
 
-export const MIN_PASSWORD_LENGTH = 12
+export const MIN_PASSWORD_LENGTH = 3 // pharmacy request; the 5-try lockout limits guessing
 export const MAX_PASSWORD_LENGTH = 256
 
 const PHC = /^\$argon2id\$v=19\$m=(\d+),t=(\d+),p=(\d+)\$([A-Za-z0-9+/]+)\$([A-Za-z0-9+/]+)$/

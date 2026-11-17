@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { confirmDelete, deleteLabel } from '../confirmDelete'
+import { ExportButton, RecordId, useCan } from '../session'
+import ImportProducts from './ImportProducts'
+import { derivePackaging, packOf, saleUnits, stockLevel, unitPrice, unitSize, type Packaging, type SaleUnit } from '../../../shared/packaging'
+import { stockText, UNIT_NAMES } from '../units'
 import type { Category, Product, Unit } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
 import { centsToInput, formatMoney, parseMoney } from '../money'
@@ -24,7 +29,8 @@ const copy = {
     category: 'Category',
     unit: 'Unit',
     none: 'None',
-    manageCatalog: 'Categories & units',
+    manageCatalog: 'Categories',
+    unitsBuiltIn: 'Units are built in: choose box, strip or pill in each product’s “Unit type”.',
     categoryName: 'Category name',
     unitName: 'Unit name',
     unitAbbreviation: 'Abbreviation',
@@ -35,6 +41,19 @@ const copy = {
     purchaseCost: 'Purchase cost',
     sellingPrice: 'Selling price',
     unitsPerBox: 'Strips per box (1 = no box selling)',
+    unitType: 'Unit type',
+    stripsPerBox: 'Strips in one box',
+    pillsPerStrip: 'Pills in one strip (optional)',
+    priceOf: { box: 'Box price', strip: 'Strip price', pill: 'Pill price' },
+    perUnit: { box: 'per box', strip: 'per strip', pill: 'per pill' },
+    inUnits: { box: 'boxes', strip: 'strips', pill: 'pills' },
+    derived: 'Sells at',
+    warnMargin: 'Warn (yellow) this much before the minimum',
+    returnDays: 'Customer may return it within (days, optional)',
+    nearMin: 'Near minimum',
+    atMin: 'At or below minimum',
+    stripsInvalid: 'Strips in one box must be 1 or more.',
+    pillsInvalid: 'Pills in one strip must be 1 or more, or left empty.',
     perBox: 'per box',
     boxPrice: 'Box selling price',
     cartonTitle: 'Receive carton',
@@ -63,6 +82,7 @@ const copy = {
     adjust: 'Adjust stock',
     adjustTitle: 'Stock adjustment',
     adjustQuantity: 'Quantity (+ receive, - remove)',
+    adjustUnit: 'Counted in',
     adjustReason: 'Reason',
     adjustSave: 'Apply adjustment',
     currentStock: 'Current stock',
@@ -108,12 +128,26 @@ const copy = {
     unitName: 'اسم الوحدة',
     unitAbbreviation: 'الاختصار',
     addCategory: 'إضافة فئة',
+    unitsBuiltIn: 'الوحدات مدمجة: اختر علبة أو شريط أو قرص من "نوع الوحدة" في كل منتج.',
     addUnit: 'إضافة وحدة',
     noCategories: 'لا توجد فئات بعد.',
     noUnits: 'لا توجد وحدات بعد.',
     purchaseCost: 'سعر الشراء',
     sellingPrice: 'سعر البيع',
     unitsPerBox: 'عدد الشرائط في العلبة (1 = بدون بيع بالعلبة)',
+    unitType: 'نوع الوحدة',
+    stripsPerBox: 'عدد الشرائط في العلبة',
+    pillsPerStrip: 'عدد الأقراص في الشريط (اختياري)',
+    priceOf: { box: 'سعر العلبة', strip: 'سعر الشريط', pill: 'سعر القرص' },
+    perUnit: { box: 'للعلبة', strip: 'للشريط', pill: 'للقرص' },
+    inUnits: { box: 'علب', strip: 'شرائط', pill: 'أقراص' },
+    derived: 'يباع بـ',
+    warnMargin: 'تنبيه (أصفر) قبل الحد الأدنى بمقدار',
+    returnDays: 'يمكن للعميل إرجاعه خلال (أيام، اختياري)',
+    nearMin: 'قريب من الحد الأدنى',
+    atMin: 'عند الحد الأدنى أو أقل',
+    stripsInvalid: 'عدد الشرائط في العلبة يجب أن يكون 1 أو أكثر.',
+    pillsInvalid: 'عدد الأقراص في الشريط يجب أن يكون 1 أو أكثر، أو اتركه فارغًا.',
     perBox: 'لكل علبة',
     boxPrice: 'سعر بيع العلبة',
     cartonTitle: 'استلام كرتونة',
@@ -142,6 +176,7 @@ const copy = {
     adjust: 'تعديل الرصيد',
     adjustTitle: 'تعديل رصيد المخزون',
     adjustQuantity: 'الكمية (+ إضافة، - خصم)',
+    adjustUnit: 'بوحدة',
     adjustReason: 'السبب',
     adjustSave: 'تطبيق التعديل',
     currentStock: 'الرصيد الحالي',
@@ -172,8 +207,6 @@ const copy = {
   }
 } as const
 
-const STOCK_CRITICAL = 3
-const STOCK_LOW = 6
 
 function daysUntil(date: string | undefined): number | null {
   if (!date) return null
@@ -192,11 +225,15 @@ interface FormState {
   unitId: string
   expiryDate: string
   purchase: string
+  /** Price of one unit of the product's own type (box, strip or pill). */
   selling: string
-  unitsPerBox: string
-  boxPrice: string
+  packaging: Packaging
+  stripsPerBox: string
+  pillsPerStrip: string
   stock: string
   minStock: string
+  warnMargin: string
+  returnDays: string
   active: boolean
 }
 
@@ -210,15 +247,21 @@ function emptyForm(): FormState {
     expiryDate: '',
     purchase: '0.00',
     selling: '0.00',
-    unitsPerBox: '1',
-    boxPrice: '',
+    packaging: 'box',
+    stripsPerBox: '1',
+    pillsPerStrip: '',
     stock: '0',
     minStock: '0',
+    warnMargin: '',
+    returnDays: '',
     active: true
   }
 }
 
 function formFrom(product: Product): FormState {
+  // Stock, minimum and cost are stored per smallest unit; the form shows them per the product's own unit.
+  const k = packOf(product)
+  const size = unitSize(product, k.packaging)
   return {
     name: product.name,
     sku: product.sku,
@@ -226,14 +269,26 @@ function formFrom(product: Product): FormState {
     categoryId: product.categoryId ?? '',
     unitId: product.unitId ?? '',
     expiryDate: product.expiryDate ? product.expiryDate.slice(0, 10) : '',
-    purchase: centsToInput(product.purchaseCostCents),
-    selling: centsToInput(product.sellingPriceCents),
-    unitsPerBox: String(product.unitsPerBox ?? 1),
-    boxPrice: product.boxPriceCents ? centsToInput(product.boxPriceCents) : '',
-    stock: String(product.stockQuantity),
-    minStock: String(product.minStock),
+    purchase: centsToInput(product.purchaseCostCents * size),
+    selling: centsToInput(unitPrice(product, k.packaging)),
+    packaging: k.packaging,
+    stripsPerBox: String(k.stripsPerBox),
+    pillsPerStrip: k.pillsPerStrip > 1 ? String(k.pillsPerStrip) : '',
+    stock: String(Math.floor(product.stockQuantity / size)),
+    minStock: String(Math.ceil(product.minStock / size)),
+    warnMargin: product.stockWarnMargin ? String(Math.ceil(product.stockWarnMargin / size)) : '',
+    returnDays: product.returnDays ? String(product.returnDays) : '',
     active: product.active !== false
   }
+}
+
+/** "Sells at Strip 30.00 · Pill 2.50": what the box (or strip) price divides into, before saving. */
+function derivedPrices(form: FormState, language: Language, currency: string, label: string): string {
+  const price = parseMoney(form.selling)
+  if (price === null || price <= 0) return ''
+  const product = derivePackaging({ packaging: form.packaging, stripsPerBox: Number(form.stripsPerBox) || 1, pillsPerStrip: Number(form.pillsPerStrip) || undefined, priceCents: price })
+  const below = saleUnits(product).filter((unit) => unit !== form.packaging)
+  return below.length ? `${label} ${below.map((unit) => `${UNIT_NAMES[language][unit]} ${formatMoney(unitPrice(product, unit), currency)}`).join(' · ')}` : ''
 }
 
 function message(error: unknown): string {
@@ -253,6 +308,14 @@ export default function InventoryPage({ products, language, currency, onChanged 
   const [form, setForm] = useState<FormState>(emptyForm)
   const [adjusting, setAdjusting] = useState<Product | null>(null)
   const [adjustQuantity, setAdjustQuantity] = useState('')
+  const canTransfer = useCan('data.transfer')
+  const canDelete = useCan('catalog.delete')
+
+  async function remove(name: string, call: () => Promise<unknown>, after: () => void): Promise<void> {
+    setSuccess('')
+    setError(await confirmDelete(language, name, call, after))
+  }
+  const [adjustUnit, setAdjustUnit] = useState<SaleUnit>('box')
   const [adjustReason, setAdjustReason] = useState('')
   const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
@@ -322,6 +385,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
 
   function openAdjust(product: Product): void {
     setAdjusting(product)
+    setAdjustUnit(packOf(product).packaging)
     setAdjustQuantity('')
     setAdjustReason('')
     setFormOpen(false)
@@ -344,16 +408,18 @@ export default function InventoryPage({ products, language, currency, onChanged 
     if (purchase === null || selling === null) return setError(text.priceInvalid)
     const minStock = wholeNumber(form.minStock, 0)
     if (minStock === null) return setError(text.minInvalid)
+    const warnMargin = form.warnMargin.trim() ? wholeNumber(form.warnMargin, 0) : 0
+    if (warnMargin === null) return setError(text.minInvalid)
+    const returnDays = form.returnDays.trim() ? wholeNumber(form.returnDays, 0) : 0
+    if (returnDays === null || returnDays > 365) return setError(text.minInvalid)
     const openingStock = wholeNumber(form.stock, 0)
     if (openingStock === null) return setError(text.stockInvalid)
-    const unitsPerBox = wholeNumber(form.unitsPerBox, 1)
-    if (unitsPerBox === null) return setError(text.unitsPerBoxInvalid)
-    let boxPriceCents: number | undefined
-    if (unitsPerBox > 1) {
-      const boxPrice = parseMoney(form.boxPrice)
-      if (boxPrice === null || boxPrice <= 0) return setError(text.boxPriceRequired)
-      boxPriceCents = boxPrice
-    }
+    const stripsPerBox = form.packaging === 'box' ? wholeNumber(form.stripsPerBox, 1) : 1
+    if (stripsPerBox === null) return setError(text.stripsInvalid)
+    const pillsPerStrip = form.packaging === 'pill' || !form.pillsPerStrip.trim() ? undefined : wholeNumber(form.pillsPerStrip, 1)
+    if (pillsPerStrip === null) return setError(text.pillsInvalid)
+    if (selling <= 0) return setError(text.priceInvalid)
+    const size = unitSize(derivePackaging({ packaging: form.packaging, stripsPerBox, pillsPerStrip, priceCents: selling }), form.packaging)
 
     const payload: Partial<Product> = {
       name,
@@ -362,14 +428,17 @@ export default function InventoryPage({ products, language, currency, onChanged 
       categoryId: form.categoryId || undefined,
       unitId: form.unitId || undefined,
       expiryDate: form.expiryDate || undefined,
-      purchaseCostCents: purchase,
-      sellingPriceCents: selling,
-      unitsPerBox,
-      minStock,
+      purchaseCostCents: Math.round(purchase / size),
+      packaging: form.packaging,
+      stripsPerBox,
+      pillsPerStrip,
+      unitPriceCents: selling,
+      minStock: minStock * size,
+      stockWarnMargin: warnMargin * size,
+      returnDays,
       active: form.active
-    }
-    if (boxPriceCents !== undefined) payload.boxPriceCents = boxPriceCents
-    if (!editing) payload.stockQuantity = openingStock
+    } as Partial<Product>
+    if (!editing) payload.stockQuantity = openingStock * size
 
     setBusy(true)
     try {
@@ -396,7 +465,8 @@ export default function InventoryPage({ products, language, currency, onChanged 
     setSuccess('')
 
     if (!/^-?\d+$/.test(adjustQuantity.trim())) return setError(text.adjustInvalid)
-    const quantity = Number(adjustQuantity)
+    // Entered in boxes, strips or pills; stored in the smallest counted unit.
+    const quantity = Number(adjustQuantity) * unitSize(adjusting, adjustUnit)
     if (!Number.isSafeInteger(quantity) || quantity === 0) return setError(text.adjustInvalid)
     if (adjusting.stockQuantity + quantity < 0) return setError(text.adjustInvalid)
     const reason = adjustReason.trim()
@@ -520,7 +590,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
   }
 
   const previewStock = adjusting
-    ? adjusting.stockQuantity + (Number.isSafeInteger(Number(adjustQuantity)) ? Number(adjustQuantity) : 0)
+    ? adjusting.stockQuantity + (Number.isSafeInteger(Number(adjustQuantity)) ? Number(adjustQuantity) * unitSize(adjusting, adjustUnit) : 0)
     : 0
 
   return (
@@ -534,6 +604,13 @@ export default function InventoryPage({ products, language, currency, onChanged 
           {text.addProduct}
         </button>
       </div>
+
+      {canTransfer ? (
+        <div className="section-header">
+          <ImportProducts language={language} currency={currency} onDone={onChanged} />
+          <ExportButton section="inventory" language={language} />
+        </div>
+      ) : null}
 
       {formOpen ? (
         <form className="crud-form" onSubmit={handleSubmit}>
@@ -595,16 +672,27 @@ export default function InventoryPage({ products, language, currency, onChanged 
               </select>
             </label>
             <label>
-              <span>{text.unit}</span>
-              <select value={form.unitId} onChange={(event) => update('unitId', event.target.value)}>
-                <option value="">{text.none}</option>
-                {units.map((unit) => (
-                  <option key={unit._id} value={unit._id}>{unit.name} ({unit.abbreviation})</option>
+              <span>{text.unitType}</span>
+              <select value={form.packaging} onChange={(event) => update('packaging', event.target.value as Packaging)}>
+                {(['box', 'strip', 'pill'] as const).map((unit) => (
+                  <option key={unit} value={unit}>{UNIT_NAMES[language][unit]}</option>
                 ))}
               </select>
             </label>
+            {form.packaging === 'box' ? (
+              <label>
+                <span>{text.stripsPerBox}</span>
+                <input type="number" min={1} step={1} value={form.stripsPerBox} onChange={(event) => update('stripsPerBox', event.target.value)} required />
+              </label>
+            ) : null}
+            {form.packaging !== 'pill' ? (
+              <label>
+                <span>{text.pillsPerStrip}</span>
+                <input type="number" min={1} step={1} value={form.pillsPerStrip} onChange={(event) => update('pillsPerStrip', event.target.value)} />
+              </label>
+            ) : null}
             <label>
-              <span>{text.purchaseCost}</span>
+              <span>{text.purchaseCost} ({text.perUnit[form.packaging]})</span>
               <input
                 inputMode="decimal"
                 value={form.purchase}
@@ -613,38 +701,17 @@ export default function InventoryPage({ products, language, currency, onChanged 
               />
             </label>
             <label>
-              <span>{text.sellingPrice}</span>
+              <span>{text.priceOf[form.packaging]}</span>
               <input
                 inputMode="decimal"
                 value={form.selling}
                 onChange={(event) => update('selling', event.target.value)}
                 required
               />
+              <small className="muted">{derivedPrices(form, language, currency, text.derived)}</small>
             </label>
             <label>
-              <span>{text.unitsPerBox}</span>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={form.unitsPerBox}
-                onChange={(event) => update('unitsPerBox', event.target.value)}
-                required
-              />
-            </label>
-            {Number(form.unitsPerBox) > 1 ? (
-              <label>
-                <span>{text.boxPrice}</span>
-                <input
-                  inputMode="decimal"
-                  value={form.boxPrice}
-                  onChange={(event) => update('boxPrice', event.target.value)}
-                  required
-                />
-              </label>
-            ) : null}
-            <label>
-              <span>{text.stock}</span>
+              <span>{text.stock} ({text.inUnits[form.packaging]})</span>
               <input
                 type="number"
                 min={0}
@@ -656,7 +723,7 @@ export default function InventoryPage({ products, language, currency, onChanged 
               />
             </label>
             <label>
-              <span>{text.minStock}</span>
+              <span>{text.minStock} ({text.inUnits[form.packaging]})</span>
               <input
                 type="number"
                 min={0}
@@ -665,6 +732,14 @@ export default function InventoryPage({ products, language, currency, onChanged 
                 onChange={(event) => update('minStock', event.target.value)}
                 required
               />
+            </label>
+            <label>
+              <span>{text.warnMargin} ({text.inUnits[form.packaging]})</span>
+              <input type="number" min={0} step={1} value={form.warnMargin} onChange={(event) => update('warnMargin', event.target.value)} />
+            </label>
+            <label>
+              <span>{text.returnDays}</span>
+              <input type="number" min={0} max={365} step={1} value={form.returnDays} onChange={(event) => update('returnDays', event.target.value)} />
             </label>
             <label className="checkbox wide">
               <input
@@ -782,11 +857,21 @@ export default function InventoryPage({ products, language, currency, onChanged 
             </form>
             {categories.length === 0 ? <p className="muted">{text.noCategories}</p> : (
               <ul className="movement-list">
-                {categories.map((category) => <li key={category._id}><span>{category.name}</span></li>)}
+                {categories.map((category) => (
+                  <li key={category._id}>
+                    <span>{category.name}</span>
+                    {canDelete ? (
+                      <button type="button" className="link-button danger-text" onClick={() => void remove(category.name, () => window.api.invCategoriesDelete(category._id as string), loadCatalog)}>
+                        {deleteLabel(language)}
+                      </button>
+                    ) : null}
+                  </li>
+                ))}
               </ul>
             )}
           </div>
-          <div>
+          <p className="muted">{text.unitsBuiltIn}</p>
+          <div hidden>
             <form className="crud-form compact-form" onSubmit={addUnit}>
               <div className="crud-grid">
                 <label>
@@ -824,12 +909,18 @@ export default function InventoryPage({ products, language, currency, onChanged 
           <div className="crud-grid">
             <div className="readout">
               <span>{text.currentStock}</span>
-              <strong>{adjusting.stockQuantity}</strong>
+              <strong>{stockText(adjusting.stockQuantity, adjusting, language)}</strong>
             </div>
             <div className="readout">
               <span>{text.afterAdjust}</span>
-              <strong className={previewStock < 0 ? 'danger-text' : ''}>{previewStock}</strong>
+              <strong className={previewStock < 0 ? 'danger-text' : ''}>{previewStock < 0 ? previewStock : stockText(previewStock, adjusting, language)}</strong>
             </div>
+            <label>
+              <span>{text.adjustUnit}</span>
+              <select value={adjustUnit} onChange={(event) => setAdjustUnit(event.target.value as SaleUnit)}>
+                {saleUnits(adjusting).map((unit) => <option key={unit} value={unit}>{UNIT_NAMES[language][unit]}</option>)}
+              </select>
+            </label>
             <label>
               <span>{text.adjustQuantity}</span>
               <input
@@ -903,24 +994,24 @@ export default function InventoryPage({ products, language, currency, onChanged 
                 const expiry = expiryState(product.expiryDate)
                 const expired = expiry === 'expired'
                 const expiresSoon = expiry === 'soon'
-                const critical = !expired && product.stockQuantity <= STOCK_CRITICAL
-                const low = !expired && !critical && product.stockQuantity <= STOCK_LOW
-                const out = product.stockQuantity <= 0
+                const level = stockLevel(product)
+                const critical = !expired && level === 'min'
+                const low = !expired && level === 'near'
+                const out = level === 'out'
                 return (
-                  <tr key={product._id ?? product.sku} className={product.active ? '' : 'row-muted'}>
+                  <tr key={product._id ?? product.sku} className={`${product.active ? '' : 'row-muted'} level-${level}`}>
                     <td>
                       <strong>{product.name}</strong>
+                      <RecordId id={product._id} />
                       {product.barcode ? <small className="block-muted">{product.barcode}</small> : null}
-                      {(product.unitsPerBox ?? 1) > 1 ? (
-                        <small className="block-muted">
-                          {text.boxPrice}: {formatMoney(product.boxPriceCents ?? 0, currency)} ({product.unitsPerBox} {text.perBox})
-                        </small>
-                      ) : null}
+                      <small className="block-muted">
+                        {saleUnits(product).map((unit) => `${UNIT_NAMES[language][unit]} ${formatMoney(unitPrice(product, unit), currency)}`).join(' · ')}
+                      </small>
                     </td>
                     <td>{product.sku}</td>
-                    <td>{formatMoney(product.sellingPriceCents, currency)}</td>
-                    <td className={critical || expired ? 'danger-text' : low ? 'warning-text' : ''}>{product.stockQuantity}</td>
-                    <td>{product.minStock}</td>
+                    <td>{formatMoney(unitPrice(product, packOf(product).packaging), currency)} <small className="muted">{text.perUnit[packOf(product).packaging]}</small></td>
+                    <td className={critical || out || expired ? 'danger-text' : low ? 'warning-text' : ''}>{stockText(product.stockQuantity, product, language)}</td>
+                    <td>{stockText(product.minStock, product, language)}</td>
                     <td>
                       {product.expiryDate ? (
                         <span className={`tag ${expired ? 'danger-tag' : expiresSoon ? 'warning-tag' : 'ok-tag'}`}>
@@ -938,9 +1029,9 @@ export default function InventoryPage({ products, language, currency, onChanged 
                       ) : out ? (
                         <span className="tag danger-tag">{text.outOfStock}</span>
                       ) : critical ? (
-                        <span className="tag danger-tag">{text.criticalStock}</span>
+                        <span className="tag danger-tag">{text.atMin}</span>
                       ) : low ? (
-                        <span className="tag warning-tag">{text.lowStock}</span>
+                        <span className="tag warning-tag">{text.nearMin}</span>
                       ) : expiresSoon ? (
                         <span className="tag warning-tag">{text.expiresSoon}</span>
                       ) : (
@@ -955,6 +1046,11 @@ export default function InventoryPage({ products, language, currency, onChanged 
                         <button type="button" onClick={() => openAdjust(product)}>
                           {text.adjust}
                         </button>
+                        {canDelete ? (
+                          <button type="button" className="danger-text" onClick={() => void remove(product.name, () => window.api.invProductsDelete(product._id as string), onChanged)}>
+                            {deleteLabel(language)}
+                          </button>
+                        ) : null}
                       </div>
                     </td>
                   </tr>

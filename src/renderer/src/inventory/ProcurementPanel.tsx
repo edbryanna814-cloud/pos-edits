@@ -1,4 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { confirmDelete, deleteLabel } from '../confirmDelete'
+import { useCan } from '../session'
 import type { Product, PurchaseOrder, PurchaseOrderLine, Supplier } from '../../../shared/inventory'
 import type { Language } from '../../../shared/settings'
 import { formatDateTime, formatMoney, parseMoney } from '../money'
@@ -138,6 +140,7 @@ export default function ProcurementPanel({
   onChanged
 }: Props) {
   const text = copy[language]
+  const canDelete = useCan('catalog.delete')
   const [tab, setTab] = useState<'suppliers' | 'orders'>('suppliers')
   const [supplierForm, setSupplierForm] = useState<SupplierForm | null>(null)
   const [orderFormOpen, setOrderFormOpen] = useState(false)
@@ -381,6 +384,11 @@ export default function ProcurementPanel({
                         <span className={`tag ${supplier.active === false ? '' : 'ok-tag'}`}>
                           {supplier.active === false ? '-' : text.active}
                         </span>
+                        {canDelete ? (
+                          <button type="button" className="link-button danger-text" onClick={async () => setError(await confirmDelete(language, supplier.name, () => window.api.invSuppliersDelete(supplier._id as string), onChanged))}>
+                            {deleteLabel(language)}
+                          </button>
+                        ) : null}
                       </td>
                     </tr>
                   ))}

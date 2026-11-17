@@ -25,6 +25,7 @@ const settingsValidator: Document = {
     properties: {
       _id: { bsonType: 'string' },
       companyName: { bsonType: 'string', minLength: 1, maxLength: 120 },
+      companyPhone: { bsonType: 'string', maxLength: 30 },
       currencyCode: { bsonType: 'string', pattern: '^[A-Z]{3}$' },
       currencyPrecision: {
         bsonType: ['int', 'long', 'double'],
@@ -48,6 +49,7 @@ const settingsValidator: Document = {
 interface SettingsDocument {
   _id: string
   companyName: string
+  companyPhone?: string
   currencyCode: string
   currencyPrecision: number
   taxRateBasisPoints: number

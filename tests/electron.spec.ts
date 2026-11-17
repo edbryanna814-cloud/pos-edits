@@ -1,6 +1,6 @@
 import { test, expect, _electron as electron, type Page } from '@playwright/test'
 import { MongoClient } from 'mongodb'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -62,6 +62,8 @@ test.describe.serial('Phase 2 - database and settings', () => {
       expect(
         await window.evaluate(() => Object.keys((window as any).api).sort())
       ).toEqual([
+        'attendanceDays',
+        'attendanceImport',
         'auditList',
         'authChangePassword',
         'authLogin',
@@ -72,29 +74,40 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'authSetup',
         'authSetupRequired',
         'authState',
+        'customersCreate',
+        'customersDelete',
+        'customersList',
+        'customersUpdate',
         'dbConnectionGet',
         'dbConnectionSave',
         'dbConnectionTest',
         'dbHealth',
         'exportBackup',
+        'exportSection',
         'getSettings',
         'getVersion',
         'importBackup',
         'invCategoriesCreate',
+        'invCategoriesDelete',
         'invCategoriesList',
+        'invImportConfirm',
+        'invImportPreview',
         'invPOCreate',
         'invPOList',
         'invPOReceive',
         'invProductsCreate',
+        'invProductsDelete',
         'invProductsList',
         'invProductsUpdate',
         'invReceiveCarton',
         'invStockAdjust',
         'invStockMovementsList',
         'invSuppliersCreate',
+        'invSuppliersDelete',
         'invSuppliersList',
         'invUnitsCreate',
         'invUnitsList',
+        'kpiSellers',
         'licenseApply',
         'licenseStatus',
         'ping',
@@ -103,6 +116,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'posCashboxList',
         'posCheckout',
         'posReturn',
+        'posReturnable',
         'posSalesList',
         'posShiftClose',
         'posShiftOpen',
@@ -151,6 +165,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
       await window.getByLabel('Company name').fill('Test Pharmacy')
       await window.getByLabel('Currency code (three letters)').fill('USD')
       await window.getByLabel('Currency decimal places').fill('2')
+      await window.getByLabel('Charge tax on sales').check()
       await window.getByLabel('Tax rate (%)').fill('10')
       await window.getByLabel('Default language').selectOption('en')
       await window.getByRole('button', { name: 'Save settings' }).click()
@@ -348,6 +363,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await window.getByLabel('Company name').fill('E2E Pharmacy')
       await window.getByLabel('Currency code (three letters)').fill('USD')
       await window.getByLabel('Currency decimal places').fill('2')
+      await window.getByLabel('Charge tax on sales').check()
       await window.getByLabel('Tax rate (%)').fill('10')
       await window.getByLabel('Default language').selectOption('en')
       await window.getByRole('button', { name: 'Save settings' }).click()
@@ -359,10 +375,12 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await window.getByLabel('Product name').fill('Paracetamol 500mg')
       await window.getByLabel('SKU', { exact: true }).fill('PARA-500')
       await window.getByLabel('Barcode (optional)').fill('1234567890')
+      await window.getByLabel('Unit type').selectOption('strip')
       await window.getByLabel('Purchase cost').fill('5.00')
-      await window.getByLabel('Selling price').fill('10.00')
+      await window.getByLabel('Strip price', { exact: true }).fill('10.00')
       await window.getByLabel('Opening stock').fill('20')
       await window.getByLabel('Minimum stock').fill('5')
+      await window.getByLabel('Customer may return it within (days, optional)').fill('7')
       await window.getByRole('button', { name: 'Save product' }).click()
       await expect(window.locator('.data-table')).toContainText('Paracetamol 500mg')
       await expect(window.locator('.data-table')).toContainText('20')
@@ -375,8 +393,14 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await window.getByRole('button', { name: /Complete sale/ }).click()
 
       await expect(window.getByRole('heading', { name: 'Receipt' })).toBeVisible()
-      await expect(window.locator('.receipt-panel')).toContainText('11.00 USD')
-      await expect(window.locator('.receipt-panel')).toContainText('9.00 USD')
+      // The printed invoice (Arabic template): total, paid and change; the seller is on it.
+      await expect(window.locator('.invoice-grand')).toContainText('11.00')
+      await expect(window.locator('.invoice-change')).toContainText('9.00')
+      await expect(window.locator('.invoice')).toContainText('صيدلية E2E Pharmacy')
+      await expect(window.locator('.invoice')).toContainText(E2E_ADMIN.username)
+      await window.emulateMedia({ media: 'print' })
+      await window.locator('.invoice').screenshot({ path: join(process.cwd(), 'screenshots', 'invoice-print.png') })
+      await window.emulateMedia({ media: 'screen' })
 
       const sale = await window.evaluate(async () => {
         const sales = await (window as any).api.posSalesList()
@@ -387,7 +411,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       expect(sale.status).toBe('completed')
 
       await window.getByRole('button', { name: 'New sale' }).click()
-      await window.getByRole('button', { name: 'Return', exact: true }).click()
+      await window.locator('.pos-bottom').getByRole('button', { name: 'Return', exact: true }).click()
       await window.getByLabel('Return reason').fill('Damaged box')
       await window.getByRole('button', { name: 'Confirm return' }).click()
       await expect(window.locator('.success')).toContainText('Invoice returned.')
@@ -510,7 +534,8 @@ test('receives cartons and sells whole boxes in base units', async () => {
         unitsPerBox: 10,
         boxPriceCents: 1800,
         stockQuantity: 0,
-        minStock: 0
+        minStock: 0,
+        returnDays: 30
       })
       await api.invReceiveCarton({
         productId: product._id,
@@ -549,6 +574,116 @@ test('receives cartons and sells whole boxes in base units', async () => {
     expect(result.line.saleUnit).toBe('box')
     expect(result.line.baseQuantity).toBe(20)
     expect(result.totalCents).toBe(3600)
+
+    // 0.3.0 units: a box of 3 strips x 12 pills for 90.00; 5 boxes in stock, one pill and one strip sold.
+    const units = await window.evaluate(async () => {
+      const api = (window as any).api
+      const product = await api.invProductsCreate({
+        name: 'Pill Box', sku: 'PILL-BOX', packaging: 'box', stripsPerBox: 3, pillsPerStrip: 12,
+        unitPriceCents: 9000, purchaseCostCents: 100, stockQuantity: 5 * 36, minStock: 0, returnDays: 7
+      })
+      const pill = await api.posCheckout({ clientRequestId: 'pill-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'pill' }], paymentMethod: 'cash', paidCents: 250 })
+      const strip = await api.posCheckout({ clientRequestId: 'strip-1', lines: [{ productId: product._id, quantity: 1, saleUnit: 'strip' }], paymentMethod: 'cash', paidCents: 3000 })
+      const stock = (await api.invProductsList()).find((p: any) => p.sku === 'PILL-BOX').stockQuantity
+      // A customer with 10% off: the server works out the discount from the percentage.
+      const mona = await api.customersCreate({ name: 'Mona', phone: '0100', discountBasisPoints: 1000 })
+      const box = await api.posCheckout({ clientRequestId: 'box-mona', customerId: mona._id, discountBasisPoints: 1000, lines: [{ productId: product._id, quantity: 1, saleUnit: 'box' }], paymentMethod: 'cash', paidCents: 8100 })
+      // Returnable list: the three sold lines, within 7 days. Return the strip on its own.
+      const returnable = await api.posReturnable()
+      const stripLine = returnable.find((r: any) => r.saleId === strip._id)
+      await api.posReturn({ saleId: strip._id, lineIndex: stripLine.lineIndex, reason: 'test' })
+      const afterReturn = (await api.posReturnable()).filter((r: any) => r.productName === 'Pill Box').length
+      // A product with no return period cannot be returned.
+      const plain = await api.invProductsCreate({ name: 'No Return', sku: 'NO-RET', packaging: 'pill', unitPriceCents: 100, stockQuantity: 5, minStock: 0 })
+      const plainSale = await api.posCheckout({ clientRequestId: 'no-ret', lines: [{ productId: plain._id, quantity: 1, saleUnit: 'pill' }], paymentMethod: 'cash', paidCents: 100 })
+      const refused = await api.posReturn({ saleId: plainSale._id, reason: 'x' }).then(() => 'returned', (e: Error) => e.message)
+      const finalStock = (await api.invProductsList()).find((p: any) => p.sku === 'PILL-BOX').stockQuantity
+      return { pill: pill.totalCents, strip: strip.totalCents, stock, box: [box.customerName, box.discountCents, box.totalCents], listed: returnable.filter((r: any) => r.productName === 'Pill Box').length, afterReturn, refused, stripRefund: stripLine.refundCents, finalStock }
+    })
+    expect(units).toMatchObject({ pill: 250, strip: 3000, stock: 180 - 1 - 12, box: ['Mona', 900, 8100], listed: 3, afterReturn: 2, stripRefund: 3000, finalStock: 180 - 1 - 36 })
+    expect(units.refused).toContain('RETURN_NOT_ALLOWED')
+    // Products made through the API appear after a reload (the session is kept).
+    await window.reload()
+    await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+    await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+    // 180 - 1 pill - 36 (box to Mona) = 143 pills = 3 boxes (108) + 2 strips (24) + 11 pills (the strip came back).
+    await expect(window.getByRole('row').filter({ hasText: 'Pill Box' })).toContainText('3 boxes · 2 strips · 11 pills')
+    await window.getByRole('button', { name: 'Customers', exact: true }).click()
+    await expect(window.getByRole('row').filter({ hasText: 'Mona' })).toContainText('10%')
+
+    // Import from Excel/CSV: the file picker is stubbed with a sheet of 3 rows, one of them bad.
+    const sheetDir = mkdtempSync(join(tmpdir(), 'import-'))
+    const sheet = join(sheetDir, 'products.csv')
+    writeFileSync(sheet, ['Name,SKU,Unit,Strips per box,Pills per strip,Price,Stock', 'Aspirin,ASP-1,box,2,10,40,3', 'Vitamin C,VIT-C,strip,,,12.5,7', 'Broken,PILL-BOX,box,1,,9,1'].join('\n'))
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as any }, sheet)
+    await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+    await window.getByRole('button', { name: 'Import from Excel' }).click()
+    await expect(window.getByRole('row').filter({ hasText: 'Broken' })).toContainText('SKU already in the pharmacy')
+    await window.getByRole('button', { name: 'Add 2 products' }).click()
+    await expect(window.getByRole('status').filter({ hasText: 'Added 2 products' })).toBeVisible()
+    await expect(window.getByRole('row').filter({ hasText: 'Aspirin' })).toContainText('3 boxes')
+
+    // Fingerprint machine: an attlog.dat export for user ID 1 (the administrator) on one day:
+    // in 08:00, break 13:00-13:30, out 17:00 = 8h 30m worked, 30m break. Imported twice: stored once.
+    const dat = join(sheetDir, 'attlog.dat')
+    const punch = (user: number, time: string, state: number) => [user, `2026-11-16 ${time}`, 1, state, 1, 0].join('\t')
+    writeFileSync(dat, [punch(1, '08:00:00', 0), punch(1, '13:00:00', 2), punch(1, '13:30:00', 3), punch(1, '17:00:00', 1), punch(9, '09:00:00', 0)].join('\n'))
+    await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [file] })) as any }, dat)
+    await window.getByRole('button', { name: 'Attendance', exact: true }).click()
+    await window.getByRole('button', { name: 'Import from the fingerprint machine' }).click()
+    await expect(window.getByRole('status')).toContainText('Added 5 punches')
+    await expect(window.getByText('Machine user numbers with no user here: 9.')).toBeVisible()
+    await window.getByRole('button', { name: 'Import from the fingerprint machine' }).click()
+    await expect(window.getByRole('status')).toContainText('Added 0 punches, 5 already imported')
+    await window.getByLabel('From').fill('2026-11-16')
+    await window.getByLabel('To').fill('2026-11-16')
+    await expect(window.getByRole('row').filter({ hasText: '2026-11-16' }).first()).toContainText('8h 30m')
+    const kpi = await window.evaluate(() => (window as any).api.kpiSellers({ from: '2026-11-16', to: '2026-11-16' }))
+    expect(kpi.find((r: any) => r.userNo === 1)).toMatchObject({ daysPresent: 1, workedMinutes: 510, breakMinutes: 30 })
+
+    // Exports (Administrator): Excel and .db, to a stubbed save location.
+    const xlsxOut = join(sheetDir, 'inventory.xlsx')
+    const dbOut = join(sheetDir, 'inventory.db')
+    for (const [format, out] of [['xlsx', xlsxOut], ['db', dbOut]] as const) {
+      await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = (async () => ({ canceled: false, filePath: file })) as any }, out)
+      const r = await window.evaluate((fmt) => (window as any).api.exportSection('inventory', fmt), format)
+      expect(r.count).toBeGreaterThan(3)
+    }
+    expect(readFileSync(xlsxOut).subarray(0, 2).toString()).toBe('PK')
+    expect(JSON.parse(readFileSync(dbOut, 'utf8')).some((p: any) => p.sku === 'ASP-1')).toBe(true)
+
+    // Deleting: refused while a product is on an open purchase order or a supplier has orders.
+    const del = await window.evaluate(async () => {
+      const api = (window as any).api
+      const cat = await api.invCategoriesCreate({ name: 'Temp category' })
+      const vit = (await api.invProductsList()).find((x: any) => x.sku === 'VIT-C')
+      const sup = await api.invSuppliersCreate({ name: 'Supplier X' })
+      await api.invPOCreate({ supplierId: sup._id, status: 'ordered', lines: [{ productId: vit._id, quantity: 1, unitCostCents: 100 }] })
+      const blocked = await api.invProductsDelete(vit._id).then(() => 'deleted', (e: Error) => e.message)
+      const supplierBlocked = await api.invSuppliersDelete(sup._id).then(() => 'deleted', (e: Error) => e.message)
+      await api.invCategoriesDelete(cat._id)
+      const mona = (await api.customersList()).find((c: any) => c.name === 'Mona')
+      await api.customersDelete(mona._id)
+      const noRet = (await api.invProductsList()).find((x: any) => x.sku === 'NO-RET')
+      await api.invProductsDelete(noRet._id)
+      return {
+        blocked, supplierBlocked,
+        category: (await api.invCategoriesList()).some((c: any) => c.name === 'Temp category'),
+        mona: (await api.customersList()).some((c: any) => c.name === 'Mona'),
+        noRet: (await api.invProductsList()).some((x: any) => x.sku === 'NO-RET')
+      }
+    })
+    expect(del.blocked).toContain('PRODUCT_ON_OPEN_ORDER')
+    expect(del.supplierBlocked).toContain('SUPPLIER_HAS_ORDERS')
+    expect([del.category, del.mona, del.noRet]).toEqual([false, false, false])
+    // In the screen: Delete asks first; accepting removes the product.
+    window.once('dialog', (d) => void d.accept())
+    await window.reload()
+    await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({ timeout: 10000 })
+    await window.getByRole('button', { name: 'Inventory', exact: true }).click()
+    await window.getByRole('row').filter({ hasText: 'Aspirin' }).getByRole('button', { name: 'Delete' }).click()
+    await expect(window.getByRole('row').filter({ hasText: 'Aspirin' })).toHaveCount(0)
+    rmSync(sheetDir, { recursive: true, force: true })
   } finally {
     await app.close()
   }
@@ -565,10 +700,10 @@ test('first-run setup and forced reset of a legacy admin/admin account (EN and A
     const window = await app.firstWindow()
     await expect(window.getByRole('heading', { name: 'Create the administrator account' })).toBeVisible({ timeout: 10000 })
     await window.getByLabel('Username').fill('owner')
-    await window.getByLabel('Password', { exact: true }).fill('short')
-    await window.getByLabel('Confirm password').fill('short')
+    await window.getByLabel('Password', { exact: true }).fill('ab')
+    await window.getByLabel('Confirm password').fill('ab')
     await window.getByRole('button', { name: 'Create administrator' }).click()
-    await expect(window.getByRole('alert')).toHaveText('The password must be at least 12 characters.')
+    await expect(window.getByRole('alert')).toHaveText('The password must be at least 3 characters.')
     await window.screenshot({ path: join(dir, 'gate1-setup-en.png') })
     await window.getByRole('button', { name: 'AR', exact: true }).click()
     await expect(window.getByRole('heading', { name: 'إنشاء حساب المدير' })).toBeVisible()
@@ -775,6 +910,15 @@ test('shared database: two tills on one server share users (A creates the admin,
       const nav = wb.getByRole('navigation')
       await expect(nav.getByRole('button')).toHaveText([/POS|Point of sale/i, /Inventory/i], { timeout: 10000 })
       await expect(wb.getByRole('heading', { name: 'Dashboard', level: 1 })).toHaveCount(0)
+      await nav.getByRole('button', { name: /Inventory/i }).click()
+      await expect(wb.getByRole('button', { name: 'Import from Excel' })).toHaveCount(0)
+      await expect(wb.getByRole('button', { name: 'Export' })).toHaveCount(0)
+      // Files in or out are for Administrators only: refused for a seller, and the buttons are not shown.
+      expect(await wb.evaluate(() => (window as any).api.invProductsDelete('65a1b2c3d4e5f60718293a4b').then(() => 'ok', (e: Error) => e.message))).toContain('PERMISSION_DENIED')
+      for (const call of ['exportSection', 'exportBackup', 'invImportPreview', 'attendanceImport']) {
+        const outcome = await wb.evaluate((c) => (window as any).api[c](c === 'exportSection' ? 'users' : { passphrase: 'x' }, 'xlsx').then(() => 'ok', (e: Error) => e.message), call)
+        expect(outcome).toContain('PERMISSION_DENIED')
+      }
       // Both tills write to one audit chain, which still verifies (seq is unique across devices).
       const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
       await client.connect()

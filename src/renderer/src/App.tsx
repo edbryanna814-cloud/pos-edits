@@ -19,8 +19,11 @@ import ShiftPanel from './pos/ShiftPanel'
 import DashboardPage from './dashboard/DashboardPage'
 import ReportsPage from './reports/ReportsPage'
 import UsersPage from './users/UsersPage'
+import { ExportButton, RecordId, SessionContext } from './session'
+import CustomersPage from './customers/CustomersPage'
+import AttendancePage, { SellerKpis } from './attendance/AttendancePage'
 
-type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit'
+type SectionId = 'dashboard' | 'pos' | 'inventory' | 'reports' | 'settings' | 'users' | 'audit' | 'customers' | 'attendance'
 
 interface Section {
   id: SectionId
@@ -60,17 +63,31 @@ const sections: Section[] = [
     permission: 'reports.view'
   },
   {
+    id: 'customers',
+    labelKey: 'customers',
+    titleKey: 'customers',
+    descriptionKey: 'customersDesc',
+    permission: 'customers.manage'
+  },
+  {
+    id: 'attendance',
+    labelKey: 'attendance',
+    titleKey: 'attendance',
+    descriptionKey: 'attendanceDesc',
+    permission: 'users.manage'
+  },
+  {
     id: 'users',
     labelKey: 'users',
     titleKey: 'users',
-    descriptionKey: 'settingsDesc',
+    descriptionKey: 'usersDesc',
     permission: 'users.read'
   },
   {
     id: 'audit',
     labelKey: 'audit',
     titleKey: 'audit',
-    descriptionKey: 'settingsDesc',
+    descriptionKey: 'auditDesc',
     permission: 'audit.view'
   },
   {
@@ -471,6 +488,7 @@ export default function App() {
   }
 
   return (
+    <SessionContext.Provider value={{ role: authUser?.role ?? '', permissions: authUser?.permissions ?? [] }}>
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
@@ -550,9 +568,16 @@ export default function App() {
             canManageDatabase={(authUser?.permissions ?? []).includes('database.manage')}
           />
         ) : active === 'users' ? (
-          <UsersPage language={language} />        ) : active === 'audit' ? (
+          <UsersPage language={language} />        ) : active === 'attendance' ? (
+          <AttendancePage language={language} />
+        ) : active === 'customers' ? (
+          <CustomersPage language={language} />
+        ) : active === 'audit' ? (
           <section className="panel">
-            <h2>{t(language, 'audit')}</h2>
+            <div className="section-header">
+              <h2>{t(language, 'audit')}</h2>
+              <ExportButton section="audit" language={language} />
+            </div>
             <table style={{ width: '100%', marginTop: 16 }}>
               <thead>
                 <tr>
@@ -565,7 +590,7 @@ export default function App() {
               <tbody>
                 {audit.map((a: any, i: number) => (
                   <tr key={i}>
-                    <td>{a.createdAt}</td>
+                    <td>{a.createdAt}<RecordId id={a._id} /></td>
                     <td>{a.actorUsername || '-'}</td>
                     <td>{a.action}</td>
                     <td>{a.resource}</td>
@@ -602,6 +627,7 @@ export default function App() {
               taxRateBasisPoints={taxRateBasisPoints}
               cashier={authUser.username}
               companyName={settings?.companyName ?? ''}
+              companyPhone={settings?.companyPhone ?? ''}
               onChanged={refreshBusinessData}
             />
             <ShiftPanel
@@ -641,6 +667,7 @@ export default function App() {
               cashbox={cashbox}
               onNavigate={(target) => setActive(target)}
             />
+            {(authUser?.permissions ?? []).includes('reports.view') ? <SellerKpis language={language} currency={currency} /> : null}
             <DatabasePanel db={db} language={language} onRetry={handleReload} />
           </>
         ) : null}
@@ -655,5 +682,6 @@ export default function App() {
         </footer>
       </main>
     </div>
+    </SessionContext.Provider>
   )
 }

@@ -12,7 +12,9 @@ export const DB_ERRORS = {
   authFailed: 'DB_AUTH_FAILED',
   noTransactions: 'DB_NO_TRANSACTIONS',
   lanAddress: 'DB_LAN_ADDRESS_INVALID',
-  joinCode: 'DB_JOIN_CODE_INVALID'
+  joinCode: 'DB_JOIN_CODE_INVALID',
+  /** The main computer presented another certificate than the one checked at "Test connection". */
+  securityCode: 'DB_SECURITY_CODE_CHANGED'
 } as const
 
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])

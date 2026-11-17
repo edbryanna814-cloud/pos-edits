@@ -14,7 +14,7 @@ interface Props {
 
 type Mode = 'checking' | 'setup' | 'login' | 'change'
 
-const MIN_PASSWORD_LENGTH = 12
+const MIN_PASSWORD_LENGTH = 3
 
 // Main returns stable codes (src/main/auth.ts AUTH_ERRORS, src/main/password.ts); map them to AR/EN text.
 const ERROR_KEYS: [string, TranslationKey][] = [

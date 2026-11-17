@@ -63,12 +63,37 @@ function getRolePermissions(role: string): Permission[] {
   return r ? r.permissions : []
 }
 
-const isAdminViewer = () => currentSession?.role === ADMIN_ROLE
+export const isAdminViewer = () => currentSession?.role === ADMIN_ROLE
 
 /** Earlier versions had Cashier / Inventory Manager / Accountant roles and per-user permissions. */
+const COUNTERS = 'counters'
+
+/** Next user ID: 1, 2, 3… (never reused). */
+async function nextUserNo(db: Db): Promise<number> {
+  const r = await db.collection<{ _id: string; seq: number }>(COUNTERS).findOneAndUpdate({ _id: 'userNo' }, { $inc: { seq: 1 } }, { upsert: true, returnDocument: 'after' })
+  return r!.seq
+}
+
+/** A user ID typed by hand: whole number 1…999999999; the counter moves past it. */
+async function reserveUserNo(db: Db, value: unknown): Promise<number> {
+  const n = Number(value)
+  if (!(Number.isInteger(n) && n >= 1 && n <= 999_999_999)) throw new Error('USER_NO_INVALID')
+  await db.collection<{ _id: string; seq: number }>(COUNTERS).updateOne({ _id: 'userNo' }, { $max: { seq: n } }, { upsert: true })
+  return n
+}
+
+const userNoTaken = (error: unknown) => (error as { code?: number; keyPattern?: Record<string, unknown> })?.code === 11000 && 'userNo' in ((error as any).keyPattern ?? {})
+
 export async function migrateRoles(): Promise<number> {
   const db = requireDb()
   let changed = 0
+  // User IDs (0.3.0): unique, and given to existing users in the order they were created.
+  await db.collection(USERS_COL).createIndex({ userNo: 1 }, { unique: true, partialFilterExpression: { userNo: { $exists: true } } })
+  const top = await db.collection<User>(USERS_COL).find({ userNo: { $exists: true } }).sort({ userNo: -1 }).limit(1).next()
+  if (top?.userNo) await reserveUserNo(db, top.userNo)
+  for (const u of await db.collection<User>(USERS_COL).find({ userNo: { $exists: false } }).sort({ createdAt: 1 }).toArray()) {
+    changed += (await db.collection(USERS_COL).updateOne({ _id: (u as any)._id, userNo: { $exists: false } }, { $set: { userNo: await nextUserNo(db) } })).modifiedCount
+  }
   for (const [from, to] of Object.entries(LEGACY_ROLES)) {
     changed += (await db.collection(USERS_COL).updateMany({ role: from }, { $set: { role: to } })).modifiedCount
   }
@@ -202,6 +227,7 @@ export async function setupFirstAdmin(input: LoginInput): Promise<LoginResult> {
   }
   const now = new Date().toISOString()
   const user: User = {
+    userNo: await nextUserNo(db),
     username,
     passwordHash: await hashPassword(input.password),
     role: 'Administrator',
@@ -362,7 +388,9 @@ export async function createUser(input: any): Promise<User> {
   const passwordError = newPasswordError(input?.password)
   if (passwordError) throw new Error(passwordError)
   if (!isAdminViewer() && input?.role === ADMIN_ROLE) throw new Error(AUTH_ERRORS.permissionDenied)
+  const manualNo = input?.userNo !== undefined && input?.userNo !== null && input?.userNo !== ''
   const user: any = {
+    userNo: manualNo ? await reserveUserNo(db, input.userNo) : await nextUserNo(db),
     username,
     passwordHash: await hashPassword(input.password),
     role: validateRole(input?.role || 'Seller'),
@@ -375,6 +403,7 @@ export async function createUser(input: any): Promise<User> {
     const result = await db.collection(USERS_COL).insertOne(user)
     insertedId = result.insertedId.toString()
   } catch (error) {
+    if (userNoTaken(error)) throw new Error('USER_NO_TAKEN')
     if ((error as { code?: number })?.code === 11000) throw new Error(AUTH_ERRORS.usernameTaken)
     throw error
   }
