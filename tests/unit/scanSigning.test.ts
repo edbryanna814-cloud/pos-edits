@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -55,6 +55,20 @@ describe('signing scan', () => {
       expect(r.status, src).toBe(1)
       expect(r.stderr).toMatch(/signing call/)
     })
+  })
+
+  it('allows signing only in src/main/lanTls.ts, and only while it never touches licensing', () => {
+    const tlsSrc = `import { generate${'KeyPair'}Sync, ${'sign'} } from 'node:crypto'\n`
+    mkdirSync(join(dir, 'src', 'main'), { recursive: true })
+    expect(scan(plant(join('src', 'main', 'lanTls.ts'), tlsSrc)).status).toBe(0)
+    expect(scan(plant('lanTlsCopy.ts', tlsSrc)).status).toBe(1)
+    for (const word of ['licence', 'license', 'PHM1', 'ANB2', 'RST1', 'panelKeys', 'lease', 'issueCode']) {
+      const r = scan(plant(join('src', 'main', 'lanTls.ts'), `${tlsSrc}const x = '${word}'\n`))
+      expect(r.status, word).toBe(1)
+      expect(r.stderr).toMatch(/must not touch licensing/)
+    }
+    const r = scan(plant(join('src', 'main', 'lanTls.ts'), `${tlsSrc}const k = '${header('BEGIN')}\\n${body}'\n`))
+    expect(r.stderr).toMatch(/private key block/)
   })
 
   it('allows verify-only crypto use', () => {

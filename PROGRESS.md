@@ -261,3 +261,4 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 - Verified on a packaged build (throw-away profile): folder ACL, plain connections refused (Wi-Fi and local), wrong pin refused, pinned join reads data, wrong join code refused, mongod stops on quit. Unit tests: certificate + pinned TLS (`tests/unit/lanTls.test.ts`).
 - Disk encryption itself is Windows' job: WHAT-TO-INSTALL.txt and the owner manuscripts ask to turn on Device encryption / BitLocker.
 - Tills that joined before this version must re-join (Settings → Database location) once the main computer runs it.
+- Signing scan (`scripts/scan-signing.mjs`): owner approved one narrow exception, `src/main/lanTls.ts` only (key generation + signing for the TLS certificate). That file fails the scan if it mentions anything licence-related (licen*, lease, ANB/PHM/RST codes, panelKey, issu*); key blocks are still refused everywhere. Tests in `tests/unit/scanSigning.test.ts`.
