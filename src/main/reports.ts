@@ -1,5 +1,7 @@
 import type { Db } from 'mongodb'
 import { getDb } from './db'
+import { isAdminViewer } from './auth'
+import { ADMIN_ROLE } from '../shared/auth'
 import { expiryState } from '../shared/expiry'
 import type { CashboxReport, InventoryReport, SalesReport } from '../shared/reports'
 
@@ -74,7 +76,7 @@ export async function salesReport(): Promise<SalesReport> {
     cogsCents,
     grossProfitCents: grossCents - discountCents - cogsCents,
     byPaymentMethod,
-    byCashier,
+    byCashier: await withoutAdmins(db, byCashier),
     byProduct: [...products.values()].sort((a, b) => b.revenueCents - a.revenueCents)
   }
 }
@@ -105,4 +107,11 @@ export async function inventoryReport(): Promise<InventoryReport> {
     totalValueCents += qty * (Number(p.purchaseCostCents) || 0)
   }
   return { totalProducts: products.length, lowStock, totalValueCents }
+}
+
+/** Administrator accounts are hidden from everyone else, here too (same rule as Users and the dashboard). */
+async function withoutAdmins<T>(db: Db, rows: Record<string, T>): Promise<Record<string, T>> {
+  if (isAdminViewer()) return rows
+  const admins = new Set((await db.collection('users').find({ role: ADMIN_ROLE }, { projection: { username: 1 } }).toArray()).map((u) => String(u.username)))
+  return Object.fromEntries(Object.entries(rows).filter(([name]) => !admins.has(name)))
 }

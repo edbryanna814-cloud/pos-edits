@@ -1,5 +1,5 @@
 // Builds the user guide PDF from docs/manual/shots (made by shoot.spec.ts) with Microsoft Edge.
-// Run: node docs/manual/build.mjs   (Arabic: MANUAL_LANG=ar, text in pages-ar.mjs, shots in shots-ar/)
+// Run: node docs/manual/build.mjs   (Arabic: MANUAL_LANG=ar; staff guide: MANUAL_GUIDE=staff, text in pages-staff.mjs)
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -8,8 +8,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const here = dirname(fileURLToPath(import.meta.url))
 const version = JSON.parse(readFileSync(join(here, '..', '..', 'package.json'), 'utf8')).version
 const AR = process.env.MANUAL_LANG === 'ar'
-const SHOTS = AR ? 'shots-ar' : 'shots'
-const OUT = join(here, AR ? 'Pharmacy-POS-User-Guide-AR.pdf' : 'Pharmacy-POS-User-Guide.pdf')
+const STAFF = process.env.MANUAL_GUIDE === 'staff'
+const SHOTS = `shots${STAFF ? '-staff' : ''}${AR ? '-ar' : ''}`
+const OUT = join(here, `Manuscript${STAFF ? ' Staff' : ''} ${AR ? 'AR' : 'EN'}.pdf`)
 
 // [shot, title, intro, steps (step n = red arrow n)]
 const pagesEn = [
@@ -107,10 +108,13 @@ const pagesEn = [
   ['18-audit', 'Audit log', 'Every important action is recorded here: who did it and when (sales, returns, price changes, deletes, sign-ins).', []]
 ]
 
-const ar = AR ? await import('./pages-ar.mjs') : null
-const pages = ar ? ar.pages : pagesEn
-if (pages.map((p) => p[0]).join() !== pagesEn.map((p) => p[0]).join()) throw new Error('Arabic pages differ from English')
-const cover = ar ? ar.cover : { title: 'Pharmacy POS', sub: 'User guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.', contents: 'Contents' }
+const lang = AR ? 'ar' : 'en'
+const staff = STAFF ? await import('./pages-staff.mjs') : null
+const ar = AR && !STAFF ? await import('./pages-ar.mjs') : null
+const pages = staff ? staff.pages[lang] : ar ? ar.pages : pagesEn
+const model = staff ? staff.pages.en : pagesEn
+if (pages.map((p) => p[0]).join() !== model.map((p) => p[0]).join()) throw new Error('Arabic pages differ from English')
+const cover = staff ? staff.cover[lang] : ar ? ar.cover : { title: 'Pharmacy POS', sub: 'User guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.', contents: 'Contents' }
 const html = `<!doctype html><html lang="${AR ? 'ar' : 'en'}" dir="${AR ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>Pharmacy POS — User Guide</title><style>
 @page { size: A4; margin: 14mm 14mm 16mm }
 body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #111; font-size: 12.5pt; line-height: 1.45 }

@@ -7,12 +7,17 @@ import { join } from 'node:path'
 // Takes the user-manual screenshots: drives the built app on a throw-away local database and draws
 // numbered red arrows on the buttons each page of the manual talks about.
 // Run: npm run build && npx playwright test -c docs/manual && node docs/manual/build.mjs
-// Arabic: set MANUAL_LANG=ar for both commands (shots-ar/, Pharmacy-POS-User-Guide-AR.pdf).
+// Arabic: set MANUAL_LANG=ar for both commands.
+// Staff guide (signed in as a Manager, nothing of the administrator shown): MANUAL_GUIDE=staff for both commands.
 
 const DB = 'pharmacy_pos_manual'
 const URI = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
 const AR = process.env['MANUAL_LANG'] === 'ar'
-const SHOTS = join(process.cwd(), 'docs', 'manual', AR ? 'shots-ar' : 'shots')
+const STAFF = process.env['MANUAL_GUIDE'] === 'staff'
+const SHOTS = join(process.cwd(), 'docs', 'manual', `shots${STAFF ? '-staff' : ''}${AR ? '-ar' : ''}`)
+const MANAGER = { username: 'mona', password: 'Manual-Staff-2026' } // gitleaks:allow demo-only, throw-away database
+// Staff guide: the administrator part only prepares the data; pictures start once the manager signs in.
+let live = !STAFF
 const PROFILE = mkdtempSync(join(tmpdir(), 'pharmacy-pos-manual-'))
 const ADMIN = { username: 'admin', password: 'Manual-Demo-2026' } // gitleaks:allow demo-only, throw-away database
 
@@ -32,6 +37,7 @@ async function launch(extra: Record<string, string> = {}): Promise<{ app: Electr
 /** Screenshot with arrow n pointing at targets[n-1]; targets not on screen are skipped (logged). */
 /** card: crop to the centred sign-in card instead of the whole window. */
 async function shot(w: Page, name: string, targets: Target[], card = false): Promise<void> {
+  if (!live) return
   await w.waitForTimeout(400)
   if (AR) {
     // The script finds things by their English labels: mark them, switch to Arabic, find the marks.
@@ -232,13 +238,104 @@ test('manual screenshots', async () => {
     await shot(w, '18-audit', [])
 
     // 9. Sign out and the forgotten-password screen.
+    await w.evaluate((m) => (window as any).api.usersCreate({ ...m, role: 'Manager', active: true }), MANAGER)
     await btn(w, 'Logout').click()
     await w.getByRole('heading', { name: 'Sign in' }).waitFor()
     await shot(w, '19-signin', [w.getByLabel('Username'), w.getByLabel('Password', { exact: true }), btn(w, /Login|Sign in/, false), btn(w, 'Forgot username or password?')], true)
     await btn(w, 'Forgot username or password?').click()
     await w.waitForTimeout(800)
     await shot(w, '20-recovery', [w.locator('.recovery-codes'), w.getByLabel('Reset code'), btn(w, 'Check reset code')], true)
+    if (STAFF) await staffShots(w)
   } finally {
     await app.close()
   }
 })
+
+/** The staff guide: the same screens as a Manager sees them (no administrator, backups, files or database). */
+async function staffShots(w: Page): Promise<void> {
+  live = true
+  await w.reload()
+  await w.getByRole('heading', { name: 'Sign in' }).waitFor()
+  await w.getByLabel('Username').fill(MANAGER.username)
+  await w.getByLabel('Password', { exact: true }).fill(MANAGER.password)
+  await shot(w, 's01-signin', [w.getByLabel('Username'), w.getByLabel('Password', { exact: true }), btn(w, /Login|Sign in/, false)], true)
+  await btn(w, /Login|Sign in/, false).click()
+  await w.getByRole('heading', { name: 'Dashboard', level: 1 }).waitFor({ timeout: 15000 })
+  await shot(w, 's02-dashboard', [w.getByRole('navigation'), btn(w, 'AR'), btn(w, 'Logout')])
+
+  await go(w, 'Settings')
+  await shot(w, 's03-settings', [w.getByLabel('Company name'), w.getByLabel(/Pharmacy phone/), w.getByLabel('Charge tax on sales'), w.getByLabel('Default language'), btn(w, 'Save settings')])
+
+  await go(w, 'Users')
+  await btn(w, 'Add user').click()
+  await w.getByLabel('Username', { exact: true }).fill('omar')
+  await w.getByLabel('Password', { exact: true }).fill('123')
+  const role = w.locator('select').filter({ hasText: 'Seller' }).first()
+  await role.selectOption({ label: 'Seller' })
+  await shot(w, 's04-users', [w.getByLabel('Username', { exact: true }), w.getByLabel('Password', { exact: true }), role, w.getByLabel(/User ID/), btn(w, 'Save')])
+  await btn(w, 'Save').click()
+  await w.waitForTimeout(800)
+
+  await go(w, 'Inventory')
+  await shot(w, 's05-inventory-top', [btn(w, 'Add product'), btn(w, 'Receive carton')])
+  await btn(w, 'Add product').click()
+  await w.getByLabel('Product name').fill('Voltaren 50')
+  await w.getByLabel('SKU', { exact: true }).fill('VOL-50')
+  await w.getByLabel('Unit type').selectOption('box')
+  await w.getByLabel('Strips in one box').fill('2')
+  await w.getByLabel('Pills in one strip (optional)').fill('10')
+  await w.getByLabel('Purchase cost').fill('30')
+  await w.getByLabel('Box price', { exact: true }).fill('50')
+  await w.getByLabel('Opening stock').fill('12')
+  await w.getByLabel('Minimum stock').fill('4')
+  await w.getByLabel(/Warn \(yellow\)/).fill('3')
+  await w.getByLabel(/Customer may return/).fill('7')
+  await shot(w, 's06-product-1', [w.getByLabel('Product name'), w.getByLabel('Unit type'), w.getByLabel('Strips in one box'), w.getByLabel('Pills in one strip (optional)'), w.getByText('Box price', { exact: true })])
+  await btn(w, 'Save product').scrollIntoViewIfNeeded()
+  await shot(w, 's07-product-2', [w.getByLabel('Opening stock'), w.getByLabel('Minimum stock'), w.getByLabel(/Warn \(yellow\)/), w.getByLabel(/Customer may return/), btn(w, 'Save product')])
+  await btn(w, 'Save product').click()
+  await w.locator('.data-table').getByText('Voltaren 50').waitFor()
+  const row = w.getByRole('row').filter({ hasText: 'Panadol Extra' })
+  await shot(w, 's08-inventory-list', [w.getByRole('row').filter({ hasText: 'Augmentin' }), w.getByRole('row').filter({ hasText: 'Brufen' }), row.getByRole('button', { name: 'Adjust stock' }), row.getByRole('button', { name: 'Delete' })])
+  await row.getByRole('button', { name: 'Adjust stock' }).click()
+  await w.getByLabel('Quantity (+ receive, - remove)').fill('-1')
+  await w.getByLabel('Reason').fill('Damaged box')
+  await shot(w, 's09-adjust', [w.getByLabel('Counted in'), w.getByLabel('Quantity (+ receive, - remove)'), w.getByLabel('Reason'), btn(w, 'Apply adjustment')])
+  await btn(w, 'Apply adjustment').click()
+  await w.waitForTimeout(800)
+
+  await go(w, 'Customers')
+  await btn(w, 'Add customer').click()
+  await w.getByLabel('Name', { exact: true }).fill('Ahmed Hassan')
+  await w.getByLabel('Phone number').fill('0122 333 4444')
+  await w.getByLabel('Discount (%)').fill('5')
+  await shot(w, 's10-customers', [w.getByLabel('Name', { exact: true }), w.getByLabel('ID number'), w.getByLabel('Phone number'), w.getByLabel('Discount (%)'), btn(w, 'Save customer')])
+  await btn(w, 'Save customer').click()
+  await w.waitForTimeout(800)
+
+  await go(w, 'POS')
+  await w.getByRole('button', { name: /Voltaren 50/ }).first().click()
+  await w.waitForTimeout(400)
+  await w.getByLabel('Customer', { exact: true }).fill('Ahmed')
+  await w.waitForTimeout(500)
+  await w.getByRole('button', { name: /Ahmed Hassan/ }).first().click().catch(() => {})
+  await w.getByLabel('Paid amount (leave empty for exact)').fill('50')
+  await shot(w, 's11-pos', [w.getByPlaceholder('Search name, SKU, or barcode'), w.getByRole('button', { name: /Voltaren 50/ }).first(), w.getByRole('button', { name: /^Strip:/ }).first(), w.locator('.cart-lines input').first(), w.getByText('Ahmed Hassan · 0122 333 4444'), w.getByLabel('Discount (%)'), w.getByLabel('Paid amount (leave empty for exact)'), btn(w, /Complete sale/, false)])
+  await btn(w, /Complete sale/, false).click()
+  await w.getByRole('heading', { name: 'Receipt' }).waitFor()
+  await shot(w, 's12-invoice', [btn(w, 'Print'), btn(w, 'New sale')])
+  await btn(w, 'New sale').click()
+  await w.waitForTimeout(500)
+  await shot(w, 's13-returns', [w.getByText('Returnable items'), w.getByPlaceholder(/Search invoice, product/), w.getByRole('button', { name: 'Return', exact: true }).first(), w.locator('.pos-bottom').getByRole('button', { name: 'Return', exact: true })])
+  await w.locator('.pos-bottom').getByRole('button', { name: 'Return', exact: true }).first().click()
+  await w.waitForTimeout(500)
+  await shot(w, 's14-return-confirm', [w.getByLabel(/Reason/), btn(w, 'Confirm return')])
+  await btn(w, 'Cancel').first().click().catch(() => {})
+
+  await go(w, 'Attendance')
+  await shot(w, 's15-attendance', [w.getByLabel('From'), w.getByLabel('To')])
+  await go(w, 'Reports')
+  await shot(w, 's16-reports', [])
+  await go(w, 'Audit log')
+  await shot(w, 's17-audit', [])
+}

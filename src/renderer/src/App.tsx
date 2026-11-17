@@ -80,14 +80,14 @@ const sections: Section[] = [
     id: 'users',
     labelKey: 'users',
     titleKey: 'users',
-    descriptionKey: 'settingsDesc',
+    descriptionKey: 'usersDesc',
     permission: 'users.read'
   },
   {
     id: 'audit',
     labelKey: 'audit',
     titleKey: 'audit',
-    descriptionKey: 'settingsDesc',
+    descriptionKey: 'auditDesc',
     permission: 'audit.view'
   },
   {

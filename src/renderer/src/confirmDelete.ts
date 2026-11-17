@@ -6,7 +6,7 @@ const strings = {
     errors: {
       PRODUCT_ON_OPEN_ORDER: 'This product is on a purchase order that is not received or cancelled yet.',
       SUPPLIER_HAS_ORDERS: 'This supplier has purchase orders; mark it inactive instead.',
-      PERMISSION_DENIED: 'Only a manager or administrator can delete.'
+      PERMISSION_DENIED: 'You are not allowed to delete this.'
     } as Record<string, string>,
     failed: 'It could not be deleted.'
   },
@@ -15,7 +15,7 @@ const strings = {
     errors: {
       PRODUCT_ON_OPEN_ORDER: 'هذا المنتج موجود في أمر شراء لم يُستلم أو يُلغَ بعد.',
       SUPPLIER_HAS_ORDERS: 'لهذا المورد أوامر شراء؛ اجعله غير نشط بدلًا من الحذف.',
-      PERMISSION_DENIED: 'الحذف للمدير أو المسؤول فقط.'
+      PERMISSION_DENIED: 'غير مسموح لك بالحذف.'
     } as Record<string, string>,
     failed: 'تعذّر الحذف.'
   }

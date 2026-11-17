@@ -41,7 +41,7 @@ const strings = {
       DB_UNREACHABLE: 'Could not reach it. Check that both devices are on the same Wi-Fi, the main computer is on, and the address is right.',
       DB_AUTH_FAILED: 'The join code (or the user name and password) was refused.',
       DB_NO_TRANSACTIONS: 'This server cannot be shared safely (it is not a replica set). Use MongoDB Atlas or a replica set.',
-      PERMISSION_DENIED: 'Only an administrator can change this.',
+      PERMISSION_DENIED: 'You are not allowed to change this.',
       other: 'The setting could not be saved.'
     }
   },
@@ -78,7 +78,7 @@ const strings = {
       DB_UNREACHABLE: 'تعذّر الوصول. تأكد أن الجهازين على نفس الواي فاي وأن الجهاز الرئيسي يعمل وأن العنوان صحيح.',
       DB_AUTH_FAILED: 'تم رفض رمز الانضمام (أو اسم المستخدم وكلمة المرور).',
       DB_NO_TRANSACTIONS: 'لا يمكن مشاركة هذا الخادم بأمان (ليس replica set). استخدم MongoDB Atlas أو replica set.',
-      PERMISSION_DENIED: 'المدير فقط يمكنه تغيير هذا الإعداد.',
+      PERMISSION_DENIED: 'غير مسموح لك بتغيير هذا الإعداد.',
       other: 'تعذّر حفظ الإعداد.'
     }
   }
