@@ -265,3 +265,4 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 
 2026-11-17: release 0.3.3 (staff manuscripts, admin hidden from reports, folder lock, LAN TLS). Installer `Pharmacy-POS-Setup-0.3.3.exe` 157562956 bytes, SHA-256 `879624cb5dae7d1a74df67130dd4a921b63429837abb80bb9f0cfdf24e2524f2`; packaged check re-run on this build (folder ACL, TLS only, pin, join code, stop on quit). Pre-release `field-test-0.3.3`; release repo `Anubis-hub/pharmacy-pos-release` v0.3.3.
 - 2026-11-17: PR #4 merged into main (owner request), merge commit 5aa1030; CI green on main.
+- 2026-11-17: owner asked for the staff manuscripts (EN/AR) on the release download; added to `Anubis-hub/pharmacy-pos-release` v0.3.3 (owner manuscripts stay out).
