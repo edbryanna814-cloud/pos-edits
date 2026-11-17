@@ -1,6 +1,6 @@
 {
   "name": "pharmacy-pos-management",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Pharmacy POS and management desktop application for one company.",
   "main": "./out/main/index.js",
   "private": true,
@@ -25,7 +25,7 @@
   },
   "build": {
     "appId": "com.pharmacy.pos",
-    "productName": "Pharmacy POS",
+    "productName": "Anubis Pharmacy",
     "asar": true,
     "directories": {
       "output": "release"
@@ -45,7 +45,8 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "Pharmacy-POS-Setup-${version}.exe"
+      "artifactName": "Anubis-Pharmacy-Setup-${version}.exe",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,

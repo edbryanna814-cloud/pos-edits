@@ -49,7 +49,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
     try {
       const window = await app.firstWindow()
 
-      await expect(window).toHaveTitle(/Pharmacy POS/)
+      await expect(window).toHaveTitle(/Anubis Pharmacy/)
       await signIn(window)
       await expect(
         window.getByRole('heading', { name: 'Dashboard', level: 1 })
@@ -121,6 +121,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'posShiftClose',
         'posShiftOpen',
         'posShiftsList',
+        'reportExport',
         'reportsCashbox',
         'reportsInventory',
         'reportsSales',
@@ -319,7 +320,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
     try {
       const window = await app.firstWindow()
 
-      await expect(window).toHaveTitle(/Pharmacy POS/)
+      await expect(window).toHaveTitle(/Anubis Pharmacy/)
       // No first-run setup without a database; the sign-in screen is shown.
       await expect(window.getByRole('heading', { name: 'Sign in' })).toBeVisible({ timeout: 10000 })
       expect(await window.evaluate(() => (window as any).api.authSetupRequired())).toBe(false)
@@ -353,7 +354,7 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
 
     try {
       const window = await app.firstWindow()
-      await expect(window).toHaveTitle(/Pharmacy POS/)
+      await expect(window).toHaveTitle(/Anubis Pharmacy/)
       await signIn(window)
       await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({
         timeout: 10000
@@ -517,7 +518,7 @@ test('receives cartons and sells whole boxes in base units', async () => {
 
   try {
     const window = await app.firstWindow()
-    await expect(window).toHaveTitle(/Pharmacy POS/)
+    await expect(window).toHaveTitle(/Anubis Pharmacy/)
     await signIn(window)
     await expect(window.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible({
       timeout: 10000
@@ -676,6 +677,16 @@ test('receives cartons and sells whole boxes in base units', async () => {
     expect(del.blocked).toContain('PRODUCT_ON_OPEN_ORDER')
     expect(del.supplierBlocked).toContain('SUPPLIER_HAS_ORDERS')
     expect([del.category, del.mona, del.noRet]).toEqual([false, false, false])
+    // Reports for managers: sales and purchasing as Excel for a date range; a bad range is refused.
+    const today = new Date().toLocaleDateString('en-CA')
+    for (const kind of ['sales', 'purchasing'] as const) {
+      const out = join(sheetDir, `${kind}.xlsx`)
+      await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = (async () => ({ canceled: false, filePath: file })) as any }, out)
+      const r = await window.evaluate(([k, d]) => (window as any).api.reportExport(k, { from: d, to: d }), [kind, today] as const)
+      expect(r.count, kind).toBeGreaterThan(0)
+      expect(readFileSync(out).subarray(0, 2).toString()).toBe('PK')
+    }
+    expect(await window.evaluate(() => (window as any).api.reportExport('sales', { from: '2026-02-01', to: '2025-01-01' }).then(() => 'ok', (e: Error) => e.message))).toContain('RANGE_INVALID')
     // In the screen: Delete asks first; accepting removes the product.
     window.once('dialog', (d) => void d.accept())
     await window.reload()
@@ -919,6 +930,7 @@ test('shared database: two tills on one server share users (A creates the admin,
         const outcome = await wb.evaluate((c) => (window as any).api[c](c === 'exportSection' ? 'users' : { passphrase: 'x' }, 'xlsx').then(() => 'ok', (e: Error) => e.message), call)
         expect(outcome).toContain('PERMISSION_DENIED')
       }
+      expect(await wb.evaluate(() => (window as any).api.reportExport('sales', { from: '2026-01-01', to: '2026-01-31' }).then(() => 'ok', (e: Error) => e.message))).toContain('PERMISSION_DENIED')
       // Both tills write to one audit chain, which still verifies (seq is unique across devices).
       const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 3000 })
       await client.connect()

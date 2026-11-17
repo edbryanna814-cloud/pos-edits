@@ -1,8 +1,8 @@
 // Staff guide (Manager and Seller): English and Arabic, same pages and arrow numbers.
 // Nothing here mentions the administrator, backups, files or the database.
 export const cover = {
-  en: { title: 'Pharmacy POS', sub: 'Staff guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.<br><br>Sellers see only <b>POS</b> and <b>Inventory</b>; the other pages are for managers.', contents: 'Contents' },
-  ar: { title: 'برنامج الصيدلية', sub: 'دليل الموظفين · الإصدار', arrows: 'في كل صورة <b style="color:#e11d48">أسهم حمراء مرقّمة</b>.<br>الخطوات المرقّمة تحت الصورة تشرح كل سهم.<br><br>البائع يرى <b>نقاط البيع</b> و<b>المخزون</b> فقط؛ باقي الصفحات للمشرف.', contents: 'المحتويات' }
+  en: { title: 'Anubis Pharmacy', sub: 'Staff guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.<br><br>Sellers see only <b>POS</b> and <b>Inventory</b>; the other pages are for managers.', contents: 'Contents' },
+  ar: { title: 'Anubis Pharmacy', sub: 'دليل الموظفين · الإصدار', arrows: 'في كل صورة <b style="color:#e11d48">أسهم حمراء مرقّمة</b>.<br>الخطوات المرقّمة تحت الصورة تشرح كل سهم.<br><br>البائع يرى <b>نقاط البيع</b> و<b>المخزون</b> فقط؛ باقي الصفحات للمشرف.', contents: 'المحتويات' }
 }
 
 export const pages = {
@@ -74,7 +74,10 @@ export const pages = {
       'Write a reason (optional).', 'Press <b>Confirm return</b>.']],
     ['s15-attendance', 'Attendance (managers)', 'Clock-in, clock-out, breaks and hours worked for each person, from the fingerprint machine.', [
       'From date…', '…to date.']],
-    ['s16-reports', 'Reports (managers)', 'Sales totals, profit, best-selling products and stock value.', []],
+    ['s16-reports', 'Reports (managers)', 'Sales totals, profit, best-selling products and stock value, and two Excel reports to download.', [
+    'First day of the period…', '…last day (at most one year).',
+    '<b>Sales report</b>: every invoice in the period with seller, customer, items, discount, tax and total, plus a totals row. Choose where to save the Excel file.',
+    '<b>Purchasing report</b>: every purchase order in the period with supplier, products, quantities and costs, plus a totals row.']],
     ['s17-audit', 'Audit log (managers)', 'Every important action is recorded: who did it and when.', []]
   ],
   ar: [
@@ -145,7 +148,10 @@ export const pages = {
       'اكتب السبب (اختياري).', 'اضغط <b>تأكيد الإرجاع</b>.']],
     ['s15-attendance', 'الحضور (للمشرف)', 'الحضور والانصراف والاستراحات وساعات العمل لكل شخص، من جهاز البصمة.', [
       'من تاريخ…', '…إلى تاريخ.']],
-    ['s16-reports', 'التقارير (للمشرف)', 'إجمالي المبيعات، الربح، الأصناف الأكثر بيعًا، وقيمة المخزون.', []],
+    ['s16-reports', 'التقارير (للمشرف)', 'إجمالي المبيعات، الربح، الأصناف الأكثر بيعًا، وقيمة المخزون، وتقريران إكسل للتنزيل.', [
+    'أول يوم في الفترة…', '…آخر يوم (سنة على الأكثر).',
+    '<b>تقرير المبيعات</b>: كل فاتورة في الفترة مع البائع والعميل والأصناف والخصم والضريبة والإجمالي، وسطر للإجماليات. اختر مكان حفظ ملف الإكسل.',
+    '<b>تقرير المشتريات</b>: كل أمر شراء في الفترة مع المورد والمنتجات والكميات والتكلفة، وسطر للإجماليات.']],
     ['s17-audit', 'سجل التدقيق (للمشرف)', 'كل عملية مهمة تُسجَّل: من فعلها ومتى.', []]
   ]
 }

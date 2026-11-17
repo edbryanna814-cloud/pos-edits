@@ -4,6 +4,7 @@ import { t, type TranslationKey } from '../i18n'
 import type { Language } from '../../../shared/settings'
 import DatabaseLocation from '../DatabaseLocation'
 import RecoveryPanel from './RecoveryPanel'
+import logo from '../assets/logo.png'
 
 interface Props {
   language: Language
@@ -109,7 +110,7 @@ export default function LoginPage({ language, onLogin, dbUnavailable }: Props) {
     <div className="login-shell">
       <section className="login-panel">
         <div className="login-brand">
-          <span className="login-logo" aria-hidden="true">P</span>
+          <img className="login-logo" src={logo} alt="" />
           <div>
             <strong>{t(language, 'appName')}</strong>
             <small>{t(language, 'appSubtitle')}</small>

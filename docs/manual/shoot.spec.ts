@@ -231,7 +231,7 @@ test('manual screenshots', async () => {
     await go(w, 'Attendance')
     await shot(w, '15-attendance', [btn(w, 'Import from the fingerprint machine'), w.getByLabel('From'), w.getByLabel('To')])
     await go(w, 'Reports')
-    await shot(w, '16-reports', [])
+    await shot(w, '16-reports', [w.getByLabel('From').first(), w.getByLabel('To').first(), btn(w, 'Sales report'), btn(w, 'Purchasing report')])
     await go(w, 'Dashboard')
     await shot(w, '17-dashboard', [w.getByRole('navigation')])
     await go(w, 'Audit log')
@@ -335,7 +335,7 @@ async function staffShots(w: Page): Promise<void> {
   await go(w, 'Attendance')
   await shot(w, 's15-attendance', [w.getByLabel('From'), w.getByLabel('To')])
   await go(w, 'Reports')
-  await shot(w, 's16-reports', [])
+  await shot(w, 's16-reports', [w.getByLabel('From').first(), w.getByLabel('To').first(), btn(w, 'Sales report'), btn(w, 'Purchasing report')])
   await go(w, 'Audit log')
   await shot(w, 's17-audit', [])
 }

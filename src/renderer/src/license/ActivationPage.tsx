@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Language } from '../../../shared/settings'
 import type { LicenseState } from '../../../shared/ipc'
+import logo from '../assets/logo.png'
 
 interface Props {
   state: LicenseState
@@ -129,10 +130,10 @@ export default function ActivationPage({ state, language, onActivated }: Props) 
     <div className="login-shell">
       <section className="login-panel license-panel">
         <div className="login-brand">
-          <span className="login-logo" aria-hidden="true">P</span>
+          <img className="login-logo" src={logo} alt="" />
           <div>
             <strong>{text.title}</strong>
-            <small>Pharmacy POS &amp; Management</small>
+            <small>Anubis Pharmacy</small>
           </div>
         </div>
 

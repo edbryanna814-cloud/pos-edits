@@ -9,6 +9,7 @@ import type { DbHealth, LicenseState } from '../../shared/ipc'
 import type { Permission } from '../../shared/auth'
 import type { Language, StoredCompanySettings } from '../../shared/settings'
 import { t, type TranslationKey } from './i18n'
+import logo from './assets/logo.png'
 import SettingsPage from './SettingsPage'
 import LoginPage from './auth/LoginPage'
 import ActivationPage from './license/ActivationPage'
@@ -492,9 +493,7 @@ export default function App() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            P
-          </span>
+          <img className="brand-mark" src={logo} alt="" />
           <div>
             <strong>{t(language, 'appName')}</strong>
             <small>{t(language, 'appSubtitle')}</small>

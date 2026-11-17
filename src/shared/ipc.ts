@@ -59,6 +59,7 @@ export const IPC = {
   AttendanceDays: 'attendance:days',
   KpiSellers: 'kpi:sellers',
   ExportSection: 'export:section',
+  ReportExport: 'report:export',
   InvCategoriesDelete: 'inv:categories:delete',
   InvProductsDelete: 'inv:products:delete',
   InvSuppliersDelete: 'inv:suppliers:delete',
@@ -165,6 +166,7 @@ export interface PreloadApi {
   attendanceDays(range: { from: string; to: string }): Promise<AttendanceDay[]>
   kpiSellers(range: { from: string; to: string }): Promise<SellerKpi[]>
   exportSection(section: string, format: 'xlsx' | 'db'): Promise<{ fileName: string; count: number } | null>
+  reportExport(kind: 'sales' | 'purchasing', range: { from: string; to: string }): Promise<{ fileName: string; count: number } | null>
   invCategoriesDelete(id: string): Promise<{ ok: true }>
   invProductsDelete(id: string): Promise<{ ok: true }>
   invSuppliersDelete(id: string): Promise<{ ok: true }>

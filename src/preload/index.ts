@@ -50,6 +50,7 @@ const api: PreloadApi = {
   attendanceDays: (range) => ipcRenderer.invoke(IPC.AttendanceDays, range),
   kpiSellers: (range) => ipcRenderer.invoke(IPC.KpiSellers, range),
   exportSection: (section, format) => ipcRenderer.invoke(IPC.ExportSection, section, format),
+  reportExport: (kind, range) => ipcRenderer.invoke(IPC.ReportExport, kind, range),
   invCategoriesDelete: (id) => ipcRenderer.invoke(IPC.InvCategoriesDelete, id),
   invProductsDelete: (id) => ipcRenderer.invoke(IPC.InvProductsDelete, id),
   invSuppliersDelete: (id) => ipcRenderer.invoke(IPC.InvSuppliersDelete, id),
