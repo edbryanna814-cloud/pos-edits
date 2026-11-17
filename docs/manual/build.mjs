@@ -1,5 +1,5 @@
 // Builds the user guide PDF from docs/manual/shots (made by shoot.spec.ts) with Microsoft Edge.
-// Run: node docs/manual/build.mjs
+// Run: node docs/manual/build.mjs   (Arabic: MANUAL_LANG=ar, text in pages-ar.mjs, shots in shots-ar/)
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -7,10 +7,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const version = JSON.parse(readFileSync(join(here, '..', '..', 'package.json'), 'utf8')).version
-const OUT = join(here, 'Pharmacy-POS-User-Guide.pdf')
+const AR = process.env.MANUAL_LANG === 'ar'
+const SHOTS = AR ? 'shots-ar' : 'shots'
+const OUT = join(here, AR ? 'Pharmacy-POS-User-Guide-AR.pdf' : 'Pharmacy-POS-User-Guide.pdf')
 
 // [shot, title, intro, steps (step n = red arrow n)]
-const pages = [
+const pagesEn = [
   ['01-license', 'Start: activate the program', 'The first time you open the program it asks for a license.', [
     'Press <b>Copy code</b> and send the device code to your supplier (WhatsApp or e-mail).',
     'Paste the license code you receive here…',
@@ -105,25 +107,29 @@ const pages = [
   ['18-audit', 'Audit log', 'Every important action is recorded here: who did it and when (sales, returns, price changes, deletes, sign-ins).', []]
 ]
 
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Pharmacy POS — User Guide</title><style>
+const ar = AR ? await import('./pages-ar.mjs') : null
+const pages = ar ? ar.pages : pagesEn
+if (pages.map((p) => p[0]).join() !== pagesEn.map((p) => p[0]).join()) throw new Error('Arabic pages differ from English')
+const cover = ar ? ar.cover : { title: 'Pharmacy POS', sub: 'User guide · version', arrows: 'Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.', contents: 'Contents' }
+const html = `<!doctype html><html lang="${AR ? 'ar' : 'en'}" dir="${AR ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>Pharmacy POS — User Guide</title><style>
 @page { size: A4; margin: 14mm 14mm 16mm }
-body { font-family: 'Segoe UI', Arial, sans-serif; color: #111; font-size: 12.5pt; line-height: 1.45 }
+body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; color: #111; font-size: 12.5pt; line-height: 1.45 }
 .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; text-align: center }
 .cover h1 { font-size: 34pt; margin: 0 0 8px; color: #0f766e } .cover p { font-size: 15pt; color: #444 }
 section { page-break-before: always }
 h2 { color: #0f766e; font-size: 20pt; margin: 0 0 4px } .intro { margin: 0 0 10px; color: #333 }
 img { width: 100%; border: 1px solid #ccc; border-radius: 6px }
 ol { padding: 0; margin: 10px 0 0; list-style: none; counter-reset: n }
-li { counter-increment: n; position: relative; padding: 4px 0 4px 40px; margin-bottom: 4px }
-li::before { content: counter(n); position: absolute; left: 0; top: 2px; width: 28px; height: 28px; border-radius: 50%; background: #e11d48; color: #fff; font-weight: 700; text-align: center; line-height: 28px }
+li { counter-increment: n; position: relative; padding-block: 4px; padding-inline-start: 40px; margin-bottom: 4px }
+li::before { content: counter(n); position: absolute; inset-inline-start: 0; top: 2px; width: 28px; height: 28px; border-radius: 50%; background: #e11d48; color: #fff; font-weight: 700; text-align: center; line-height: 28px }
 .red { color: #b91c1c; font-weight: 700 } .yellow { color: #a16207; font-weight: 700 }
 .toc li::before { background: #0f766e }
 </style></head><body>
-<div class="cover"><h1>Pharmacy POS</h1><p>User guide · version ${version}</p><p style="margin-top:40px">Each picture has <b style="color:#e11d48">red numbered arrows</b>.<br>The numbered steps under it say what each one does.</p></div>
-<section><h2>Contents</h2><ol class="toc">${pages.map((p) => `<li>${p[1]}</li>`).join('')}</ol></section>
+<div class="cover"><h1>${cover.title}</h1><p>${cover.sub} ${version}</p><p style="margin-top:40px">${cover.arrows}</p></div>
+<section><h2>${cover.contents}</h2><ol class="toc">${pages.map((p) => `<li>${p[1]}</li>`).join('')}</ol></section>
 ${pages.map(([shot, title, intro, steps]) => {
-  if (!existsSync(join(here, 'shots', `${shot}.png`))) throw new Error(`missing shot ${shot}`)
-  return `<section><h2>${title}</h2><p class="intro">${intro}</p><img src="shots/${shot}.png">${steps.length ? `<ol>${steps.map((s) => `<li>${s}</li>`).join('')}</ol>` : ''}</section>`
+  if (!existsSync(join(here, SHOTS, `${shot}.png`))) throw new Error(`missing shot ${shot}`)
+  return `<section><h2>${title}</h2><p class="intro">${intro}</p><img src="${SHOTS}/${shot}.png">${steps.length ? `<ol>${steps.map((s) => `<li>${s}</li>`).join('')}</ol>` : ''}</section>`
 }).join('\n')}
 </body></html>`
 

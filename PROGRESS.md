@@ -250,4 +250,4 @@ Finish the open Gate 1 items above. Do not start B1 until panel A3 signing is ve
 
 ## Last completed step
 
-2026-11-17: 0.3.2 (deletes, invoice template) built; pre-release `field-test-0.3.2`; PR #4 open (not merged). Release repo `Anubis-hub/pharmacy-pos-release` updated to v0.3.2 (commit 2301789, same installer SHA-256 9a934fdd…). User guide PDF added: `docs/manual/Pharmacy-POS-User-Guide.pdf` (21 pages of screenshots with numbered arrows; rebuild: `npm run build && npx playwright test -c docs/manual && node docs/manual/build.mjs`).
+2026-11-17: 0.3.2 (deletes, invoice template) built; pre-release `field-test-0.3.2`; PR #4 open (not merged). Release repo `Anubis-hub/pharmacy-pos-release` updated to v0.3.2 (commit 2301789, same installer SHA-256 9a934fdd…). User guide PDF added: `docs/manual/Pharmacy-POS-User-Guide.pdf` (21 pages of screenshots with numbered arrows; rebuild: `npm run build && npx playwright test -c docs/manual && node docs/manual/build.mjs`). Arabic guide `docs/manual/Pharmacy-POS-User-Guide-AR.pdf` (same pages, Arabic screens; `MANUAL_LANG=ar` for both commands).

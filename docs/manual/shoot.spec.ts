@@ -7,10 +7,12 @@ import { join } from 'node:path'
 // Takes the user-manual screenshots: drives the built app on a throw-away local database and draws
 // numbered red arrows on the buttons each page of the manual talks about.
 // Run: npm run build && npx playwright test -c docs/manual && node docs/manual/build.mjs
+// Arabic: set MANUAL_LANG=ar for both commands (shots-ar/, Pharmacy-POS-User-Guide-AR.pdf).
 
 const DB = 'pharmacy_pos_manual'
 const URI = 'mongodb://127.0.0.1:27017/?replicaSet=rs0'
-const SHOTS = join(process.cwd(), 'docs', 'manual', 'shots')
+const AR = process.env['MANUAL_LANG'] === 'ar'
+const SHOTS = join(process.cwd(), 'docs', 'manual', AR ? 'shots-ar' : 'shots')
 const PROFILE = mkdtempSync(join(tmpdir(), 'pharmacy-pos-manual-'))
 const ADMIN = { username: 'admin', password: 'Manual-Demo-2026' } // gitleaks:allow demo-only, throw-away database
 
@@ -31,6 +33,13 @@ async function launch(extra: Record<string, string> = {}): Promise<{ app: Electr
 /** card: crop to the centred sign-in card instead of the whole window. */
 async function shot(w: Page, name: string, targets: Target[], card = false): Promise<void> {
   await w.waitForTimeout(400)
+  if (AR) {
+    // The script finds things by their English labels: mark them, switch to Arabic, find the marks.
+    for (const [i, t] of targets.entries()) await t.first().evaluate((el, n) => el.setAttribute('data-manual', String(n)), i + 1).catch(() => {})
+    await w.getByRole('button', { name: 'AR', exact: true }).first().click()
+    await w.waitForTimeout(600)
+    targets = targets.map((_, i) => w.locator(`[data-manual="${i + 1}"]`))
+  }
   const first = targets[0]?.first()
   if (first && (await first.count())) await first.scrollIntoViewIfNeeded().catch(() => {})
   const boxes: Array<{ x: number; y: number; width: number; height: number; n: number } | null> = []
@@ -40,7 +49,7 @@ async function shot(w: Page, name: string, targets: Target[], card = false): Pro
     if (!b) console.warn(`[manual] ${name}: arrow ${i + 1} not found`)
     boxes.push(b ? { ...b, n: i + 1 } : null)
   }
-  await w.evaluate((list) => {
+  await w.evaluate(({ list, rtl }) => {
     const vw = window.innerWidth, vh = window.innerHeight
     const ns = 'http://www.w3.org/2000/svg'
     const svg = document.createElementNS(ns, 'svg')
@@ -61,19 +70,25 @@ async function shot(w: Page, name: string, targets: Target[], card = false): Pro
       add('rect', { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8, rx: 8, fill: 'none', stroke: '#e11d48', 'stroke-width': 3 })
       // Badge just above the target's top-right corner (the label row is empty there), short arrow down;
       // below the target when it touches the top of the window.
-      const ex = Math.max(b.x + 20, b.x + b.width - 34)
+      // Right-to-left: the label sits at the right, so use the top-left corner instead.
+      const ex = rtl ? Math.min(b.x + b.width - 20, b.x + 34) : Math.max(b.x + 20, b.x + b.width - 34)
       const below = b.y < 60
       const ey = below ? b.y + b.height + 4 : b.y - 4
-      const sx = Math.min(vw - 22, Math.max(22, ex + 26))
+      const sx = Math.min(vw - 22, Math.max(22, ex + (rtl ? -26 : 26)))
       const sy = below ? ey + 44 : Math.max(20, ey - 40)
       add('line', { x1: sx, y1: sy, x2: ex, y2: ey, stroke: '#e11d48', 'stroke-width': 4, 'marker-end': 'url(#mh)' })
       add('circle', { cx: sx, cy: sy, r: 17, fill: '#e11d48', stroke: '#fff', 'stroke-width': 3 })
       add('text', { x: sx, y: sy + 7, 'text-anchor': 'middle', 'font-size': 20, 'font-weight': 700, fill: '#fff', 'font-family': 'Segoe UI, Arial' }, String(b.n))
     }
     document.body.appendChild(svg)
-  }, boxes)
+  }, { list: boxes, rtl: AR })
   await w.screenshot({ path: join(SHOTS, `${name}.png`), ...(card ? { clip: { x: 323, y: 60, width: 760, height: 800 } } : {}) })
   await w.evaluate(() => document.getElementById('manual-overlay')?.remove())
+  if (AR) {
+    await w.evaluate(() => document.querySelectorAll('[data-manual]').forEach((el) => el.removeAttribute('data-manual')))
+    await w.getByRole('button', { name: 'EN', exact: true }).first().click()
+    await w.waitForTimeout(600)
+  }
 }
 
 const btn = (w: Page, name: string | RegExp, exact = typeof name === 'string') => w.getByRole('button', { name, exact })
