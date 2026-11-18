@@ -120,6 +120,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'posCheckout',
         'posReturn',
         'posReturnable',
+        'posSaleGet',
         'posSalesList',
         'posShiftClose',
         'posShiftOpen',
@@ -402,10 +403,10 @@ test.describe.serial('Business flow - inventory, sale, return', () => {
       await expect(window.locator('.invoice-change')).toContainText('9.00')
       await expect(window.locator('.invoice')).toContainText('صيدلية E2E Pharmacy')
       await expect(window.locator('.invoice')).toContainText(E2E_ADMIN.username)
+      await expect(window.locator('.invoice')).toContainText(E2E_ADMIN.username)
       await window.emulateMedia({ media: 'print' })
       await window.locator('.invoice').screenshot({ path: join(process.cwd(), 'screenshots', 'invoice-print.png') })
       await window.emulateMedia({ media: 'screen' })
-
       const sale = await window.evaluate(async () => {
         const sales = await (window as any).api.posSalesList()
         return sales[0]

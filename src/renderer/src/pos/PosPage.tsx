@@ -22,6 +22,8 @@ interface Props {
   cashier: string
   companyName: string
   companyPhone: string
+  companyAddress: string
+  invoiceFooterNote: string
   onChanged: () => void
 }
 
@@ -29,7 +31,7 @@ const copy = {
   en: {
     title: 'Point of sale',
     intro: 'Search, add to cart, and complete the sale.',
-    search: 'Search name, SKU, or barcode',
+    search: 'Search name, SKU, barcode, or invoice',
     cart: 'Cart',
     emptyCart: 'Cart is empty',
     emptyCartHint: 'Choose a product to start a sale.',
@@ -71,8 +73,11 @@ const copy = {
     returnTitle: 'Return invoice',
     returnReason: 'Return reason',
     confirmReturn: 'Confirm return',
+    returnItem: 'Return item',
+    returnAll: 'Return all remaining',
     cancel: 'Cancel',
     returned: 'Invoice returned.',
+    returnedItem: 'Item returned.',
     cashbox: 'Cashbox',
     cashboxBalance: 'Balance',
     cashIn: 'Cash in',
@@ -98,13 +103,13 @@ const copy = {
   },
   ar: {
     title: 'نقطة البيع',
-    intro: 'ابحث، أضف إلى السلة، وأتمم عملية البيع.',
-    search: 'ابحث بالاسم أو الكود أو الباركود',
+    intro: 'ابحث وأضف إلى السلة وأكمل عملية البيع.',
+    search: 'ابحث بالاسم أو الرمز أو الباركود أو الفاتورة',
     cart: 'سلة البيع',
     emptyCart: 'السلة فارغة',
     emptyCartHint: 'اختر منتجًا لبدء عملية البيع.',
     noProducts: 'لا توجد منتجات مطابقة',
-    noProductsHint: 'أضف منتجات من صفحة المخزون أولًا.',
+    noProductsHint: 'أضف منتجات من صفحة المخزون أولاً.',
     expired: 'منتهي الصلاحية',
     expiredError: 'هذا المنتج منتهي الصلاحية ولا يمكن بيعه.',
     outOfStock: 'نفد المخزون',
@@ -114,35 +119,38 @@ const copy = {
     box: 'علبة',
     boxPriceMissing: 'سعر العلبة غير محدد لهذا المنتج.',
     remove: 'حذف',
-    subtotal: 'الإجمالي الفرعي',
+    subtotal: 'المجموع الفرعي',
     discount: 'الخصم',
     discountPercent: 'الخصم (%)',
     tax: 'الضريبة',
-    total: 'الإجمالي',
+    total: 'المجموع',
     paymentMethod: 'طريقة الدفع',
-    cash: 'نقدًا',
+    cash: 'نقدي',
     card: 'بطاقة',
     other: 'أخرى',
-    paid: 'المبلغ المدفوع (اتركه فارغًا للمبلغ بالضبط)',
+    paid: 'المبلغ المدفوع (اتركه فارغًا للمبلغ المطابق)',
     paidReceipt: 'المبلغ المدفوع',
     change: 'الباقي',
     checkout: 'إتمام البيع',
-    processing: 'جارٍ إتمام البيع...',
+    processing: 'جارٍ الإتمام...',
     clear: 'تفريغ السلة',
     receipt: 'الفاتورة',
-    invoice: 'رقم الفاتورة',
+    invoice: 'فاتورة',
     date: 'التاريخ',
-    cashierLabel: 'الكاشير',
+    cashierLabel: 'البائع',
     newSale: 'بيع جديد',
     print: 'طباعة',
-    recentSales: 'أحدث المبيعات',
+    recentSales: 'المبيعات الأخيرة',
     noSales: 'لا توجد مبيعات بعد.',
-    returnLabel: 'مرتجع',
-    returnTitle: 'إرجاع الفاتورة',
+    returnLabel: 'إرجاع',
+    returnTitle: 'إرجاع فاتورة',
     returnReason: 'سبب الإرجاع',
     confirmReturn: 'تأكيد الإرجاع',
+    returnItem: 'إرجاع صنف',
+    returnAll: 'إرجاع الكل المتبقي',
     cancel: 'إلغاء',
     returned: 'تم إرجاع الفاتورة.',
+    returnedItem: 'تم إرجاع الصنف.',
     cashbox: 'الصندوق',
     cashboxBalance: 'الرصيد',
     cashIn: 'إيداع',
@@ -153,16 +161,16 @@ const copy = {
     noCashbox: 'لا توجد حركات صندوق بعد.',
     cartEmptyError: 'أضف منتجًا واحدًا على الأقل إلى السلة.',
     discountError: 'أدخل خصمًا من 0 إلى 100%.',
-    discountTooBig: 'لا يمكن أن يتجاوز الخصم الإجمالي الفرعي.',
+    discountTooBig: 'لا يمكن أن يتجاوز الخصم المجموع الفرعي.',
     paidError: 'أدخل مبلغًا مدفوعًا صحيحًا.',
-    paidTooLow: 'المبلغ المدفوع أقل من الإجمالي.',
-    checkoutError: 'تعذّر إتمام البيع',
-    returnError: 'تعذّر إرجاع الفاتورة',
+    paidTooLow: 'المبلغ المدفوع أقل من المجموع.',
+    checkoutError: 'تعذر إتمام البيع',
+    returnError: 'تعذر إرجاع الفاتورة',
     returnReasonError: 'أدخل سبب الإرجاع.',
     cashError: 'أدخل مبلغًا صحيحًا.',
     cashReasonError: 'أدخل السبب.',
-    cashboxError: 'تعذّر تسجيل حركة الصندوق.',
-    units: ['الفاتورة', 'التاريخ', 'الإجمالي', 'الحالة', ''],
+    cashboxError: 'تعذر تسجيل حركة الصندوق.',
+    units: ['الفاتورة', 'التاريخ', 'المجموع', 'الحالة', ''],
     status: { completed: 'مكتملة', returned: 'مرتجعة', void: 'ملغاة' },
     cashTypes: { in: 'إيداع', out: 'سحب', sale: 'بيع', refund: 'استرداد' }
   }
@@ -215,6 +223,8 @@ export default function PosPage({
   cashier,
   companyName,
   companyPhone,
+  companyAddress,
+  invoiceFooterNote,
   onChanged
 }: Props) {
   const text = copy[language]
@@ -235,7 +245,8 @@ export default function PosPage({
   const [success, setSuccess] = useState('')
   const [returnSale, setReturnSale] = useState<Sale | null>(null)
   const [returnReason, setReturnReason] = useState('')
-  const [returnBusy, setReturnBusy] = useState(false)
+  const [returnQty, setReturnQty] = useState<Record<number, number>>({})
+  const [returnBusy, setReturnBusy] = useState<string | false>(false)
   const [cashAmount, setCashAmount] = useState('')
   const [cashReason, setCashReason] = useState('')
   const [cashBusy, setCashBusy] = useState(false)
@@ -317,7 +328,15 @@ export default function PosPage({
           event.preventDefault()
           addProductRef.current(match)
           setQuery('')
+          return
         }
+        void window.api.posSaleGet(code).then((sale) => {
+          if (sale) {
+            setReceipt(sale)
+            setQuery('')
+            setError('')
+          }
+        }).catch(() => {})
         return
       }
       if (event.key.length === 1) buffer += event.key
@@ -440,19 +459,69 @@ export default function PosPage({
     }
   }
 
+  async function openSale(ref: string): Promise<Sale | null> {
+    const sale = await window.api.posSaleGet(ref.trim())
+    if (!sale) return null
+    setReceipt(sale)
+    setQuery('')
+    setError('')
+    setSuccess('')
+    return sale
+  }
+
+  async function openReturn(sale: Sale): Promise<void> {
+    const fresh = sale._id ? (await window.api.posSaleGet(sale._id)) ?? sale : sale
+    setReturnSale(fresh)
+    setReturnReason('')
+    const q: Record<number, number> = {}
+    fresh.lines.forEach((line, i) => {
+      const remaining = line.quantity - (line.returnedQuantity ?? 0)
+      if (remaining > 0) q[i] = remaining
+    })
+    setReturnQty(q)
+    setError('')
+    setSuccess('')
+  }
+
   async function confirmReturn(): Promise<void> {
     if (!returnSale?._id) return
     const reason = returnReason.trim()
     if (!reason) return setError(text.returnReasonError)
-    setReturnBusy(true)
+    setReturnBusy('all')
     setError('')
     setSuccess('')
     try {
       await window.api.posReturn({ saleId: returnSale._id, reason })
       setReturnSale(null)
       setReturnReason('')
+      setReturnQty({})
       setSuccess(text.returned)
       onChanged()
+    } catch (returnError) {
+      setError(returnErrorText(language, returnError) ?? `${text.returnError}: ${errorText(returnError)}`)
+    } finally {
+      setReturnBusy(false)
+    }
+  }
+
+  async function returnLine(lineIndex: number): Promise<void> {
+    if (!returnSale?._id) return
+    const reason = returnReason.trim()
+    if (!reason) return setError(text.returnReasonError)
+    const line = returnSale.lines[lineIndex]
+    const remaining = line.quantity - (line.returnedQuantity ?? 0)
+    const take = Math.max(1, Math.min(Math.trunc(returnQty[lineIndex] ?? remaining), remaining))
+    if (take <= 0) return
+    setReturnBusy(String(lineIndex))
+    setError('')
+    setSuccess('')
+    try {
+      await window.api.posReturn({ saleId: returnSale._id, lineIndex, quantity: take, reason })
+      setSuccess(text.returnedItem)
+      onChanged()
+      const fresh = await window.api.posSaleGet(returnSale._id)
+      if (fresh) await openReturn(fresh)
+      else setReturnSale(null)
     } catch (returnError) {
       setError(returnErrorText(language, returnError) ?? `${text.returnError}: ${errorText(returnError)}`)
     } finally {
@@ -506,7 +575,7 @@ export default function PosPage({
               </button>
             </div>
           </div>
-          <InvoicePrint sale={receipt} companyName={companyName} companyPhone={companyPhone} cashier={cashier} />
+          <InvoicePrint sale={receipt} companyName={companyName} companyPhone={companyPhone} companyAddress={companyAddress} invoiceFooterNote={invoiceFooterNote} cashier={cashier} />
         </section>
       ) : null}
 
@@ -514,7 +583,7 @@ export default function PosPage({
         <section className="panel inline-panel">
           <div className="crud-form-header">
             <h3>
-              {text.returnTitle}: {returnSale.invoiceNo} · {formatMoney(returnSale.totalCents, currency)}
+              {text.returnTitle}: {returnSale.invoiceNo} — {formatMoney(returnSale.totalCents, currency)}
             </h3>
             <button type="button" className="link-button" onClick={() => setReturnSale(null)}>
               {text.cancel}
@@ -531,9 +600,43 @@ export default function PosPage({
               />
             </label>
           </div>
+          <div className="table-wrap">
+            <table className="data-table compact">
+              <thead>
+                <tr><th>#</th><th>{text.invoice}</th><th>{text.quantity}</th><th>{text.total}</th><th /></tr>
+              </thead>
+              <tbody>
+                {returnSale.lines.map((line, i) => {
+                  const remaining = line.quantity - (line.returnedQuantity ?? 0)
+                  if (remaining <= 0) return null
+                  return (
+                    <tr key={`${line.productId}:${i}`}>
+                      <td>{i + 1}</td>
+                      <td>
+                        {line.productName}
+                        {(line.returnedQuantity ?? 0) > 0 ? <small className="block-muted"> {line.returnedQuantity}/{line.quantity}</small> : null}
+                      </td>
+                      <td>
+                        <input type="number" min={1} max={remaining} value={returnQty[i] ?? remaining}
+                          onChange={(e) => setReturnQty((m) => ({ ...m, [i]: Math.max(1, Math.min(remaining, Math.trunc(Number(e.target.value) || 1))) }))}
+                          style={{ width: 72 }} aria-label={text.quantity} />
+                        <small className="block-muted">/ {remaining}</small>
+                      </td>
+                      <td>{formatMoney(line.lineTotalCents, currency)}</td>
+                      <td>
+                        <button type="button" disabled={!!returnBusy} onClick={() => void returnLine(i)}>
+                          {returnBusy === String(i) ? text.processing : text.returnItem}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
           <div className="form-actions">
-            <button type="button" className="primary" onClick={confirmReturn} disabled={returnBusy}>
-              {returnBusy ? text.processing : text.confirmReturn}
+            <button type="button" className="primary" onClick={confirmReturn} disabled={!!returnBusy}>
+              {returnBusy === 'all' ? text.processing : text.confirmReturn}
             </button>
             <button type="button" onClick={() => setReturnSale(null)}>
               {text.cancel}
@@ -553,8 +656,12 @@ export default function PosPage({
                 if (event.key !== 'Enter') return
                 const code = query.trim()
                 const exact = products.find((product) => product.barcode === code)
-                if (exact) addProduct(exact)
-                else if (visibleProducts[0]) addProduct(visibleProducts[0])
+                if (exact) { addProduct(exact); return }
+                void (async () => {
+                  const sale = await window.api.posSaleGet(code).catch(() => null)
+                  if (sale) { setReceipt(sale); setQuery(''); setError(''); setSuccess(''); return }
+                  if (visibleProducts[0]) addProduct(visibleProducts[0])
+                })()
               }}
               placeholder={text.search}
               aria-label={text.search}
@@ -772,12 +879,7 @@ export default function PosPage({
                           <button
                             type="button"
                             className="link-button"
-                            onClick={() => {
-                              setReturnSale(sale)
-                              setReturnReason('')
-                              setError('')
-                              setSuccess('')
-                            }}
+                            onClick={() => void openReturn(sale)}
                           >
                             {text.returnLabel}
                           </button>

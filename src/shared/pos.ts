@@ -21,6 +21,8 @@ export type SaleLine = {
 export type Sale = {
   _id?: string
   invoiceNo: string
+  /** Scannable invoice reference (equals invoiceNo when absent). */
+  barcode?: string
   clientRequestId?: string
   lines: SaleLine[]
   subtotalCents: number
@@ -55,7 +57,7 @@ export type Return = {
   _id?: string
   saleId: string
   invoiceNo: string
-  lines: { productId: string; quantity: number; amountCents: number }[]
+  lines: { productId: string; lineIndex?: number; saleUnitQuantity?: number; quantity: number; amountCents: number }[]
   refundCents: number
   reason: string
   createdAt: string

@@ -6,8 +6,10 @@ export type ReturnableLine = {
   invoiceNo: string
   lineIndex: number
   productName: string
+  /** Remaining quantity that can still be returned (sale unit). */
   quantity: number
   saleUnit?: string
+  /** Refund for returning the remaining quantity on this line. */
   refundCents: number
   soldAt: string
   /** Last moment it can be returned. */
@@ -29,13 +31,20 @@ export function returnDeadline(sale: { createdAt: string }, line: { returnDays?:
 
 export const isLineOpen = (line: LineLike) => (line.returnedQuantity ?? 0) < line.quantity
 
+function remainingSaleUnits(sale: SaleLike): number {
+  return sale.lines.reduce((sum, l) => sum + (isLineOpen(l) ? l.quantity - (l.returnedQuantity ?? 0) : 0), 0)
+}
+
 /**
- * The money back for one line: its share of what the customer paid (after the sale's discount and tax).
- * The last open line gets whatever is left, so all refunds add up to the sale total exactly.
+ * Money back for returning `qty` units of a line (sale unit). The final return that closes the whole sale
+ * gets whatever is left so all refunds sum to the sale total exactly.
  */
-export function lineRefund(sale: SaleLike, index: number): number {
-  const open = sale.lines.filter(isLineOpen)
-  if (open.length === 1 && isLineOpen(sale.lines[index])) return sale.totalCents - (sale.refundedCents ?? 0)
+export function lineRefund(sale: SaleLike, index: number, qty?: number): number {
+  const line = sale.lines[index]
+  const remaining = line.quantity - (line.returnedQuantity ?? 0)
+  const take = Math.max(0, Math.min(Math.trunc(qty ?? remaining), remaining))
+  if (take <= 0) return 0
+  if (take === remainingSaleUnits(sale)) return sale.totalCents - (sale.refundedCents ?? 0)
   if (sale.subtotalCents <= 0) return 0
-  return Math.round((sale.lines[index].lineTotalCents * sale.totalCents) / sale.subtotalCents)
+  return Math.round((line.lineTotalCents * (take / line.quantity) * sale.totalCents) / sale.subtotalCents)
 }

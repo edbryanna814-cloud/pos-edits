@@ -2213,3 +2213,7 @@ img.login-logo {
 img.invoice-logo {
   object-fit: contain;
 }
+
+.invoice-barcode { margin: 6px 0; text-align: center; }
+.invoice-barcode svg { display: block; margin: 0 auto; }
+.invoice-barcode-text { font-size: 10px; letter-spacing: 1px; margin-top: 2px; }

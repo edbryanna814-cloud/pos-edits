@@ -17,6 +17,8 @@ interface Props {
 interface FormState {
   companyName: string
   companyPhone: string
+  companyAddress: string
+  invoiceFooterNote: string
   currencyCode: string
   currencyPrecision: string
   taxEnabled: boolean
@@ -30,6 +32,8 @@ function toForm(settings: StoredCompanySettings | null): FormState {
     return {
       companyName: '',
       companyPhone: '',
+      companyAddress: '',
+      invoiceFooterNote: '',
       currencyCode: '',
       currencyPrecision: '',
       taxEnabled: false,
@@ -42,6 +46,8 @@ function toForm(settings: StoredCompanySettings | null): FormState {
   return {
     companyName: settings.companyName,
     companyPhone: settings.companyPhone ?? '',
+    companyAddress: settings.companyAddress ?? '',
+    invoiceFooterNote: settings.invoiceFooterNote ?? '',
     currencyCode: settings.currencyCode,
     currencyPrecision: String(settings.currencyPrecision),
     taxEnabled: settings.taxRateBasisPoints > 0,
@@ -120,6 +126,8 @@ export default function SettingsPage({
       currencyPrecision: precision,
       taxRateBasisPoints: Math.round(taxPercent * 100),
       companyPhone: form.companyPhone,
+      companyAddress: form.companyAddress,
+      invoiceFooterNote: form.invoiceFooterNote,
       defaultLanguage: form.defaultLanguage,
       backupDirectory: form.backupDirectory
     }
@@ -218,6 +226,16 @@ export default function SettingsPage({
         <label>
           <span>{t(language, 'companyPhone')}</span>
           <input dir="ltr" inputMode="tel" maxLength={30} value={form.companyPhone} onChange={(event) => update('companyPhone', event.target.value)} />
+        </label>
+
+        <label className="wide">
+          <span>{language === 'ar' ? 'عنوان الصيدلية (للفاتورة)' : 'Company address (invoice)'}</span>
+          <input maxLength={200} value={form.companyAddress} onChange={(event) => update('companyAddress', event.target.value)} />
+        </label>
+
+        <label className="wide">
+          <span>{language === 'ar' ? 'ملاحظة تذييل الفاتورة' : 'Invoice footer note'}</span>
+          <input maxLength={300} value={form.invoiceFooterNote} onChange={(event) => update('invoiceFooterNote', event.target.value)} />
         </label>
 
         <label className="checkbox">

@@ -72,6 +72,7 @@ export const IPC = {
   CustomersCreate: 'customers:create',
   CustomersUpdate: 'customers:update',
   PosSalesList: 'pos:sales:list',
+  PosSaleGet: 'pos:sale:get',
   PosReturn: 'pos:return',
   PosReturnable: 'pos:returnable',
   PosCashIn: 'pos:cash:in',
@@ -181,7 +182,8 @@ export interface PreloadApi {
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
   posCheckout(input: any): Promise<Sale>
   posSalesList(): Promise<Sale[]>
-  posReturn(input: { saleId: string; reason: string; lineIndex?: number }): Promise<Return>
+  posSaleGet(ref: string): Promise<Sale | null>
+  posReturn(input: { saleId: string; reason: string; lineIndex?: number; quantity?: number }): Promise<Return>
   posReturnable(): Promise<ReturnableLine[]>
   posCashIn(amountCents: number, reason: string): Promise<CashboxMovement>
   posCashOut(amountCents: number, reason: string): Promise<CashboxMovement>

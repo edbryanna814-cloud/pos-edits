@@ -43,10 +43,20 @@ export async function ensurePosSchema(): Promise<void> {
     { clientRequestId: 1 },
     { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } }
   )
+  await db.collection(SALES).createIndex(
+    { barcode: 1 },
+    { unique: true, partialFilterExpression: { barcode: { $type: 'string' } } }
+  )
 }
 
-function genInvoice(): string {
-  return `INV-${Date.now()}-${randomUUID().slice(0, 6).toUpperCase()}`
+async function genInvoiceNo(db: Db): Promise<string> {
+  const day = new Date().toISOString().slice(2, 10).replace(/-/g, '')
+  for (let i = 0; i < 20; i++) {
+    const invoiceNo = `S-${day}-${randomUUID().replace(/-/g, '').slice(0, 4).toUpperCase()}`
+    const exists = await db.collection(SALES).findOne({ $or: [{ invoiceNo }, { barcode: invoiceNo }] } as any, { projection: { _id: 1 } })
+    if (!exists) return invoiceNo
+  }
+  return `S-${day}-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`
 }
 
 function withStringId<T>(doc: T): T {
@@ -165,8 +175,10 @@ async function createSale(db: Db, input: any): Promise<Sale> {
   const cashierUsername =
     typeof input?.cashierUsername === 'string' ? input.cashierUsername.trim() : ''
   const customer = await customerForSale(db, input?.customerId, input.session)
+  const invoiceNo = await genInvoiceNo(db)
   const sale: Omit<Sale, '_id'> = {
-    invoiceNo: genInvoice(),
+    invoiceNo,
+    barcode: invoiceNo,
     ...(clientRequestId ? { clientRequestId } : {}),
     ...(cashierUsername ? { cashierUsername } : {}),
     ...(customer ?? {}),
@@ -252,6 +264,16 @@ export async function listSales(): Promise<Sale[]> {
   return (await db.collection<Sale>(SALES).find({}).sort({ createdAt: -1 }).toArray()).map(withStringId)
 }
 
+export async function getSale(ref: string): Promise<Sale | null> {
+  const db = requireDb()
+  const key = String(ref ?? '').trim()
+  if (!key) return null
+  const or: any[] = [{ invoiceNo: key }, { barcode: key }]
+  if (ObjectId.isValid(key)) or.push({ _id: new ObjectId(key) })
+  const sale = await db.collection<Sale>(SALES).findOne({ $or: or } as any)
+  return sale ? withStringId(sale) : null
+}
+
 /** Sale lines that can still be returned, soonest deadline first (a passed period drops off the list). */
 export async function listReturnable(): Promise<ReturnableLine[]> {
   const db = requireDb()
@@ -263,9 +285,10 @@ export async function listReturnable(): Promise<ReturnableLine[]> {
     sale.lines.forEach((line, lineIndex) => {
       const deadline = returnDeadline(sale, line)
       if (!deadline || deadline.getTime() < now || !isLineOpen(line)) return
+      const remaining = line.quantity - (line.returnedQuantity ?? 0)
       out.push({
-        saleId: String(sale._id), invoiceNo: sale.invoiceNo, lineIndex, productName: line.productName, quantity: line.quantity,
-        saleUnit: line.saleUnit, refundCents: lineRefund(sale, lineIndex), soldAt: sale.createdAt, deadline: deadline.toISOString(),
+        saleId: String(sale._id), invoiceNo: sale.invoiceNo, lineIndex, productName: line.productName, quantity: remaining,
+        saleUnit: line.saleUnit, refundCents: lineRefund(sale, lineIndex, remaining), soldAt: sale.createdAt, deadline: deadline.toISOString(),
         ...(sale.customerName ? { customerName: sale.customerName } : {})
       })
     })
@@ -274,10 +297,10 @@ export async function listReturnable(): Promise<ReturnableLine[]> {
 }
 
 /**
- * Returns one line (lineIndex) or every line still open. Only lines whose return period has not ended can
- * come back; the refund is each line's share of what was paid. The sale is "returned" once nothing is open.
+ * Returns selected quantity from a line (lineIndex) or every line still open (full remaining). Partial,
+ * traceable, and idempotent-safe against over-return: stock/financials update only for the returned amount.
  */
-export async function posReturn(input: { saleId: string; reason: string; lineIndex?: number }, username?: string): Promise<Return> {
+export async function posReturn(input: { saleId: string; reason: string; lineIndex?: number; quantity?: number }, username?: string): Promise<Return> {
   const db = requireDb()
   const client = requireClient()
   if (!ObjectId.isValid(input.saleId)) throw new Error('Invalid sale')
@@ -296,33 +319,46 @@ export async function posReturn(input: { saleId: string; reason: string; lineInd
       if (single && !(Number.isInteger(input.lineIndex) && sale.lines[input.lineIndex as number])) throw new Error('RETURN_LINE_INVALID')
       const indexes = sale.lines.map((_, i) => i).filter((i) => (single ? i === input.lineIndex : true) && isLineOpen(sale.lines[i]))
       if (indexes.length === 0) throw new Error('Sale not found or already returned')
+      if (single && input.quantity != null && !(Number.isInteger(input.quantity) && input.quantity > 0)) throw new Error('RETURN_QTY_INVALID')
       for (const i of indexes) {
         const deadline = returnDeadline(sale, sale.lines[i])
         if (!deadline) throw new Error(`RETURN_NOT_ALLOWED: ${sale.lines[i].productName}`)
         if (Date.now() > deadline.getTime()) throw new Error(`RETURN_PERIOD_OVER: ${sale.lines[i].productName}`)
       }
+      const takes = indexes.map((i) => {
+        const remaining = sale.lines[i].quantity - (sale.lines[i].returnedQuantity ?? 0)
+        const take = single && input.quantity != null ? (input.quantity as number) : remaining
+        if (!(Number.isInteger(take) && take > 0 && take <= remaining)) throw new Error('RETURN_QTY_INVALID')
+        return take
+      })
       const working = { ...sale, lines: sale.lines.map((l) => ({ ...l })) }
       const refunds: number[] = []
-      for (const i of indexes) {
-        refunds.push(lineRefund(working, i))
-        working.refundedCents = (working.refundedCents ?? 0) + refunds[refunds.length - 1]
-        working.lines[i].returnedQuantity = working.lines[i].quantity
-      }
+      indexes.forEach((i, k) => {
+        refunds.push(lineRefund(working, i, takes[k]))
+        working.refundedCents = (working.refundedCents ?? 0) + refunds[k]
+        working.lines[i].returnedQuantity = (working.lines[i].returnedQuantity ?? 0) + takes[k]
+      })
       const refundCents = refunds.reduce((a, b) => a + b, 0)
 
-      for (const i of indexes) {
+      const baseBacks = indexes.map((i, k) => {
         const line = sale.lines[i]
-        const baseQuantity = line.baseQuantity ?? line.quantity // a line always comes back whole
+        const basePerUnit = (line.baseQuantity ?? line.quantity) / line.quantity
+        return Math.round(basePerUnit * takes[k])
+      })
+      for (let k = 0; k < indexes.length; k++) {
+        const i = indexes[k]
+        const line = sale.lines[i]
+        const baseBack = baseBacks[k]
         await db.collection('inv_products').updateOne(
           { _id: new ObjectId(line.productId) } as any,
-          { $inc: { stockQuantity: baseQuantity }, $set: { updatedAt: now } },
+          { $inc: { stockQuantity: baseBack }, $set: { updatedAt: now } },
           { session }
         )
         await db.collection('inv_stock_movements').insertOne(
           {
             productId: line.productId,
             type: 'return',
-            quantity: baseQuantity,
+            quantity: baseBack,
             reason: `Return ${sale.invoiceNo}`,
             reference: input.saleId,
             ...(username ? { cashierUsername: username } : {}),
@@ -344,16 +380,17 @@ export async function posReturn(input: { saleId: string; reason: string; lineInd
         invoiceNo: sale.invoiceNo,
         lines: indexes.map((i, k) => ({
           productId: sale.lines[i].productId,
-          quantity: sale.lines[i].baseQuantity ?? sale.lines[i].quantity,
+          lineIndex: i,
+          saleUnitQuantity: takes[k],
+          quantity: Math.round(((sale.lines[i].baseQuantity ?? sale.lines[i].quantity) / sale.lines[i].quantity) * takes[k]),
           amountCents: refunds[k]
-        })),
+        })) as any,
         refundCents,
         reason: String(input.reason ?? '').trim() || 'Customer return',
         createdAt: now,
         ...(username ? { createdBy: username } : {})
       }
       const inserted = await db.collection(RETURNS).insertOne(ret as any, { session })
-      // Mirror the original payment: only cash refunds come out of the drawer.
       if (sale.paymentMethod === 'cash') {
         await db.collection(CASHBOX).insertOne(
           {
@@ -361,6 +398,7 @@ export async function posReturn(input: { saleId: string; reason: string; lineInd
             amountCents: -refundCents,
             reason: `Return ${sale.invoiceNo}`,
             reference: input.saleId,
+            ...(username ? { cashierUsername: username } : {}),
             createdAt: now
           },
           { session }

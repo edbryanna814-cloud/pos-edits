@@ -22,4 +22,16 @@ describe('returns', () => {
     const odd = { createdAt: '', subtotalCents: 300, totalCents: 1000, refundedCents: 333 * 2, lines: [{ lineTotalCents: 100, quantity: 1, returnedQuantity: 1 }, { lineTotalCents: 100, quantity: 1, returnedQuantity: 1 }, { lineTotalCents: 100, quantity: 1 }] }
     expect(lineRefund(odd, 2)).toBe(334)
   })
+
+  it('supports partial quantity returns and tracks remaining correctly', () => {
+    const sale = { createdAt: '', subtotalCents: 2000, totalCents: 2000, refundedCents: 0, lines: [{ lineTotalCents: 2000, quantity: 4, returnedQuantity: 0 }] }
+    expect(lineRefund(sale, 0, 1)).toBe(500)
+    sale.lines[0].returnedQuantity = 1
+    sale.refundedCents = 500
+    expect(isLineOpen(sale.lines[0])).toBe(true)
+    expect(lineRefund(sale, 0, 2)).toBe(1000)
+    sale.lines[0].returnedQuantity = 3
+    sale.refundedCents = 1500
+    expect(lineRefund(sale, 0, 1)).toBe(500)
+  })
 })

@@ -4,6 +4,10 @@ export interface CompanySettings {
   companyName: string
   /** Printed on invoices; optional. */
   companyPhone: string
+  /** Printed on invoices; optional. */
+  companyAddress: string
+  /** Footer line on printed invoices (e.g. contact); optional, no fictitious defaults. */
+  invoiceFooterNote: string
   currencyCode: string
   currencyPrecision: number
   taxRateBasisPoints: number
@@ -31,6 +35,9 @@ export function validateSettings(input: unknown): CompanySettings {
   if (companyPhone && !/^[+\d][\d\s-]{2,29}$/.test(companyPhone)) {
     throw new Error('Pharmacy phone: digits, spaces and dashes only')
   }
+
+  const companyAddress = typeof raw.companyAddress === 'string' ? raw.companyAddress.trim().slice(0, 200) : ''
+  const invoiceFooterNote = typeof raw.invoiceFooterNote === 'string' ? raw.invoiceFooterNote.trim().slice(0, 300) : ''
 
   const currencyCode =
     typeof raw.currencyCode === 'string' ? raw.currencyCode.trim().toUpperCase() : ''
@@ -68,6 +75,8 @@ export function validateSettings(input: unknown): CompanySettings {
   return {
     companyName,
     companyPhone,
+    companyAddress,
+    invoiceFooterNote,
     currencyCode,
     currencyPrecision,
     taxRateBasisPoints,

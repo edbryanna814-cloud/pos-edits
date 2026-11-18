@@ -627,6 +627,8 @@ export default function App() {
               cashier={authUser.username}
               companyName={settings?.companyName ?? ''}
               companyPhone={settings?.companyPhone ?? ''}
+              companyAddress={settings?.companyAddress ?? ''}
+              invoiceFooterNote={settings?.invoiceFooterNote ?? ''}
               onChanged={refreshBusinessData}
             />
             <ShiftPanel

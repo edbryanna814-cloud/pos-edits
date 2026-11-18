@@ -21,7 +21,7 @@ import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { changePassword, createUser, ensureAuthSchema, listAdminUsernames, migrateRoles, recoverAdminPassword, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
 import { deleteCategory, deleteProduct, deleteSupplier, createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listReceipts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updatePO, updateProduct, updateSupplier } from './inventory'
-import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn, listReturnable } from './pos'
+import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, getSale, listCashbox, listSales, listShifts, openShift, posReturn, listReturnable } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
 import { PANEL_KEYS } from './panelKeys'
@@ -98,6 +98,7 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.CustomersList]: ['pos.use'],
   [IPC.CustomersCreate]: ['pos.use'],
   [IPC.CustomersUpdate]: ['customers.manage'],
+  [IPC.PosSaleGet]: ['pos.use'],
   [IPC.PosReturn]: ['pos.use'],
   [IPC.PosReturnable]: ['pos.use'],
   [IPC.PosCashIn]: ['pos.use'],
@@ -491,6 +492,7 @@ function registerIpc(): void {
   handle(IPC.CustomersCreate, async (_event, input: unknown) => createCustomer(input, requireSession().username))
   handle(IPC.CustomersUpdate, async (_event, id: unknown, input: unknown) => updateCustomer(id, input, requireSession().username))
   handle(IPC.PosSalesList, async (event) => { assertTrusted(event); return listSales() })
+  handle(IPC.PosSaleGet, async (event, ref: string) => { assertTrusted(event); return getSale(ref) })
   handle(IPC.PosReturn, async (event, input: any) => { assertTrusted(event); return posReturn(input, requireSession().username) })
   handle(IPC.PosReturnable, async () => listReturnable())
   handle(IPC.PosCashIn, async (event, amountCents: number, reason: string) => { assertTrusted(event); return cashIn(amountCents, reason, requireSession().username) })
