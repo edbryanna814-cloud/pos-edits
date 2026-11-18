@@ -48,7 +48,7 @@ function sheetRows(section: ExportSection, docs: any[]): Cell[][] {
     case 'users':
       return [['User ID', 'Username', 'Role', 'Active', 'Created', 'Record ID'], ...docs.map((u) => [u.userNo ?? '', u.username, u.role, u.active !== false ? 'yes' : 'no', u.createdAt, id(u)])]
     case 'customers':
-      return [['Name', 'ID number', 'Phone', 'Discount %', 'Created', 'Record ID'], ...docs.map((c) => [c.name, c.nationalId, c.phone, (c.discountBasisPoints ?? 0) / 100, c.createdAt, id(c)])]
+      return [['Name', 'ID number', 'Phone', 'Email', 'Address', 'Notes', 'Discount %', 'Active', 'Created', 'Record ID'], ...docs.map((c) => [c.name, c.nationalId, c.phone, c.email ?? '', c.address ?? '', c.notes ?? '', (c.discountBasisPoints ?? 0) / 100, c.active === false ? 'no' : 'yes', c.createdAt, id(c)])]
     case 'sales':
       return [
         ['Invoice', 'Date', 'Cashier', 'Customer', 'Items', 'Subtotal', 'Discount', 'Tax', 'Total', 'Refunded', 'Payment', 'Status', 'Record ID'],
@@ -109,17 +109,24 @@ export async function exportReport(kind: unknown, range: unknown): Promise<{ dat
   const suppliers = new Map((await db.collection('inv_suppliers').find({ _id: { $in: asIds(supplierIds) } }).toArray()).map((s) => [String(s._id), s.name]))
   const products = new Map((await db.collection('inv_products').find({ _id: { $in: asIds(productIds) } }).toArray()).map((p) => [String(p._id), p]))
   const receipts = await db.collection('inv_purchase_receipts').find({ purchaseOrderId: { $in: orders.map((o) => String(o._id)) } }).toArray()
-  const receivedAt = new Map(receipts.map((r) => [String(r.purchaseOrderId), r.receivedAt ?? r.createdAt]))
+  const receivedAt = new Map<string, string>()
+  for (const r of receipts) {
+    const key = String(r.purchaseOrderId)
+    const at = String(r.receivedAt ?? r.createdAt ?? '')
+    if (!receivedAt.has(key) || at > (receivedAt.get(key) ?? '')) receivedAt.set(key, at)
+  }
   const rows: Cell[][] = orders.flatMap((o) =>
     (o.lines ?? []).map((l: any) => {
       const p = products.get(l.productId)
+      const ordered = Number(l.quantity) || 0
+      const receivedQty = Number(l.receivedQuantity) || 0
       return [
-        String(o.createdAt).slice(0, 10), o.status, suppliers.get(o.supplierId) ?? '', p?.name ?? '', p?.sku ?? '',
-        l.quantity, money(l.unitCostCents), money(l.quantity * l.unitCostCents), receivedAt.get(String(o._id)) ?? '', o.notes ?? ''
+        String(o.orderDate ?? o.createdAt ?? '').slice(0, 10), o.orderNo ?? '', o.status, suppliers.get(o.supplierId) ?? '', p?.name ?? '', p?.sku ?? '',
+        ordered, receivedQty, Math.max(0, ordered - receivedQty), money(l.unitCostCents), money(ordered * l.unitCostCents), receivedAt.get(String(o._id)) ?? '', o.notes ?? ''
       ]
     })
   )
-  const head: Cell[] = ['Order date', 'Status', 'Supplier', 'Product', 'SKU', 'Quantity', 'Unit cost', 'Line total', 'Received', 'Notes']
-  const totals: Cell[] = ['Total', '', '', '', '', sum(rows, 5), '', sum(rows, 7), '', '']
+  const head: Cell[] = ['Order date', 'PO no.', 'Status', 'Supplier', 'Product', 'SKU', 'Ordered', 'Received', 'Remaining', 'Unit cost', 'Line total', 'Last received', 'Notes']
+  const totals: Cell[] = ['Total', '', '', '', '', '', sum(rows, 6), sum(rows, 7), sum(rows, 8), '', sum(rows, 10), '', '']
   return { data: writeXlsx([head, ...rows, totals], 'purchasing'), count: orders.length, name }
 }

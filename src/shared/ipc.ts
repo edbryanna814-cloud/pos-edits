@@ -1,4 +1,4 @@
-import type { CompanySettings, StoredCompanySettings } from './settings'
+﻿import type { CompanySettings, StoredCompanySettings } from './settings'
 import type { ReturnableLine } from './returns'
 import type { AttendanceDay, AttendanceImportResult, SellerKpi } from './attendance'
 import type { Customer } from './customers'
@@ -50,9 +50,12 @@ export const IPC = {
   InvStockAdjust: 'inv:stock:adjust',
   InvSuppliersList: 'inv:suppliers:list',
   InvSuppliersCreate: 'inv:suppliers:create',
+  InvSuppliersUpdate: 'inv:suppliers:update',
   InvPOList: 'inv:po:list',
   InvPOCreate: 'inv:po:create',
   InvPOReceive: 'inv:po:receive',
+  InvPOUpdate: 'inv:po:update',
+  InvPOReceiptsList: 'inv:po:receipts:list',
   InvImportPreview: 'inv:import:preview',
   InvImportConfirm: 'inv:import:confirm',
   AttendanceImport: 'attendance:import',
@@ -156,10 +159,12 @@ export interface PreloadApi {
   invStockAdjust(input: { productId: string; quantity: number; reason: string }): Promise<StockMovement>
   invSuppliersList(): Promise<Supplier[]>
   invSuppliersCreate(input: Partial<Supplier>): Promise<Supplier>
+  invSuppliersUpdate(id: string, input: Partial<Supplier>): Promise<Supplier>
   invPOList(): Promise<PurchaseOrder[]>
   invPOCreate(input: Partial<PurchaseOrder>): Promise<PurchaseOrder>
-  invPOReceive(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt>
-  posCheckout(input: any): Promise<Sale>
+  invPOReceive(purchaseOrderId: string, input?: { lines?: { productId: string; receivedQuantity?: number; damagedQuantity?: number }[]; notes?: string; receivedBy?: string } | string): Promise<PurchaseReceipt>
+  invPOUpdate(id: string, input: Partial<PurchaseOrder>): Promise<PurchaseOrder>
+  invPOReceiptsList(purchaseOrderId?: string): Promise<PurchaseReceipt[]>
   invImportPreview(): Promise<ProductImportPreview | null>
   invImportConfirm(batchId: string): Promise<{ added: number; skipped: number }>
   attendanceImport(): Promise<AttendanceImportResult | null>
@@ -174,6 +179,7 @@ export interface PreloadApi {
   customersList(): Promise<Customer[]>
   customersCreate(input: Partial<Customer>): Promise<Customer>
   customersUpdate(id: string, input: Partial<Customer>): Promise<Customer>
+  posCheckout(input: any): Promise<Sale>
   posSalesList(): Promise<Sale[]>
   posReturn(input: { saleId: string; reason: string; lineIndex?: number }): Promise<Return>
   posReturnable(): Promise<ReturnableLine[]>
@@ -189,3 +195,5 @@ export interface PreloadApi {
   licenseStatus(): Promise<LicenseState>
   licenseApply(code: string): Promise<LicenseState>
 }
+
+

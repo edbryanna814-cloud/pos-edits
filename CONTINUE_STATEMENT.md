@@ -1,131 +1,38 @@
-# CONTINUE STATEMENT — Continue the Existing Project
+# CONTINUE EXISTING FEATURE EXPANSION
 
-Continue working on the existing project from its actual current state.
+Continue working on the EXISTING application from the exact point where you stopped.
 
-Do not restart the project.
+Before doing anything:
 
-Do not recreate existing features.
+1. Read MASTER_PROMPT.md.
+2. Read SAFE_EXPANSION_AUDIT.md.
+3. Read FEATURE_EXPANSION_PLAN.md.
+4. Read the latest PHASE_X_COMPLETION_REPORT.md.
+5. Inspect the actual repository and current implementation.
+6. Identify completed, partially completed, and pending features.
 
-Do not replace working architecture unnecessarily.
+IMPORTANT:
 
-## 1. Read Project Documentation
+- Do not restart the project.
+- Do not rebuild existing modules.
+- Do not remove or replace existing functionality.
+- Do not reset the database.
+- Do not repeat completed work unnecessarily.
+- Do not assume a feature is complete just because documentation says so.
+- Verify actual implementation and tests.
 
-Before continuing, read:
+Resume from the first incomplete task in the implementation roadmap.
 
-- MASTER_PROMPT.md
-- ARCHITECTURE.md
-- AGENTS.md
-- IMPLEMENTATION_ROADMAP.md
-- START_HERE.md
-- DEVICE_LICENSING.md
+Continue implementing the remaining requested features using Big Pickle and Ponytail FULL mode.
 
-## 2. Inspect Current State
+Run Playwright visual tests using the actual running application.
 
-Inspect:
+Open the browser visibly and verify functionality before proceeding.
 
-- Git status.
-- Recent changes.
-- Existing files.
-- Current modules.
-- Existing database structures.
-- Existing tests.
-- Previous implementation reports.
+Update the phase completion report after every completed phase.
 
-Determine:
+Keep working through all remaining phases until every requested feature is implemented and verified.
 
-- Last completed phase.
-- Current phase.
-- Incomplete tasks.
-- Failed tests.
-- Existing defects.
+If context becomes limited, save the exact progress, modified files, test results, and next task so work can resume without losing progress.
 
-## 3. Continue From the Exact Point
-
-Continue from the first genuinely incomplete acceptance criterion.
-
-Do not repeat completed tasks unless a defect requires it.
-
-Do not implement future phases without approval.
-
-Do not rewrite working code.
-
-## 4. Preserve Project Requirements
-
-Remember:
-
-- One company.
-- Electron.
-- React.
-- TypeScript.
-- Vite.
-- Node.js.
-- MongoDB.
-- CRM.
-- POS.
-- Inventory.
-- Cashbox.
-- Reports.
-- Monthly software subscription.
-- Hardware-based device licensing.
-
-## 5. Mandatory Licensing Rules
-
-- Device limits are configurable by administration per license.
-- Backend enforces device limits.
-- Hardware fingerprint uses multiple available identifiers.
-- MAC address alone is insufficient.
-- Device replacement requires administrator approval.
-- Private signing key remains on trusted backend.
-- Desktop verifies signed entitlements using a public key.
-- Do not trust local editable files as licensing authority.
-- Do not invent offline grace duration.
-- Never delete business data because of licensing problems.
-
-## 6. Testing
-
-After each meaningful implementation:
-
-1. Run focused unit tests.
-2. Run integration tests.
-3. Run relevant regression tests.
-4. Launch the actual application.
-5. Use Playwright.
-6. Use Electron automation when needed.
-7. Inspect errors.
-8. Report actual results.
-
-If a visual test cannot be performed, explain exactly why.
-
-Never claim a test passed if it was not executed.
-
-## 7. If You Encounter a Blocker
-
-Do not stop with a vague message.
-
-Explain:
-
-- Exact blocker.
-- What was inspected.
-- What is already working.
-- What remains.
-- Safe alternatives.
-- What decision or information is needed from the owner.
-
-## 8. End-of-Session Report
-
-Always provide:
-
-- Current phase.
-- Last completed task.
-- Current unfinished task.
-- Files changed.
-- Tests executed.
-- Actual results.
-- Visual verification status.
-- Known defects.
-- Next exact task.
-- Owner decisions required.
-
-Continue with the smallest useful task.
-
-Do not abandon unfinished implementation simply because a session is ending.
+**Do not stop voluntarily while there are remaining implementation tasks.**

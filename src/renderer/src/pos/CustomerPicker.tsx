@@ -21,17 +21,17 @@ export default function CustomerPicker({ language, selected, onSelect }: { langu
   const [error, setError] = useState('')
 
   useEffect(() => {
-    window.api.customersList().then(setCustomers).catch(() => setCustomers([]))
+    window.api.customersList().then((list) => setCustomers(list.filter((c) => c.active !== false))).catch(() => setCustomers([]))
   }, [])
 
   async function add(): Promise<void> {
     setError('')
     try {
-      const created = await window.api.customersCreate({ ...form, discountBasisPoints: percentInput(form.discount) })
-      setCustomers((list) => [...list, created])
+      const created = await window.api.customersCreate({ ...form, discountBasisPoints: percentInput(form.discount), active: true })
+      if (created.active !== false) setCustomers((list) => [...list, created])
       setAdding(false)
       setForm({ name: '', phone: '', nationalId: '', discount: '' })
-      onSelect(created)
+      onSelect(created.active !== false ? created : null)
     } catch (err) {
       setError(customerErrorText(language, err))
     }

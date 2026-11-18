@@ -280,6 +280,8 @@ export async function createSupplier(input: Partial<Supplier>): Promise<Supplier
     phone: input.phone ? String(input.phone).trim() : undefined,
     email: input.email ? String(input.email).trim() : undefined,
     address: input.address ? String(input.address).trim() : undefined,
+    taxInfo: input.taxInfo ? String(input.taxInfo).trim() : undefined,
+    notes: input.notes ? String(input.notes).trim() : undefined,
     active: input.active !== false,
     createdAt: now,
     updatedAt: now
@@ -289,112 +291,211 @@ export async function createSupplier(input: Partial<Supplier>): Promise<Supplier
   return { ...sup, _id: r.insertedId.toString() }
 }
 
+export async function updateSupplier(id: string, input: Partial<Supplier>): Promise<Supplier> {
+  const db = requireDb()
+  if (!ObjectId.isValid(id)) throw new Error('Invalid supplier')
+  const _id = new ObjectId(id)
+  const current = await db.collection(SUPPLIERS).findOne({ _id })
+  if (!current) throw new Error('Supplier not found')
+  const set: any = { updatedAt: new Date().toISOString() }
+  if (input.name !== undefined) set.name = requireText(input.name, 'Supplier name')
+  if (input.contact !== undefined) set.contact = input.contact ? String(input.contact).trim() : undefined
+  if (input.phone !== undefined) set.phone = input.phone ? String(input.phone).trim() : undefined
+  if (input.email !== undefined) set.email = input.email ? String(input.email).trim() : undefined
+  if (input.address !== undefined) set.address = input.address ? String(input.address).trim() : undefined
+  if (input.taxInfo !== undefined) set.taxInfo = input.taxInfo ? String(input.taxInfo).trim() : undefined
+  if (input.notes !== undefined) set.notes = input.notes ? String(input.notes).trim() : undefined
+  if (input.active !== undefined) set.active = Boolean(input.active)
+  const updated = await db.collection(SUPPLIERS).findOneAndUpdate({ _id } as any, { $set: set }, { returnDocument: 'after' })
+  if (!updated) throw new Error('Supplier not found')
+  await logAudit({ action: 'inventory.supplier.update', resource: 'inv_suppliers', resourceId: id })
+  return withStringId(updated as any) as Supplier
+}
+
 export async function listPO(): Promise<PurchaseOrder[]> {
   const db = requireDb()
   return (await db.collection<PurchaseOrder>(PO).find({}).sort({ createdAt: -1 }).toArray()).map(withStringId)
 }
-export async function createPO(input: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
+
+export async function listReceipts(purchaseOrderId?: string): Promise<PurchaseReceipt[]> {
   const db = requireDb()
-  if (!ObjectId.isValid(String(input.supplierId || ''))) throw new Error('Supplier is required')
-  const supplier = await db.collection(SUPPLIERS).findOne({ _id: new ObjectId(String(input.supplierId)) } as any)
-  if (!supplier) throw new Error('Supplier not found')
-  const rawLines = Array.isArray(input.lines) ? input.lines : []
-  if (rawLines.length === 0) throw new Error('Add at least one line item')
+  const filter = purchaseOrderId ? { purchaseOrderId } : {}
+  return (await db.collection<PurchaseReceipt>(RECEIPTS).find(filter as any).sort({ receivedAt: -1, createdAt: -1 }).toArray()).map(withStringId)
+}
+
+const PO_STATUSES = new Set(['draft', 'pending_approval', 'approved', 'sent', 'ordered', 'partially_received', 'received', 'completed', 'canceled'])
+const genNo = (prefix: string) => `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+const isoDate = (value: unknown) => {
+  if (value === undefined || value === null || value === '') return undefined
+  const s = String(value).trim()
+  if (!/^\d{4}-\d{2}-\d{2}/.test(s)) throw new Error('Invalid date')
+  return s.slice(0, 10)
+}
+
+async function normalizePoLines(db: Db, rawLines: unknown, existing?: PurchaseOrderLine[]): Promise<PurchaseOrderLine[]> {
+  const arr = Array.isArray(rawLines) ? rawLines : []
+  if (arr.length === 0) throw new Error('Add at least one line item')
+  const prev = new Map((existing ?? []).map((l) => [l.productId, l]))
   const lines: PurchaseOrderLine[] = []
-  for (const raw of rawLines) {
+  for (const raw of arr) {
     const productId = String((raw as any)?.productId || '')
     if (!ObjectId.isValid(productId)) throw new Error('Invalid product in purchase order')
     const product = await db.collection(PRODUCTS).findOne({ _id: new ObjectId(productId) } as any)
     if (!product) throw new Error('Product not found in purchase order')
-    lines.push({
-      productId,
-      quantity: toInteger((raw as any)?.quantity, 'Line quantity', 1),
-      unitCostCents: toInteger((raw as any)?.unitCostCents ?? 0, 'Line unit cost')
-    })
+    const quantity = toInteger((raw as any)?.quantity, 'Line quantity', 1)
+    const kept = prev.get(productId)
+    const receivedQuantity = Math.max(0, Math.min(quantity, toInteger((raw as any)?.receivedQuantity ?? kept?.receivedQuantity ?? 0, 'Received quantity', 0)))
+    lines.push({ productId, quantity, unitCostCents: toInteger((raw as any)?.unitCostCents ?? 0, 'Line unit cost'), ...(receivedQuantity ? { receivedQuantity } : {}) })
   }
-  const status = ['draft', 'ordered', 'canceled'].includes(String(input.status))
-    ? (input.status as PurchaseOrder['status'])
-    : 'draft'
+  return lines
+}
+
+export async function createPO(input: Partial<PurchaseOrder>, actor?: string): Promise<PurchaseOrder> {
+  const db = requireDb()
+  if (!ObjectId.isValid(String(input.supplierId || ''))) throw new Error('Supplier is required')
+  const supplier = await db.collection(SUPPLIERS).findOne({ _id: new ObjectId(String(input.supplierId)) } as any)
+  if (!supplier) throw new Error('Supplier not found')
+  const lines = await normalizePoLines(db, input.lines)
+  const status = PO_STATUSES.has(String(input.status)) ? (input.status as PurchaseOrder['status']) : 'draft'
+  if (status === 'partially_received' || status === 'received' || status === 'completed') throw new Error('Invalid purchase order status')
   const now = new Date().toISOString()
   const po: any = {
+    orderNo: String(input.orderNo || '').trim() || genNo('PO'),
     supplierId: String(input.supplierId),
     status,
-    lines,
+    lines: lines.map((l) => ({ ...l, receivedQuantity: 0 })),
     totalCents: lines.reduce((sum, line) => sum + line.quantity * line.unitCostCents, 0),
-    notes: input.notes ? String(input.notes).trim() : undefined,
+    orderDate: isoDate(input.orderDate) ?? now.slice(0, 10),
+    ...(isoDate(input.expectedDeliveryDate) ? { expectedDeliveryDate: isoDate(input.expectedDeliveryDate) } : {}),
+    ...(input.notes ? { notes: String(input.notes).trim() } : {}),
+    ...(actor || input.createdBy ? { createdBy: actor || String(input.createdBy) } : {}),
     createdAt: now,
     updatedAt: now
   }
   const r = await db.collection(PO).insertOne(po)
-  await logAudit({ action: 'inventory.po.create', resource: 'inv_purchase_orders', resourceId: r.insertedId.toString() })
+  await logAudit({ action: 'inventory.po.create', resource: 'inv_purchase_orders', resourceId: r.insertedId.toString(), details: { orderNo: po.orderNo } })
   return { ...po, _id: r.insertedId.toString() }
 }
 
-export async function receivePO(purchaseOrderId: string, notes?: string): Promise<PurchaseReceipt> {
+export async function updatePO(id: string, input: Partial<PurchaseOrder>): Promise<PurchaseOrder> {
+  const db = requireDb()
+  if (!ObjectId.isValid(id)) throw new Error('Invalid purchase order')
+  const current = await db.collection<PurchaseOrder>(PO).findOne({ _id: new ObjectId(id) } as any)
+  if (!current) throw new Error('Purchase order not found')
+  if (current.status === 'completed' || current.status === 'received' || current.status === 'canceled') throw new Error('Purchase order cannot be edited')
+  const anyReceived = (current.lines ?? []).some((l: any) => (l.receivedQuantity ?? 0) > 0)
+  const status = input.status && PO_STATUSES.has(String(input.status)) ? (input.status as PurchaseOrder['status']) : current.status
+  const supplierId = input.supplierId !== undefined ? String(input.supplierId) : current.supplierId
+  if (!ObjectId.isValid(supplierId)) throw new Error('Supplier is required')
+  const supplier = await db.collection(SUPPLIERS).findOne({ _id: new ObjectId(supplierId) } as any)
+  if (!supplier) throw new Error('Supplier not found')
+  const lines: PurchaseOrderLine[] = input.lines ? await normalizePoLines(db, input.lines, current.lines as any) : ((current.lines ?? []) as PurchaseOrderLine[])
+  if (anyReceived) {
+    for (const l of lines) {
+      const prev = (current.lines as any[]).find((x) => x.productId === l.productId)
+      if (!prev || l.quantity < (prev.receivedQuantity ?? 0)) throw new Error('Cannot reduce quantity below received')
+    }
+  }
+  const allDone = lines.length > 0 && lines.every((l) => (l.receivedQuantity ?? 0) >= l.quantity)
+  const nextStatus = status === 'canceled' ? 'canceled' : anyReceived ? (allDone ? (status === 'completed' ? 'completed' : 'received') : 'partially_received') : status
+  const now = new Date().toISOString()
+  const set: any = { supplierId, status: nextStatus, lines, totalCents: lines.reduce((sum: number, line: PurchaseOrderLine) => sum + line.quantity * line.unitCostCents, 0), updatedAt: now }
+  if (input.orderDate !== undefined) { const d = isoDate(input.orderDate); if (d) set.orderDate = d }
+  if (input.expectedDeliveryDate !== undefined) { const d = isoDate(input.expectedDeliveryDate); set.expectedDeliveryDate = d }
+  if (input.notes !== undefined) set.notes = input.notes ? String(input.notes).trim() : undefined
+  const updated = await db.collection(PO).findOneAndUpdate({ _id: new ObjectId(id) } as any, { $set: set }, { returnDocument: 'after' })
+  if (!updated) throw new Error('Purchase order not found')
+  await logAudit({ action: 'inventory.po.update', resource: 'inv_purchase_orders', resourceId: id })
+  return withStringId(updated as any) as PurchaseOrder
+}
+
+export async function receivePO(purchaseOrderId: string, input?: { lines?: { productId: string; receivedQuantity?: number; damagedQuantity?: number }[]; notes?: string; receivedBy?: string } | string): Promise<PurchaseReceipt> {
   const db = requireDb()
   if (!ObjectId.isValid(purchaseOrderId)) throw new Error('Invalid purchase order')
   const po = await db.collection<PurchaseOrder>(PO).findOne({ _id: new ObjectId(purchaseOrderId) } as any)
   if (!po) throw new Error('Purchase order not found')
-  if (po.status === 'received') throw new Error('Purchase order already received')
   if (po.status === 'canceled') throw new Error('Canceled purchase order cannot be received')
-  const lines = Array.isArray(po.lines) ? po.lines : []
-  if (lines.length === 0) throw new Error('Purchase order has no line items')
+  const poLines = Array.isArray(po.lines) ? (po.lines as any[]) : []
+  if (poLines.length === 0) throw new Error('Purchase order has no line items')
+  const payload = typeof input === 'string' ? { notes: input } : (input ?? {})
+  const byId = new Map((payload.lines ?? []).map((l) => [String(l.productId), l]))
+  const now = new Date().toISOString()
+  const receiptLines: any[] = []
+  const updates: { index: number; accepted: number }[] = []
+  for (let i = 0; i < poLines.length; i++) {
+    const line = poLines[i]
+    const ordered = toInteger(line.quantity, 'Line quantity', 1)
+    const prev = Math.max(0, toInteger(line.receivedQuantity ?? 0, 'Received quantity', 0))
+    const remaining = ordered - prev
+    const explicit = byId.get(String(line.productId))
+    const receivedQtyRaw = explicit ? explicit.receivedQuantity : (payload.lines && payload.lines.length ? 0 : remaining)
+    const receivedQty = toInteger(receivedQtyRaw ?? 0, 'Received quantity', 0)
+    const damagedQty = explicit ? toInteger(explicit.damagedQuantity ?? 0, 'Damaged quantity', 0) : 0
+    if (receivedQty === 0) continue
+    if (damagedQty > receivedQty) throw new Error('Damaged quantity exceeds received quantity')
+    const accepted = receivedQty - damagedQty
+    if (accepted <= 0) throw new Error('Accepted quantity must be greater than zero')
+    if (accepted > remaining) throw new Error('Received quantity exceeds remaining quantity')
+    receiptLines.push({ productId: String(line.productId), quantity: accepted, ...(damagedQty ? { damagedQuantity: damagedQty } : {}), remainingQuantity: remaining - accepted, unitCostCents: line.unitCostCents })
+    updates.push({ index: i, accepted })
+  }
+  if (receiptLines.length === 0) throw new Error('No quantities to receive')
 
   const client = getClient()
   if (!client) throw new Error('Database unavailable')
   const session = client.startSession()
-  const now = new Date().toISOString()
-  let receiptId: string
+  let receiptId = ''
+  const supplyNo = genNo('SUP')
   try {
     receiptId = await session.withTransaction(async () => {
-      for (const line of lines) {
-        const quantity = toInteger(line.quantity, 'Line quantity', 1)
+      for (const line of receiptLines) {
         const result = await db.collection(PRODUCTS).updateOne(
           { _id: new ObjectId(line.productId) } as any,
-          { $inc: { stockQuantity: quantity }, $set: { updatedAt: now } },
+          { $inc: { stockQuantity: line.quantity }, $set: { updatedAt: now } },
           { session }
         )
         if (result.matchedCount !== 1) throw new Error('Product not found in purchase order')
         await db.collection(STOCK).insertOne(
-          {
-            productId: line.productId,
-            type: 'purchase',
-            quantity,
-            reason: `Purchase order received`,
-            reference: purchaseOrderId,
-            createdAt: now
-          },
+          { productId: line.productId, type: 'purchase', quantity: line.quantity, reason: 'Supply order received', reference: purchaseOrderId, createdAt: now },
           { session }
         )
       }
+      const fresh = await db.collection(PO).findOne({ _id: new ObjectId(purchaseOrderId) } as any, { session })
+      if (!fresh) throw new Error('Purchase order not found')
+      if (fresh.status === 'canceled') throw new Error('Canceled purchase order cannot be received')
+      const freshLines = [...((fresh.lines ?? []) as any[])]
+      for (const u of updates) {
+        const ordered = toInteger(freshLines[u.index].quantity, 'Line quantity', 1)
+        const prev = toInteger(freshLines[u.index].receivedQuantity ?? 0, 'Received quantity', 0)
+        if (prev + u.accepted > ordered) throw new Error('Received quantity exceeds remaining quantity')
+        freshLines[u.index] = { ...freshLines[u.index], receivedQuantity: prev + u.accepted }
+      }
+      const done = freshLines.every((l) => (l.receivedQuantity ?? 0) >= l.quantity)
+      const nextStatus = done ? (fresh.status === 'completed' ? 'completed' : 'received') : 'partially_received'
+      await db.collection(PO).updateOne(
+        { _id: new ObjectId(purchaseOrderId) } as any,
+        { $set: { lines: freshLines, status: nextStatus, updatedAt: now } },
+        { session }
+      )
       const receipt: any = {
+        supplyNo,
         purchaseOrderId,
         receivedAt: now,
-        lines,
-        notes: notes ? String(notes).trim() : undefined,
+        ...(payload.receivedBy ? { receivedBy: String(payload.receivedBy) } : {}),
+        lines: receiptLines,
+        ...(payload.notes ? { notes: String(payload.notes).trim() } : {}),
         createdAt: now
       }
       const inserted = await db.collection(RECEIPTS).insertOne(receipt, { session })
-      await db.collection(PO).updateOne(
-        { _id: new ObjectId(purchaseOrderId) } as any,
-        { $set: { status: 'received', updatedAt: now } },
-        { session }
-      )
       return inserted.insertedId.toString()
     })
   } finally {
     await session.endSession()
   }
-  await logAudit({ action: 'inventory.po.receive', resource: 'inv_purchase_orders', resourceId: purchaseOrderId })
-  return {
-    _id: receiptId,
-    purchaseOrderId,
-    receivedAt: now,
-    lines,
-    notes: notes ? String(notes).trim() : undefined,
-    createdAt: now
-  }
+  await logAudit({ action: 'inventory.po.receive', resource: 'inv_purchase_orders', resourceId: purchaseOrderId, details: { receiptId, supplyNo } })
+  return { _id: receiptId, supplyNo, purchaseOrderId, receivedAt: now, ...(payload.receivedBy ? { receivedBy: String(payload.receivedBy) } : {}), lines: receiptLines, ...(payload.notes ? { notes: String(payload.notes).trim() } : {}), createdAt: now } as any
 }
+
 
 // Deleting. Sales, returns and receipts keep their own copy of names, so history stays readable.
 
@@ -421,13 +522,13 @@ export async function deleteProduct(id: unknown): Promise<{ ok: true }> {
   const _id = objectId(id, 'Product')
   const product = await db.collection(PRODUCTS).findOne({ _id })
   if (!product) throw new Error('Product not found')
-  if (await db.collection(PO).findOne({ status: { $in: ['draft', 'ordered'] }, 'lines.productId': String(id) })) throw new Error('PRODUCT_ON_OPEN_ORDER')
+  if (await db.collection(PO).findOne({ status: { $nin: ['received', 'completed', 'canceled'] }, 'lines.productId': String(id) })) throw new Error('PRODUCT_ON_OPEN_ORDER')
   await db.collection(PRODUCTS).deleteOne({ _id })
   await logAudit({ action: 'inventory.product.delete', resource: PRODUCTS, resourceId: String(id), details: { name: product.name, sku: product.sku, stockQuantity: product.stockQuantity } })
   return { ok: true }
 }
 
-/** Refused while any purchase order names the supplier (deactivate it instead). */
+/** Refused when the supplier is referenced by purchase orders. */
 export async function deleteSupplier(id: unknown): Promise<{ ok: true }> {
   const db = requireDb()
   const _id = objectId(id, 'Supplier')

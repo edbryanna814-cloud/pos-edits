@@ -94,7 +94,9 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'invImportPreview',
         'invPOCreate',
         'invPOList',
+        'invPOReceiptsList',
         'invPOReceive',
+        'invPOUpdate',
         'invProductsCreate',
         'invProductsDelete',
         'invProductsList',
@@ -105,6 +107,7 @@ test.describe.serial('Phase 2 - database and settings', () => {
         'invSuppliersCreate',
         'invSuppliersDelete',
         'invSuppliersList',
+        'invSuppliersUpdate',
         'invUnitsCreate',
         'invUnitsList',
         'kpiSellers',
@@ -670,13 +673,15 @@ test('receives cartons and sells whole boxes in base units', async () => {
       return {
         blocked, supplierBlocked,
         category: (await api.invCategoriesList()).some((c: any) => c.name === 'Temp category'),
-        mona: (await api.customersList()).some((c: any) => c.name === 'Mona'),
+        mona: (await api.customersList()).find((c: any) => c.name === 'Mona'),
         noRet: (await api.invProductsList()).some((x: any) => x.sku === 'NO-RET')
       }
     })
     expect(del.blocked).toContain('PRODUCT_ON_OPEN_ORDER')
     expect(del.supplierBlocked).toContain('SUPPLIER_HAS_ORDERS')
-    expect([del.category, del.mona, del.noRet]).toEqual([false, false, false])
+    expect(del.category).toBe(false)
+    expect(del.mona?.active).toBe(false)
+    expect(del.noRet).toBe(false)
     // Reports for managers: sales and purchasing as Excel for a date range; a bad range is refused.
     const today = new Date().toLocaleDateString('en-CA')
     for (const kind of ['sales', 'purchasing'] as const) {

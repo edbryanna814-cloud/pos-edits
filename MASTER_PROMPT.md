@@ -1,575 +1,948 @@
-# MASTER PROMPT — Electron CRM + POS + Inventory + Subscription System
+# MASTER PROMPT — SAFE FEATURE EXPANSION
+## Existing Application Enhancement — Big Pickle + Ponytail
 
-## 1. Your Role
+You are working on an EXISTING, FUNCTIONAL application. Your task is to extend it with new features while preserving every existing feature, workflow, UI component, business rule, database record, integration, and working behavior.
 
-You are an autonomous senior software engineering team working through OpenCode using Big Pickle and Ponytail.
+This is NOT a rebuild, redesign from scratch, replacement, or migration to a different architecture.
 
-Your mission is to inspect, build, test, improve, and maintain a complete desktop business management application.
+Your highest priority is:
 
-You must work incrementally, preserve existing functionality, avoid unnecessary complexity, and never claim that something works without actually testing it.
+**ADD FEATURES WITHOUT BREAKING, REMOVING, RESETTING, OR REPLACING ANYTHING THAT ALREADY WORKS.**
 
-Use the existing project files and supplied HTML designs whenever available.
-
----
-
-## 2. Project Overview
-
-Build a professional desktop application for ONE company.
-
-The system combines:
-
-1. CRM
-2. POS
-3. Inventory Management
-4. Suppliers and Purchasing
-5. Cashbox and Treasury
-6. Expenses
-7. Financial and Operational Reports
-8. Users, Roles and Permissions
-9. Monthly Software Subscription
-10. Hardware-Based Device Licensing
-
-This is NOT a multi-company SaaS platform.
-
-Do not introduce multi-tenancy unless explicitly requested.
-
-### Technology Stack
-
-- Electron
-- React
-- TypeScript
-- Vite
-- Node.js
-- MongoDB
-
-Do not use NestJS or Next.js.
-
-Do not replace the requested technology stack without explicit approval.
+Use Big Pickle as the primary implementation agent and Ponytail as the engineering simplification and review workflow.
 
 ---
 
-## 3. Operating Modes
+# 1. NON-NEGOTIABLE RULES
 
-The application must support two explicitly configured operating modes.
+1. Inspect the entire existing repository before changing anything.
+2. Understand the current architecture, database models, API routes, UI pages, permissions, POS workflow, invoices, inventory, and existing tests.
+3. Do not delete existing files or features unless I explicitly authorize it.
+4. Do not replace existing working implementations simply because you prefer another approach.
+5. Do not rename existing database collections, fields, routes, or components without a verified compatibility requirement.
+6. Do not reset, drop, truncate, or overwrite existing MongoDB data.
+7. Do not introduce breaking database migrations.
+8. Reuse existing components, utilities, services, and dependencies whenever possible.
+9. Follow the current project's architecture and coding conventions.
+10. Do not introduce unnecessary libraries, abstractions, services, or dependencies.
+11. Keep all existing functionality working.
+12. Every new feature must integrate with the existing application instead of becoming a disconnected module.
+13. Preserve existing UI styling and design language. Improve visual quality where necessary without destroying the current identity.
+14. Maintain backward compatibility with existing records and invoices.
+15. Never use mock data as a replacement for real application functionality.
 
-### Local Mode
+## Before modifying anything
 
-- Business data is stored locally using a properly installed and managed MongoDB service.
-- The application can operate without a remote application backend.
-- Database availability must be checked.
-- Local database startup and connection failures must be handled clearly.
-- Backup and restore must be supported.
+Create:
 
-MongoDB is NOT an embedded database.
+`SAFE_EXPANSION_AUDIT.md`
 
-You must investigate and document:
+Include:
+- Existing project architecture.
+- Existing modules and features.
+- Existing database collections and relationships.
+- Existing POS and invoice workflows.
+- Existing authentication and authorization.
+- Existing financial calculations.
+- Existing printing implementation.
+- Existing backup implementation, if any.
+- Existing testing setup.
+- Files that each requested feature needs to modify.
+- Potential risks and compatibility requirements.
 
-- MongoDB installation.
-- MongoDB service startup.
-- MongoDB service health.
-- Database permissions.
-- Database upgrades.
-- Backup and restore.
-- Uninstallation behavior.
+Then create:
 
-Do not claim MongoDB is bundled or embedded unless an actual supported deployment solution has been implemented and tested.
+`FEATURE_EXPANSION_PLAN.md`
 
-### Backend Mode
+Map all 11 requested features to the existing application and explain how each one will be integrated safely.
 
-The application may connect to an existing backend API when the owner supplies its actual details.
-
-Never assume a backend exists.
-
-Never invent:
-
-- API endpoints.
-- Authentication contracts.
-- Database schemas.
-- Payment endpoints.
-- Credentials.
-
-Do not silently switch between Local Mode and Backend Mode.
-
-Do not implement automatic synchronization in the first release unless explicitly requested.
-
-### Database Security
-
-The Electron renderer must never connect directly to MongoDB.
-
-All database operations must be performed through trusted application services.
+After completing the audit and plan, proceed with implementation. Do not stop after writing documentation.
 
 ---
 
-## 4. Main Modules
+# 2. NEW FEATURES
 
-### Module A — CRM
+## FEATURE 01 — Financial Treasury / Cashbox
 
-Implement:
+Create a dedicated Treasury (الخزنة) module.
 
-- Customers and contacts.
-- Companies.
-- Leads.
-- Deals and opportunities.
-- Customer notes.
-- Activities and reminders.
-- Customer communication history.
-- Customer timeline.
-- Purchase history.
-- Customer search and filtering.
-- Customer categories and tags.
+Its responsibility is tracking MONEY MOVEMENTS ONLY.
 
-Each customer should have a complete profile.
+It must be connected to the existing sales and purchasing workflows.
 
-### Module B — POS
+### Required functionality
 
-Implement:
-
-- Cashier interface.
-- Product search.
-- Barcode scanning.
-- SKU search.
-- Product name search.
-- Shopping cart.
-- Quantity management.
-- Discounts.
-- Configurable taxes.
-- Customer selection.
-- Walk-in customers.
-- Multiple payment methods.
-- Cash payments.
-- Card payments.
-- Other configured payment methods.
-- Invoice generation.
-- Receipt printing.
-- Sales history.
-- Returns and refunds.
-- Cashier shifts.
-
-The POS must be fast and practical.
-
-Support keyboard-based workflows where appropriate.
-
-### Module C — Inventory
-
-Implement:
-
-- Products.
-- Categories.
-- Units.
-- SKU.
-- Barcode.
-- Purchase cost.
-- Selling price.
-- Stock quantity.
-- Stock movements.
-- Stock adjustments.
-- Inventory transfers only if required by the actual single-company workflow.
-- Low-stock alerts.
-- Inventory history.
-- Suppliers.
-- Purchase orders.
-- Goods receiving.
-
-Every stock change must have a recorded reason and source.
-
-### Module D — Cashbox and Treasury
-
-Implement:
-
-- Cashbox management.
+- Cash received from sales.
+- Cash paid for purchases.
+- Money received.
+- Money paid.
+- Current cash balance.
 - Opening balance.
 - Closing balance.
-- Cash in.
-- Cash out.
-- Expenses.
-- Cashier shifts.
-- Cash reconciliation.
-- Expected balance.
-- Actual balance.
-- Variance.
 - Cash movement history.
+- Movement date and time.
+- Movement reference.
+- Transaction type.
+- Payment method.
+- Description and notes.
+- User responsible for the transaction.
 
-### Module E — Reports
+### Financial rules
 
-Implement:
+1. Sales payments must increase the treasury balance according to the actual amount received.
+2. Purchase payments must decrease the treasury balance according to the actual amount paid.
+3. Partial payments must be supported.
+4. Credit transactions must not be counted as received or paid money until an actual payment occurs.
+5. Refunds must create appropriate reverse financial movements.
+6. Voided transactions must be handled safely without silently deleting historical financial records.
+7. Never count the same financial transaction twice.
+8. All treasury movements must be traceable to their original transaction.
+9. Prevent unauthorized modification of historical financial movements.
+10. Record who performed every financial operation.
 
+The treasury must not become another inventory or invoice management module. It manages financial movements only.
+
+---
+
+## FEATURE 02 — Suppliers and Customers
+
+Create or extend:
+
+- Suppliers management.
+- Customers management.
+
+### Suppliers
+
+Each supplier should support:
+- Name.
+- Phone number.
+- Address.
+- Email (optional).
+- Tax information (optional).
+- Notes.
+- Previous transactions.
+- Total purchases.
+- Total paid.
+- Outstanding balance.
+
+### Customers
+
+Each customer should support:
+- Name.
+- Phone number.
+- Address.
+- Email (optional).
+- Notes.
+- Sales history.
+- Total purchases.
+- Total paid.
+- Outstanding balance.
+
+### Important
+
+- Integrate suppliers with purchasing.
+- Integrate customers with POS and sales invoices.
+- Support searching and filtering.
+- Support editing and viewing transaction history.
+- Prevent deleting records that are referenced by financial or commercial transactions.
+- Use archive/deactivation where appropriate.
+
+Do not create duplicate customer or supplier systems if they already exist.
+
+---
+
+## FEATURE 03 — Purchasing: Supply Orders and Purchase Orders
+
+Improve the existing purchasing module.
+
+I need TWO separate workflows:
+
+### A. Purchase Order (أمر شراء)
+
+This represents a request or authorization to purchase products from a supplier.
+
+Fields:
+- Purchase order number.
+- Supplier.
+- Products.
+- Quantities.
+- Expected prices.
+- Order date.
+- Expected delivery date.
+- Notes.
+- Created by.
+- Status.
+
+Suggested statuses:
+- Draft.
+- Pending approval.
+- Approved.
+- Sent to supplier.
+- Partially received.
+- Completed.
+- Cancelled.
+
+### B. Supply Order (أمر توريد)
+
+This represents the actual delivery/receipt of goods from the supplier.
+
+Fields:
+- Supply order number.
+- Related purchase order.
+- Supplier.
+- Received products.
+- Received quantities.
+- Damaged quantities, if applicable.
+- Remaining quantities.
+- Receipt date.
+- Receiving employee.
+- Notes.
+
+### Business logic
+
+- Creating a purchase order must not automatically increase inventory.
+- Receiving goods through a supply order updates inventory according to the actual accepted quantities.
+- Partial deliveries must be supported.
+- Multiple supply orders can belong to one purchase order.
+- Do not allow receiving quantities that violate the remaining order quantities without an authorized exception.
+- Purchase invoices must be linked to the correct supplier and purchasing records.
+- Avoid duplicate stock additions.
+
+Integrate with the existing inventory and product management systems.
+
+---
+
+## FEATURE 04 — Reports Center
+
+Create a unified Reports Center.
+
+I need to generate, view, filter, print, and export reports for both SALES and PURCHASES.
+
+### Sales reports
 - Daily sales.
 - Weekly sales.
 - Monthly sales.
+- Custom date range.
 - Sales by product.
 - Sales by customer.
-- Returns.
-- Discounts.
-- Taxes.
-- Cost of goods sold.
-- Gross profit.
-- Expenses.
-- Cashbox movements.
-- Inventory valuation.
-- Low-stock reports.
-- Cashier performance.
-- Payment method reports.
+- Sales by employee.
+- Sales by payment method.
+- Sales returns.
+- Cancelled invoices.
+- Total received money.
+- Outstanding customer balances.
 
-Reports must reconcile with their underlying business records.
+### Purchasing reports
+- Daily purchases.
+- Weekly purchases.
+- Monthly purchases.
+- Custom date range.
+- Purchases by supplier.
+- Purchases by product.
+- Purchase returns.
+- Outstanding supplier balances.
+- Total paid.
+- Unpaid purchases.
 
-### Module F — Users and Permissions
+### Report functionality
 
-Implement:
+- Date range filters.
+- Search.
+- Sorting.
+- Pagination.
+- Summary totals.
+- Print.
+- PDF export.
+- Excel export.
+- CSV export.
 
-- Users.
-- Roles.
-- Permissions.
-- Login and session management.
-- User activity history.
-- Audit logs.
-
-Examples of roles:
-
-- Administrator.
-- Manager.
-- Cashier.
-- Inventory Manager.
-- Accountant.
-- CRM Employee.
-
-Roles and permissions must be configurable.
-
-Authorization must be enforced in trusted services, not only through frontend visibility.
+Make sure all reports use real database records and accurate financial calculations.
 
 ---
 
-## 5. Financial Accuracy
+## FEATURE 05 — Sales and Purchase Invoices
 
-Financial correctness is mandatory.
+Improve the existing invoice system without breaking existing invoice records.
 
-Rules:
+### Invoice IDs
 
-- Never use JavaScript floating-point arithmetic for financial calculations.
-- Use integer minor units or a documented decimal strategy.
-- Define currency precision.
-- Define tax calculation rules.
-- Define discount calculation rules.
-- Define rounding rules.
-- Preserve historical invoice values.
-- Prevent duplicate transactions.
-- Use idempotency for checkout and payment operations.
-- Validate stock before completing sales.
-- Validate returns against original sale records.
+Make invoice identifiers shorter and more readable.
 
-A completed POS sale must keep the following consistent:
+Requirements:
+- Short human-readable invoice numbers.
+- Unique identifiers.
+- No duplicate invoice numbers.
+- Keep internal database IDs unchanged.
+- Preserve references to old invoices.
+- Existing invoices must remain accessible.
 
-- Sale record.
-- Invoice.
-- Payment record.
-- Stock movements.
-- Cashbox movements.
-- Audit event.
+Use a safe numbering strategy, for example:
 
-Verify MongoDB transaction support for the actual deployment topology.
+`INV-000123`
 
-Do not assume transactions work on standalone MongoDB.
+The format can be adapted to the existing project.
 
-If transactions are unavailable, document and implement a safe recovery strategy.
+### Invoice barcode
 
----
+Every new invoice should have a scannable barcode.
 
-## 6. Monthly Software Subscription
+Requirements:
+- Barcode represents a unique invoice reference.
+- Scanning it inside the application should open the corresponding invoice.
+- Support barcode scanning through the existing barcode scanner workflow.
+- Make the barcode available on printed invoices.
+- Preserve invoice lookup through existing search methods.
 
-> **Status (C0, D-LIC-14): panel workstream, not app screens.** Plans, prices,
-> renewal, and payment history belong to the separate, owner-controlled licence
-> panel (`docs/licensing/ADR-001-licence-authority.md`). The app never prices,
-> renews, or manages a subscription in any role. Nothing in this section is
-> implemented.
+### Company footer
 
-This subscription is the fee paid by the company to use this software.
+Every printed sales and purchase invoice must have a footer containing:
 
-It is NOT a subscription sold to the company's CRM customers.
+**ANUBIS**
 
-Panel scope (licence panel repo, not app work):
+Company name and contact information.
 
-- Subscription plans.
-- Configurable prices.
-- Configurable currency.
-- Configurable billing periods.
-- Subscription start date.
-- Current billing period.
-- Next renewal date.
-- Payment history.
-- Manual renewal.
-- Subscription status.
+Include configurable:
+- Company name.
+- Phone numbers.
+- Address.
+- Other business contact information.
 
-Suggested statuses:
+Do not hardcode fictional phone numbers or addresses. Make them configurable through application settings.
 
-- pending
-- trialing
-- active
-- past_due
-- canceled
-- expired
-- suspended
+### Invoice returns — CRITICAL
 
-Do not invent:
+Review the entire existing invoice return implementation.
 
-- Subscription prices.
-- Currency.
-- Trial duration.
-- Grace period.
-- Refund policy.
-- Cancellation policy.
-- Payment provider.
+The current behavior must support returning ONE OR MORE SELECTED ITEMS without cancelling or resetting the entire invoice.
 
-Keep payment integration provider-neutral until the owner selects a provider and supplies the required API contract.
+Required behavior:
 
-### Automated Recurring Payments
+1. Open an existing invoice.
+2. Select a specific product.
+3. Enter the quantity being returned.
+4. Calculate the refund based on the returned quantity and applicable price/discount rules.
+5. Keep all non-returned products in the original invoice.
+6. Update returned quantities correctly.
+7. Update inventory according to the existing stock rules.
+8. Record the return as a separate traceable transaction.
+9. Update financial records according to the actual refund.
+10. Allow additional partial returns later, but never exceed the remaining returnable quantity.
 
-Automatic recurring billing requires:
+Example:
 
-- Trusted backend.
-- Supported payment provider.
-- Hosted checkout or tokenization.
-- Verified server-side webhooks.
-- Idempotency.
-- Integration tests.
+Original invoice:
 
-A browser redirect is NOT proof of payment.
+- Product A: 5 units.
+- Product B: 3 units.
+- Product C: 2 units.
 
-Never store card numbers or CVV.
+Customer returns:
+- Product B: 1 unit.
 
-Never place payment gateway secrets inside Electron.
+Expected result:
+- Product A remains unchanged.
+- Product B has 1 returned unit and 2 remaining sold units.
+- Product C remains unchanged.
+- The original invoice remains available.
+- Only the correct refund is calculated.
+- Inventory and treasury are updated correctly.
+
+Never reset the entire invoice because one item is returned.
+
+Apply appropriate validation and transaction safety to prevent duplicate returns.
 
 ---
 
-## 7. Hardware-Based Device Licensing
+## FEATURE 06 — Administrator Data Reset
 
-> **Status (C0, D-LIC-14): target, not implemented.** No licensing backend
-> exists. Device limits, activation, replacement, and administration are panel
-> work in a separate private repo; the app only verifies signed entitlements.
-> See `docs/licensing/`.
+Add a button that allows an authorized administrator to reset application data in one operation.
 
-The software subscription must be protected by hardware-based device licensing.
+This is a HIGH-RISK operation.
 
-### Device Limit
+### Requirements
 
-The maximum number of devices is configurable by administration separately for each license.
+- Visible only to authorized administrators.
+- Require administrator authentication.
+- Require explicit confirmation.
+- Require typing a confirmation phrase before execution.
+- Show a clear warning explaining what will be reset.
+- Create and verify a backup before resetting.
+- Log the administrator responsible, date, and time.
+- Never allow ordinary employees to access this operation.
+
+### Reset scope
+
+Analyze the existing database and classify data before implementing the reset.
+
+Provide a clear reset preview.
+
+Do not automatically delete:
+- Application configuration.
+- Licensing information.
+- Administrator credentials.
+- Company settings.
+- Essential system configuration.
+
+The reset must target operational/business data only according to the administrator's confirmed selection.
+
+Do not execute destructive database operations against unrelated collections.
+
+---
+
+## FEATURE 07 — Optional Barcode Generator
+
+Add an optional Barcode Generator.
+
+This feature must be OPTIONAL, not mandatory.
+
+Some businesses may already have their own barcode system and do not want automatic barcode generation.
+
+### Settings
+
+Add an administrator setting:
+
+`Enable Automatic Barcode Generation`
+
+Values:
+- Enabled.
+- Disabled.
+
+### When enabled
+
+- Generate barcodes for products that need them.
+- Prevent duplicate barcodes.
+- Allow barcode printing.
+- Support barcode lookup and scanning.
+- Follow the existing product identification rules.
+
+### When disabled
+
+- Do not automatically generate barcodes.
+- Continue accepting manually entered product barcodes.
+- Continue supporting existing barcode scanning.
+- Do not break existing products.
+
+### Important
+
+Never replace existing product barcodes automatically.
+
+If a product already has a barcode, preserve it.
+
+---
+
+## FEATURE 08 — Flexible Expenses Management
+
+Create a dedicated Expenses page.
+
+The expense categories must be flexible.
+
+Examples:
+- Water.
+- Gas.
+- Electricity.
+- Internet.
+- Maintenance.
+- Repairs.
+- Transportation.
+- Rent.
+- Other expenses.
+
+But these are examples only.
+
+The administrator or authorized employee must be able to enter a custom expense name.
+
+### Expense fields
+
+- Expense title.
+- Category.
+- Amount.
+- Date.
+- Payment method.
+- Description.
+- Attachment (optional, if supported by the current architecture).
+- Employee responsible.
+- Notes.
+
+### Functionality
+
+- Add expenses.
+- Edit expenses with proper authorization.
+- View expense history.
+- Search and filter.
+- Filter by date.
+- Filter by category.
+- Print expense reports.
+- Export reports.
+
+### Financial integration
+
+When an expense is paid:
+- Record the corresponding outgoing treasury movement.
+- Update the available balance.
+- Prevent duplicate treasury entries.
+- Keep the expense linked to its treasury transaction.
+
+Unpaid expenses must not decrease the cash balance until actually paid.
+
+---
+
+## FEATURE 09 — Flexible Printing and Paper Sizes
+
+Improve printing across the application.
+
+A5 should be supported, but printing must not be limited to A5.
+
+### Required formats
+
+- A5.
+- A4.
+- A6.
+- 80mm thermal receipt.
+- 58mm thermal receipt.
+- Custom paper size where the printer supports it.
+
+### Requirements
+
+- Printer selection.
+- Paper size selection.
+- Portrait and landscape where appropriate.
+- Preview before printing.
+- Proper margins.
+- Correct scaling.
+- No clipped text.
+- No missing barcode.
+- No unnecessary blank pages.
+- Support common Windows printers.
+- Make layouts responsive to the selected paper size.
+
+Use the existing printing solution if it works.
+
+Do not introduce a new printing library unless necessary.
+
+Test actual print layouts using print preview and browser/desktop printing capabilities available in the project.
+
+---
+
+## FEATURE 10 — Automatic Backup System
+
+Improve the backup system.
+
+I want the administrator to choose how frequently backups happen.
+
+### Backup interval setting
+
+Add an administrator setting that allows choosing:
+
+- Every 1 hour.
+- Every 2 hours.
+- Every 4 hours.
+- Every 6 hours.
+- Every 8 hours.
+- Every 12 hours.
+- Every 24 hours.
+- Custom interval in hours.
+
+The administrator should be able to change this interval whenever necessary.
+
+### Important architecture requirement
+
+The backup execution should NOT depend on the user keeping a particular application page open.
+
+Prefer a lightweight independent backup worker/service or an appropriate Windows scheduled task, depending on the current application architecture.
+
+The application settings should configure the backup interval, while the backup execution remains independent of the UI.
+
+Do not introduce unnecessary infrastructure.
+
+### Required backup behavior
+
+1. Automatically create backups according to the configured interval.
+2. Create a backup when the user logs out, as requested.
+3. Avoid creating duplicate backups during repeated logout events.
+4. Handle application shutdown safely.
+5. Preserve existing backup files.
+6. Allow selecting the backup destination.
+7. Show the last successful backup date.
+8. Show backup status.
+9. Show errors if backup fails.
+10. Allow manual backup.
+11. Allow safe restore.
+12. Verify backup integrity before considering it successful.
+
+### Data safety
+
+- Never overwrite the only available backup.
+- Never delete existing backups without an explicit retention policy.
+- Do not report success before the backup is verified.
+- Protect sensitive backup contents.
+- Handle interrupted backups.
+- Keep backup operations independent from normal POS operations.
+
+### Logout behavior
+
+Before completing logout:
+- Attempt to create a backup.
+- Verify the backup operation.
+- Complete logout safely.
+- If backup fails, show an appropriate warning and let the administrator's configured security policy determine whether logout proceeds.
+
+Do not risk losing user-entered transactions.
+
+---
+
+## FEATURE 11 — Keyboard Shortcuts F1–F12
+
+Add global keyboard shortcuts from F1 through F12.
+
+The administrator should be able to assign application pages to the function keys.
+
+Example default mapping:
+
+| Key | Suggested Page |
+|---|---|
+| F1 | POS |
+| F2 | Sales |
+| F3 | Purchases |
+| F4 | Products / Inventory |
+| F5 | Customers |
+| F6 | Suppliers |
+| F7 | Treasury |
+| F8 | Expenses |
+| F9 | Reports |
+| F10 | Dashboard |
+| F11 | Settings |
+| F12 | Users Management |
+
+These are default suggestions, not mandatory fixed assignments.
+
+### Requirements
+
+- Allow changing assignments.
+- Save assignments persistently.
+- Support different user permissions.
+- Do not allow shortcuts to open pages the current user cannot access.
+- Avoid duplicate assignments unless explicitly supported.
+- Display shortcut labels in the UI where useful.
+- Support navigation without requiring mouse interaction.
+
+### Important keyboard handling
+
+- Do not interrupt normal typing inside inputs, textareas, search fields, or editable components.
+- Avoid interfering with browser/system-reserved shortcuts.
+- Handle key combinations safely.
+- Ensure shortcuts work consistently across application pages.
+- Prevent a single key press from triggering multiple navigations.
+
+---
+
+# 3. DASHBOARD — VISUAL IMPROVEMENT
+
+Improve the existing dashboard or add a dashboard if one does not exist.
+
+Do not remove existing dashboard information.
+
+I want a professional dashboard with attractive, clean charts.
+
+### Suggested widgets
+
+- Today's sales.
+- Today's purchases.
+- Today's expenses.
+- Current treasury balance.
+- Monthly sales chart.
+- Monthly purchasing chart.
+- Expenses chart.
+- Sales vs purchases comparison.
+- Top-selling products.
+- Recent invoices.
+- Low-stock products.
+- Outstanding customer balances.
+- Outstanding supplier balances.
+
+### Design requirements
+
+- Professional visual design.
+- Clear chart labels.
+- Good spacing.
+- Consistent colors.
+- Responsive layout.
+- Smooth interactions.
+- Useful date filters.
+- Accurate calculations.
+- Real database data.
+
+Do not make the dashboard visually attractive at the expense of performance.
+
+Reuse an existing chart library if one is already installed.
+
+---
+
+# 4. DATABASE AND FINANCIAL INTEGRITY
+
+All features must integrate with the current MongoDB database.
+
+Before changing any schema:
+- Inspect existing models.
+- Reuse existing collections where appropriate.
+- Add only the fields and collections actually needed.
+- Preserve existing documents.
+- Make migrations backward-compatible.
+- Add indexes where justified.
+- Avoid duplicate records.
+- Maintain referential integrity through application-level validation and safe transaction handling.
+
+### Financial integrity is mandatory
+
+Sales, purchases, partial payments, returns, expenses, and treasury transactions must use consistent financial rules.
+
+Never calculate the treasury balance by simply summing invoice totals.
+
+Only actual financial movements affect the cash balance.
+
+Use safe MongoDB transaction handling where supported by the existing deployment. If transactions are unavailable, implement a safe alternative that prevents partial or duplicated financial operations.
+
+All financial operations must be auditable.
+
+---
+
+# 5. PERMISSIONS AND SECURITY
+
+Integrate new permissions into the existing authentication and authorization system.
 
 Examples:
 
-- Customer A: 1 device.
-- Customer B: 2 devices.
-- Customer C: 5 devices.
+- View treasury.
+- Manage treasury.
+- View expenses.
+- Manage expenses.
+- Manage suppliers.
+- Manage customers.
+- Create purchase orders.
+- Receive supply orders.
+- Manage invoices.
+- Process returns.
+- Generate reports.
+- Export reports.
+- Reset operational data.
+- Configure backups.
+- Manage keyboard shortcuts.
+- Configure barcode generation.
 
-There must be no hardcoded global device limit.
+Do not assume every employee is an administrator.
 
-The backend is responsible for enforcing the device limit.
+Validate permissions on the backend, not just by hiding UI buttons.
 
-### Hardware Fingerprint
-
-Use a combination of available hardware identifiers:
-
-- Physical disk serial number.
-- Motherboard UUID.
-- BIOS serial number.
-- Network adapter MAC address.
-- Operating system machine identifier.
-
-Important:
-
-- MAC address is not a hard drive serial number.
-- MAC address alone is insufficient.
-- Hardware identifiers may be missing or change.
-- Normalize identifiers consistently.
-- Use a versioned fingerprint algorithm.
-- Protect fingerprint information.
-- Avoid collecting unnecessary personal information.
-- Allow reasonable hardware changes to be evaluated safely.
-
-Do not claim that hardware fingerprinting is impossible to bypass.
-
-### Activation
-
-1. Application collects supported device identifiers.
-2. Generates a normalized fingerprint.
-3. Sends activation request to the trusted licensing backend.
-4. Backend validates the subscription.
-5. Backend checks whether the device is already activated.
-6. Backend checks the configured device limit.
-7. Backend activates the device if authorized.
-8. Backend issues a signed license entitlement.
-9. Electron verifies the entitlement using an embedded public key.
-
-Activation limit enforcement must be atomic.
-
-Concurrent requests must never exceed the configured limit.
-
-### Device Replacement
-
-Device replacement requires administrator approval.
-
-Customers cannot independently transfer their licenses.
-
-Workflow:
-
-1. Customer submits a replacement request.
-2. System records the existing device and requested replacement.
-3. Administrator reviews the request.
-4. Administrator approves or rejects it.
-5. If approved, the old device is safely deactivated.
-6. The new device becomes eligible for activation.
-7. The operation is recorded in the audit log.
-
-Never silently deactivate an existing device before approval.
-
-### Administration
-
-Provide an administration interface to:
-
-- Set maximum devices per license.
-- View active devices.
-- View device history.
-- View activation dates.
-- View last validation dates.
-- Approve replacement requests.
-- Reject replacement requests.
-- Revoke devices.
-- Reactivate eligible devices.
-- Change device limits.
-- Review device-related audit events.
-
-### Signed Entitlements
-
-- Private signing key must remain on trusted backend infrastructure.
-- Desktop application contains only the public verification key.
-- Entitlements must be digitally signed.
-- Desktop must verify entitlement signatures.
-- Local editable files must not be trusted as the authority for licensing.
-
-### Offline Licensing
-
-The application may operate locally, but local licensing data is not tamper-proof.
-
-The owner must approve:
-
-- Offline grace duration.
-- Validation frequency.
-- Features available during grace.
-- Behavior after grace expiration.
-
-Do not invent these values.
-
-New device activation and device replacement require online authorization.
-
-Never delete business data because of license expiration or failed license validation.
+Record important administrative actions in an audit log.
 
 ---
 
-## 8. Electron Security
+# 6. IMPLEMENTATION STRATEGY
 
-Mandatory configuration:
+Work in small, controlled phases.
 
-- contextIsolation: true
-- nodeIntegration: false
-- Restrictive Content Security Policy.
-- Secure preload.
-- Narrow typed IPC.
-- Input validation in main process.
-- Authorization in trusted services.
+Do not implement all features in one massive uncontrolled change.
 
-Do not expose:
+### Phase 0 — Existing Application Audit
 
-- Raw ipcRenderer.
-- Arbitrary IPC channel access.
-- MongoDB handles.
-- Unrestricted filesystem operations.
-- Shell access.
-- Signing private keys.
-- Payment credentials.
+- Inspect repository.
+- Inspect architecture.
+- Inspect database.
+- Inspect existing workflows.
+- Inspect existing tests.
+- Create audit and expansion plan.
+- Run existing tests before modifying anything.
+- Record the baseline.
+
+### Phase 1 — Suppliers, Customers, Purchasing
+
+- Suppliers.
+- Customers.
+- Purchase orders.
+- Supply orders.
+- Inventory integration.
+
+### Phase 2 — Invoices and Returns
+
+- Short invoice numbers.
+- Invoice barcodes.
+- ANUBIS invoice footer.
+- Partial item returns.
+- Sales and purchase invoice improvements.
+
+### Phase 3 — Treasury and Expenses
+
+- Financial treasury.
+- Incoming and outgoing movements.
+- Flexible expenses.
+- Sales/purchase/payment integration.
+
+### Phase 4 — Dashboard and Reports
+
+- Visual dashboard.
+- Charts.
+- Sales reports.
+- Purchase reports.
+- Export and printing.
+
+### Phase 5 — Printing and Barcode Settings
+
+- Multiple paper formats.
+- Print preview.
+- Optional automatic barcode generation.
+
+### Phase 6 — Backup System
+
+- Configurable interval.
+- Independent backup execution.
+- Logout backup.
+- Restore and integrity verification.
+
+### Phase 7 — Keyboard Shortcuts and Admin Reset
+
+- F1–F12 mapping.
+- Permissions.
+- Safe operational data reset.
+
+### Phase 8 — Full Regression Testing
+
+Test every new feature and every affected existing feature.
+
+Fix any regression before declaring the work complete.
 
 ---
 
-## 9. Arabic and English
+# 7. PLAYWRIGHT AND VISUAL TESTING
 
-Support:
+This requirement is mandatory.
 
-- Arabic.
-- English.
-- RTL.
-- LTR.
+Use Playwright to test the actual running application.
 
-All important screens must work correctly in both languages.
+I want to SEE the browser open and the application being tested.
 
-Do not hardcode all text directly inside components.
-
-Use a maintainable translation approach without unnecessary complexity.
-
----
-
-## 10. Development and Testing
-
-You must work in phases.
-
-Use:
-
+Do not rely exclusively on:
 - Unit tests.
-- Integration tests.
-- Playwright.
-- Suitable Electron desktop automation.
+- Static analysis.
+- TypeScript compilation.
+- API tests.
+- Screenshots without actual interaction.
 
 For each phase:
 
-1. Inspect the existing code.
-2. Implement the current approved phase only.
-3. Run automated tests.
-4. Launch the actual application.
-5. Open the application using Playwright or suitable desktop automation.
-6. Test real user workflows.
-7. Show the running application to the owner.
-8. Report actual test results.
-9. Wait for owner approval before moving to the next phase.
+1. Start the actual application.
+2. Open the browser visibly.
+3. Navigate to the relevant pages.
+4. Interact with the UI.
+5. Test forms.
+6. Test validation.
+7. Test saving and retrieving real records.
+8. Test permissions.
+9. Test important workflows.
+10. Check the browser console.
+11. Check API errors.
+12. Check database results.
+13. Run regression tests for existing features.
 
-Never claim that a test passed unless it was actually executed.
+### Important test scenarios
 
-Never fabricate screenshots.
+- Complete a sale and verify treasury movement.
+- Create a purchase order.
+- Receive part of the ordered goods.
+- Verify inventory quantities.
+- Record a purchase payment.
+- Return one product from a multi-product invoice.
+- Verify other invoice items remain unchanged.
+- Scan an invoice barcode and open the invoice.
+- Record an expense and verify the treasury movement.
+- Generate sales and purchasing reports.
+- Print invoices using different supported formats.
+- Perform a backup and restore test.
+- Verify F1–F12 navigation and permissions.
+- Test data reset using a safe test database only.
+
+Never test destructive operations against production data.
 
 ---
 
-## 11. Safe Development Rules
+# 8. PONTAIL ENGINEERING RULES
 
-- Inspect the repository before editing.
-- Preserve working features.
-- Preserve existing data.
-- Do not rewrite the project unnecessarily.
-- Do not create duplicate modules.
-- Avoid unnecessary dependencies.
-- Avoid speculative abstractions.
-- Use Ponytail to simplify code while preserving required behavior.
-- Make small reviewable changes.
-- Keep documentation updated.
+Apply Ponytail in FULL mode.
+
+- Understand the existing implementation before changing it.
+- Reuse existing code.
+- Choose the simplest solution that actually works.
+- Do not create unnecessary abstractions.
+- Do not add dependencies without a real requirement.
+- Keep code changes minimal and focused.
+- Fix root causes rather than symptoms.
+- Never simplify away validation, financial integrity, security, or data protection.
+- Add tests for important financial and destructive operations.
+- Do not rewrite working modules just to make the code look different.
+
+Ponytail must simplify the implementation, NOT remove requested features.
 
 ---
 
-## 12. Final Delivery
+# 9. PHASE COMPLETION REQUIREMENTS
 
-Maintain these files:
+A phase is complete only when:
 
-- MASTER_PROMPT.md
-- ARCHITECTURE.md
-- AGENTS.md
-- IMPLEMENTATION_ROADMAP.md
-- START_HERE.md
-- CONTINUE_STATEMENT.md
-- BIG_PICKLE_TRIGGER_PROMPT.md
-- PONYTAIL_REVIEW_PROMPT.md
-- DEVICE_LICENSING.md
+- Its requested functionality is implemented.
+- Existing related functionality still works.
+- Database compatibility is verified.
+- Permissions are implemented.
+- Tests pass.
+- Playwright visual testing is completed.
+- No critical browser errors remain.
+- No critical API errors remain.
+- No known financial inconsistencies remain.
 
-At the end of each session report:
+After every phase create a report:
 
-- Current phase.
-- Completed work.
-- Changed files.
-- Tests executed.
-- Actual test results.
-- Visual testing results.
-- Remaining issues.
-- Next task.
+`PHASE_X_COMPLETION_REPORT.md`
 
-Never mark a phase complete while required tests or owner review are outstanding.
+Include:
+- What was implemented.
+- Files added.
+- Files modified.
+- Database changes.
+- Tests performed.
+- Playwright results.
+- Known limitations.
+- Remaining tasks.
+- Confirmation that existing features were preserved.
+
+Do not claim a test passed if it was not actually executed.
+
+---
+
+# 10. FINAL ACCEPTANCE CRITERIA
+
+The final application must:
+
+1. Retain all original features.
+2. Include all 11 requested enhancements.
+3. Have an integrated financial treasury.
+4. Have supplier and customer management.
+5. Have purchase and supply order workflows.
+6. Have comprehensive sales and purchasing reports.
+7. Support partial item returns.
+8. Have invoice barcodes and ANUBIS company footers.
+9. Have a protected administrator data-reset function.
+10. Support optional barcode generation.
+11. Have flexible expense management.
+12. Support multiple printer paper formats.
+13. Have configurable independent backups and logout backups.
+14. Have configurable F1–F12 shortcuts.
+15. Have a professional visual dashboard.
+16. Preserve existing MongoDB records and compatibility.
+17. Pass regression and integration testing.
+
+**FINAL INSTRUCTION:**
+
+Start by inspecting the existing application. Do not rebuild it.
+
+Add the requested features incrementally, integrate them into existing workflows, preserve all existing functionality, and test everything before declaring completion.
+
+If you encounter an existing bug, document it and fix it only when it is directly related to the requested enhancement or blocks its safe implementation. Do not use this task as an excuse to rewrite unrelated modules.
+
+If something cannot be implemented safely without clarification, explain the exact issue and propose the safest solution instead of silently changing existing behavior.

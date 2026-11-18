@@ -20,7 +20,7 @@ import { lanUri, newJoinCode, normalizeJoinCode } from './mongoAuth'
 import { ensureSettingsSchema, getSettings, saveSettings } from './settings'
 import { exportBackup, importBackup } from './backup'
 import { changePassword, createUser, ensureAuthSchema, listAdminUsernames, migrateRoles, recoverAdminPassword, getAuthState, getCurrentSession, isSetupRequired, listAudit, listRoles, listUsers, logAudit, login, logout, requirePermission, requireSession, setAuditFallbackFile, setupFirstAdmin, updateUser, verifyAuditLog } from './auth'
-import { deleteCategory, deleteProduct, deleteSupplier, createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updateProduct } from './inventory'
+import { deleteCategory, deleteProduct, deleteSupplier, createCategory, createPO, createProduct, createSupplier, createUnit, ensureInventorySchema, listCategories, listPO, listProducts, listReceipts, listStockMovements, listSuppliers, listUnits, receiveCarton, receivePO, stockAdjust, updatePO, updateProduct, updateSupplier } from './inventory'
 import { cashIn, cashOut, checkout, closeShift, ensurePosSchema, listCashbox, listSales, listShifts, openShift, posReturn, listReturnable } from './pos'
 import { cashboxReport, inventoryReport, salesReport } from './reports'
 import { applyLicenseCode, getHardwareInfo, getLicenseState, hasValidLicense } from './license'
@@ -69,7 +69,9 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvReceiveCarton]: ['inventory.manage'],
   [IPC.InvStockAdjust]: ['inventory.manage'],
   [IPC.InvSuppliersCreate]: ['inventory.manage'],
+  [IPC.InvSuppliersUpdate]: ['inventory.manage'],
   [IPC.InvPOCreate]: ['inventory.manage'],
+  [IPC.InvPOUpdate]: ['inventory.manage'],
   [IPC.InvPOReceive]: ['inventory.manage'],
   [IPC.InvImportPreview]: ['data.transfer'],
   [IPC.InvImportConfirm]: ['data.transfer'],
@@ -90,6 +92,7 @@ const channelGuards: Partial<Record<IpcChannel, ChannelGuard>> = {
   [IPC.InvStockMovementsList]: 'authenticated',
   [IPC.InvSuppliersList]: 'authenticated',
   [IPC.InvPOList]: 'authenticated',
+  [IPC.InvPOReceiptsList]: 'authenticated',
   [IPC.PosCheckout]: ['pos.use'],
   // Sellers pick and add customers at the till; changing one is for managers.
   [IPC.CustomersList]: ['pos.use'],
@@ -394,9 +397,17 @@ function registerIpc(): void {
   handle(IPC.InvStockAdjust, async (event, input: any) => { assertTrusted(event); return stockAdjust(input) })
   handle(IPC.InvSuppliersList, async (event) => { assertTrusted(event); return listSuppliers() })
   handle(IPC.InvSuppliersCreate, async (event, input: any) => { assertTrusted(event); return createSupplier(input) })
+  handle(IPC.InvSuppliersUpdate, async (event, id: string, input: any) => { assertTrusted(event); return updateSupplier(id, input) })
   handle(IPC.InvPOList, async (event) => { assertTrusted(event); return listPO() })
-  handle(IPC.InvPOCreate, async (event, input: any) => { assertTrusted(event); return createPO(input) })
-  handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, notes?: string) => { assertTrusted(event); return receivePO(purchaseOrderId, notes) })
+  handle(IPC.InvPOReceiptsList, async (event, purchaseOrderId?: string) => { assertTrusted(event); return listReceipts(purchaseOrderId) })
+  handle(IPC.InvPOCreate, async (event, input: any) => { assertTrusted(event); return createPO(input, requireSession().username) })
+  handle(IPC.InvPOUpdate, async (event, id: string, input: any) => { assertTrusted(event); return updatePO(id, input) })
+  handle(IPC.InvPOReceive, async (event, purchaseOrderId: string, input?: any) => {
+    assertTrusted(event)
+    const actor = requireSession().username
+    const payload = typeof input === 'string' ? { notes: input, receivedBy: actor } : input && typeof input === 'object' ? { ...input, receivedBy: input.receivedBy ?? actor } : { receivedBy: actor }
+    return receivePO(purchaseOrderId, payload)
+  })
 
   // Products from Excel/CSV: check and show every row first; add only on confirmation.
   handle(IPC.InvImportPreview, async (event) => {

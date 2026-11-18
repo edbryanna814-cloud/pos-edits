@@ -61,6 +61,8 @@ export type Supplier = {
   phone?: string
   email?: string
   address?: string
+  taxInfo?: string
+  notes?: string
   active: boolean
   createdAt: string
   updatedAt: string
@@ -70,24 +72,43 @@ export type PurchaseOrderLine = {
   productId: string
   quantity: number
   unitCostCents: number
+  /** Accepted so far across supply orders (base units/line quantity). */
+  receivedQuantity?: number
 }
 
 export type PurchaseOrder = {
   _id?: string
+  /** Human-readable number for new orders; legacy orders may not have one. */
+  orderNo?: string
   supplierId: string
-  status: 'draft' | 'ordered' | 'received' | 'canceled'
+  status: 'draft' | 'pending_approval' | 'approved' | 'sent' | 'ordered' | 'partially_received' | 'received' | 'completed' | 'canceled'
   lines: PurchaseOrderLine[]
   totalCents: number
+  orderDate?: string
+  expectedDeliveryDate?: string
   notes?: string
+  createdBy?: string
   createdAt: string
   updatedAt: string
 }
 
+export type PurchaseReceiptLine = {
+  productId: string
+  /** Accepted quantity added to stock. */
+  quantity: number
+  damagedQuantity?: number
+  remainingQuantity?: number
+  unitCostCents?: number
+}
+
 export type PurchaseReceipt = {
   _id?: string
+  /** Human-readable number for new supply orders; legacy receipts may not have one. */
+  supplyNo?: string
   purchaseOrderId: string
   receivedAt: string
-  lines: PurchaseOrderLine[]
+  receivedBy?: string
+  lines: PurchaseReceiptLine[]
   notes?: string
   createdAt: string
 }

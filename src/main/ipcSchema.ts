@@ -3,7 +3,7 @@
 // so adding a channel without a schema fails typecheck.
 import { IPC, type IpcChannel } from '../shared/ipc'
 
-export type ArgSpec = 'id' | 'string' | 'optString' | 'int' | 'optInt' | 'object'
+export type ArgSpec = 'id' | 'string' | 'optString' | 'int' | 'optInt' | 'object' | 'optObject'
 
 export const LIMITS = { maxString: 10_000, maxArray: 1_000, maxKeys: 200, maxDepth: 8 } as const
 
@@ -52,9 +52,12 @@ export const IPC_ARGS: Record<IpcChannel, ArgSpec[]> = {
   [IPC.InvStockAdjust]: ['object'],
   [IPC.InvSuppliersList]: none,
   [IPC.InvSuppliersCreate]: ['object'],
+  [IPC.InvSuppliersUpdate]: ['id', 'object'],
   [IPC.InvPOList]: none,
   [IPC.InvPOCreate]: ['object'],
-  [IPC.InvPOReceive]: ['id', 'optString'],
+  [IPC.InvPOReceive]: ['id', 'optObject'],
+  [IPC.InvPOUpdate]: ['id', 'object'],
+  [IPC.InvPOReceiptsList]: ['optString'],
   [IPC.InvImportPreview]: none,
   [IPC.InvImportConfirm]: ['string'],
   [IPC.AttendanceImport]: none,
@@ -131,6 +134,8 @@ function check(spec: ArgSpec, value: unknown): void {
       return value === undefined || value === null || Number.isSafeInteger(value) ? undefined : fail()
     case 'object':
       return value !== null && typeof value === 'object' && !Array.isArray(value) ? undefined : fail()
+    case 'optObject':
+      return value === undefined || value === null || typeof value === 'string' || (typeof value === 'object' && !Array.isArray(value)) ? undefined : fail()
   }
 }
 
